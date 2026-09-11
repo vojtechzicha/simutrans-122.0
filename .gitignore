@@ -27,3 +27,12 @@
 *.patch
 *.log
 /doxygen
+
+# built helper binary for macOS GUI tests
+/tools/mac-test/click
+
+# runtime files written by the macOS test build (-singleuser -use_workdir)
+/simutrans/simutrans
+/simutrans/save/
+/simutrans/settings.xml
+/simutrans/default.sve
