@@ -15,6 +15,7 @@
 #include "../simfab.h"
 #include "../simhalt.h"
 #include "../simline.h"
+#include "../simunits.h"
 #include "../simlinemgmt.h"
 #include "../simcity.h"
 #include "../simversion.h"
@@ -33,6 +34,7 @@
 #include "koord3d.h"
 #include "schedule.h"
 #include "settings.h"
+#include "translator.h"
 
 #include "../macros.h"
 #include "../utils/simstring.h"
@@ -67,26 +69,71 @@ private:
 		need_comma = false;
 	}
 
+	/**
+	 * Length of the complete, well-formed UTF-8 sequence starting at p, or 0 if
+	 * the bytes there are not one (invalid lead byte, missing or wrong continuation).
+	 * Names in the game are cut to a fixed byte length, so a string can end in the
+	 * middle of a multibyte character; such a tail is dropped, since a JSON file
+	 * must be valid UTF-8.
+	 */
+	static size_t utf8_sequence_length( const unsigned char *p )
+	{
+		size_t len;
+		if(  *p < 0x80  ) {
+			return 1;
+		}
+		else if(  (*p & 0xE0) == 0xC0  &&  *p >= 0xC2  ) {
+			len = 2;
+		}
+		else if(  (*p & 0xF0) == 0xE0  ) {
+			len = 3;
+		}
+		else if(  (*p & 0xF8) == 0xF0  &&  *p <= 0xF4  ) {
+			len = 4;
+		}
+		else {
+			return 0;
+		}
+		for(  size_t i = 1;  i < len;  i++  ) {
+			if(  (p[i] & 0xC0) != 0x80  ) {
+				return 0;
+			}
+		}
+		return len;
+	}
+
 	void raw_string( const char *s )
 	{
 		fputc( '"', f );
 		if(  s  ) {
-			for(  const unsigned char *p = (const unsigned char *)s;  *p;  p++  ) {
+			for(  const unsigned char *p = (const unsigned char *)s;  *p;  ) {
 				switch(  *p  ) {
-					case '"':  fputs( "\\\"", f ); break;
-					case '\\': fputs( "\\\\", f ); break;
-					case '\b': fputs( "\\b", f );  break;
-					case '\f': fputs( "\\f", f );  break;
-					case '\n': fputs( "\\n", f );  break;
-					case '\r': fputs( "\\r", f );  break;
-					case '\t': fputs( "\\t", f );  break;
+					case '"':  fputs( "\\\"", f ); p++; break;
+					case '\\': fputs( "\\\\", f ); p++; break;
+					case '\b': fputs( "\\b", f );  p++; break;
+					case '\f': fputs( "\\f", f );  p++; break;
+					case '\n': fputs( "\\n", f );  p++; break;
+					case '\r': fputs( "\\r", f );  p++; break;
+					case '\t': fputs( "\\t", f );  p++; break;
 					default:
 						if(  *p < 0x20  ||  *p == 0x7F  ) {
 							fprintf( f, "\\u%04x", (unsigned)*p );
+							p++;
+						}
+						else if(  *p < 0x80  ) {
+							fputc( *p, f );
+							p++;
 						}
 						else {
-							// everything else (including UTF-8 continuation bytes) passes through
-							fputc( *p, f );
+							const size_t len = utf8_sequence_length( p );
+							if(  len == 0  ) {
+								// broken or truncated multibyte character: skip the byte
+								p++;
+							}
+							else {
+								fwrite( p, 1, len, f );
+								p += len;
+							}
 						}
 						break;
 				}
@@ -444,7 +491,12 @@ static void export_goods( json_writer_t &w )
 		w.kv_string( "name", ware->get_name() );
 		w.kv_int( "catg", ware->get_catg() );
 		w.kv_int( "catg_index", ware->get_catg_index() );
-		w.kv_string( "catg_name", ware->get_catg_name() );
+		// special freight (catg 0) has one category per good; the game shows the good's name for it
+		const char *catg_name = ware->get_catg() == 0 ? ware->get_name() : ware->get_catg_name();
+		w.kv_string( "catg_name", catg_name );
+		// names as the game shows them in its current language (the keys above stay the pak ids)
+		w.kv_string( "label", translator::translate( ware->get_name() ) );
+		w.kv_string( "catg_label", translator::translate( catg_name ) );
 		w.kv_int( "speed_bonus", ware->get_speed_bonus() );
 		w.kv_int( "weight_per_unit", ware->get_weight_per_unit() );
 		w.kv_int( "value", ware->get_value() );
@@ -879,7 +931,8 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		}
 		w.end_array();
 
-		w.kv_int( "max_speed", cnv->get_min_top_speed() );
+		// min_top_speed is in internal speed units, the dialogs show it as km/h
+		w.kv_int( "max_speed", speed_to_kmh( cnv->get_min_top_speed() ) );
 		w.kv_int( "sum_power", cnv->get_sum_power() );
 		w.kv_int( "loading_level", cnv->get_loading_level() );
 		w.kv_int( "loading_limit", cnv->get_loading_limit() );

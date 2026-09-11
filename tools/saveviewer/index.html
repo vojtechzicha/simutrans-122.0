@@ -137,6 +137,7 @@ h2:first-child { margin-top: 0; }
   padding: 3px 7px; min-width: 0;
 }
 .toolbar input[type=text] { width: 230px; }
+.toolbar select { max-width: 320px; }
 .toolbar input[type=text]:focus, .toolbar select:focus { outline: 2px solid var(--accent-bg); border-color: var(--accent); }
 .toolbar .count { color: var(--text-dim); margin-left: auto; font-variant-numeric: tabular-nums; }
 
@@ -156,6 +157,9 @@ table.grid tbody tr:hover { background: var(--row-hover); }
 table.grid tbody tr.clickable { cursor: pointer; }
 table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.grid td.wide { white-space: normal; max-width: 420px; }
+/* long names (stops carry line lists in this pakset) get cut with an ellipsis; the full text is in the title */
+table.grid td.clip { max-width: 440px; overflow: hidden; text-overflow: ellipsis; }
+.cols table.grid td.clip { max-width: 280px; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .dim { color: var(--text-dim); }
@@ -370,12 +374,12 @@ function convoyLink(id) {
 }
 function goodsName(index) {
   var g = IDX.goods[index];
-  return g ? str(g.name, "Goods " + index) : "Goods " + index;
+  return g ? str(g.label, str(g.name, "Goods " + index)) : "Goods " + index;
 }
 function catgName(index) {
   var found = null;
   arr(D.goods).forEach(function (g) { if (found === null && num(g.catg_index, -1) === index) found = g; });
-  return found ? str(found.catg_name, str(found.name, "Category " + index)) : "Category " + index;
+  return found ? str(found.catg_label, str(found.catg_name, str(found.name, "Category " + index))) : "Category " + index;
 }
 
 /* ---------------------------------------------------------------- loading */
@@ -526,7 +530,10 @@ function renderTable(host, cols, rows, opt) {
       h += "<tr" + (href ? ' class="clickable" data-href="' + esc(href) + '"' : "") + ">";
       for (var j = 0; j < cols.length; j++) {
         var c = cols[j];
-        h += "<td" + (c.num ? ' class="num"' : (c.wide ? ' class="wide"' : "")) + ">" +
+        var cls = c.num ? "num" : (c.wide ? "wide" : (c.clip ? "clip" : ""));
+        var title = c.clip && c.value ? c.value(row) : "";
+        h += "<td" + (cls ? ' class="' + cls + '"' : "") +
+             (title ? ' title="' + esc(String(title)) + '"' : "") + ">" +
              (c.html ? c.html(row) : esc(c.value ? c.value(row) : "")) + "</td>";
       }
       h += "</tr>";
@@ -796,7 +803,7 @@ function viewLines(host) {
     countLabel(rows.length, all.length, "lines")
   ]);
   renderTable(host, [
-    { key: "name", label: "Name", value: function (l) { return str(l.name); },
+    { key: "name", label: "Name", clip: true, value: function (l) { return str(l.name); },
       html: function (l) { return '<a href="#line/' + l.id + '">' + esc(str(l.name, "Line " + l.id)) + "</a>"; } },
     { key: "owner", label: "Owner", value: function (l) { return playerName(l.owner_id); },
       html: function (l) { return esc(playerName(l.owner_id)); } },
@@ -856,7 +863,7 @@ function scheduleList(host, sched) {
 function convoyMiniTable(host, ids) {
   var list = arr(ids).map(function (id) { return IDX.convoy[id]; }).filter(Boolean);
   renderTable(host, [
-    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+    { key: "name", label: "Name", clip: true, value: function (c) { return str(c.name); },
       html: function (c) { return convoyLink(c.id); } },
     { key: "state", label: "State", value: function (c) { return str(c.state); },
       html: function (c) { return stateBadge(c.state); } },
@@ -943,7 +950,7 @@ function viewStops(host) {
     countLabel(rows.length, all.length, "stops")
   ]);
   renderTable(host, [
-    { key: "name", label: "Name", value: function (s) { return str(s.name); },
+    { key: "name", label: "Name", clip: true, value: function (s) { return str(s.name); },
       html: function (s) { return '<a href="#stop/' + s.id + '">' + esc(str(s.name, "Stop " + s.id)) + "</a>"; } },
     { key: "owner", label: "Owner", value: function (s) { return playerName(s.owner_id); },
       html: function (s) { return esc(playerName(s.owner_id)); } },
@@ -1016,7 +1023,7 @@ function viewStopDetail(host, id) {
   heading(left, "Lines serving this stop");
   var lines = arr(s.line_ids).map(function (id) { return IDX.line[id]; }).filter(Boolean);
   renderTable(left, [
-    { key: "name", label: "Name", value: function (l) { return str(l.name); },
+    { key: "name", label: "Name", clip: true, value: function (l) { return str(l.name); },
       html: function (l) { return lineLink(l.id); } },
     { key: "type", label: "Type", html: function (l) { return typeBadge(l.type); } },
     { key: "state", label: "State", html: function (l) { return stateBadge(l.state); } },
@@ -1040,7 +1047,7 @@ function viewStopDetail(host, id) {
     });
     var list = Object.keys(byHalt).map(function (k) { return byHalt[k]; });
     renderTable(right, [
-      { key: "halt", label: "Stop", value: function (c) { return str((IDX.stop[c.halt_id] || {}).name); },
+      { key: "halt", label: "Stop", clip: true, value: function (c) { return str((IDX.stop[c.halt_id] || {}).name); },
         html: function (c) { return stopLink(c.halt_id); } },
       { key: "catg", label: "Goods categories", sortable: false,
         html: function (c) {
@@ -1084,11 +1091,11 @@ function viewConvoys(host) {
     countLabel(rows.length, all.length, "convoys")
   ]);
   renderTable(host, [
-    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+    { key: "name", label: "Name", clip: true, value: function (c) { return str(c.name); },
       html: function (c) { return '<a href="#convoy/' + c.id + '">' + esc(str(c.name, "Convoy " + c.id)) + "</a>"; } },
     { key: "owner", label: "Owner", value: function (c) { return playerName(c.owner_id); },
       html: function (c) { return esc(playerName(c.owner_id)); } },
-    { key: "line", label: "Line",
+    { key: "line", label: "Line", clip: true,
       value: function (c) { return (IDX.line[c.line_id] ? str(IDX.line[c.line_id].name) : ""); },
       html: function (c) {
         return (c.line_id === null || c.line_id === undefined)
@@ -1173,7 +1180,7 @@ function viewCities(host) {
     countLabel(rows.length, all.length, "cities")
   ]);
   renderTable(host, [
-    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+    { key: "name", label: "Name", clip: true, value: function (c) { return str(c.name); },
       html: function (c) { return esc(str(c.name, "unnamed")); } },
     { key: "pop", label: "Population", num: true, value: function (c) { return num(c.population); },
       html: function (c) { return fmtInt(c.population); } },
@@ -1223,10 +1230,12 @@ function viewGoods(host) {
   renderTable(host, [
     { key: "index", label: "Index", num: true, value: function (g) { return num(g.index); },
       html: function (g) { return fmtInt(g.index); } },
-    { key: "name", label: "Name", value: function (g) { return str(g.name); },
-      html: function (g) { return esc(str(g.name, "unnamed")); } },
-    { key: "catg", label: "Category", value: function (g) { return str(g.catg_name); },
-      html: function (g) { return esc(str(g.catg_name, String(num(g.catg_index)))); } },
+    { key: "name", label: "Name", value: function (g) { return str(g.label, str(g.name)); },
+      html: function (g) { return esc(str(g.label, str(g.name, "unnamed"))); } },
+    { key: "key", label: "Pak name", value: function (g) { return str(g.name); },
+      html: function (g) { return '<span class="dim">' + esc(str(g.name)) + "</span>"; } },
+    { key: "catg", label: "Category", value: function (g) { return str(g.catg_label, str(g.catg_name)); },
+      html: function (g) { return esc(str(g.catg_label, str(g.catg_name, String(num(g.catg_index))))); } },
     { key: "value", label: "Value", num: true, value: function (g) { return num(g.value); },
       html: function (g) { return fmtInt(g.value); } },
     { key: "bonus", label: "Speed bonus", num: true, value: function (g) { return num(g.speed_bonus); },
