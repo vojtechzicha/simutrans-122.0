@@ -65,6 +65,7 @@
 #include "network/network.h" // must be before any "windows.h" is included via bzlib2.h ...
 #include "dataobj/loadsave.h"
 #include "dataobj/environment.h"
+#include "dataobj/savegame_export.h"
 #include "dataobj/tabfile.h"
 #include "dataobj/settings.h"
 #include "dataobj/translator.h"
@@ -453,6 +454,7 @@ int simu_main(int argc, char** argv)
 			" -use_hw             hardware double buffering, only for SDL\n"
 			" -debug NUM          enables debugging (1..5)\n"
 			" -easyserver         set up every for server (query own IP, port forwarding)\n"
+			" -export FILE        dumps the loaded game as JSON to FILE and quits (needs -load)\n"
 			" -freeplay           play with endless money\n"
 			" -fullscreen         starts simutrans in fullscreen mode\n"
 			" -fps COUNT          framerate (from 5 to 100)\n"
@@ -500,6 +502,9 @@ int simu_main(int argc, char** argv)
 		);
 		return 0;
 	}
+
+	// batch mode: dump the loaded game as JSON and quit, no user is there to answer dialogues
+	const char *export_filename = gimme_arg(argc, argv, "-export", 1);
 
 #ifdef __BEOS__
 	if (1) // since BeOS only supports relative paths ...
@@ -1109,11 +1114,17 @@ int simu_main(int argc, char** argv)
 	pakset_info_t::debug();
 
 	if(  !overlaid_warning.empty()  ) {
-		overlaid_warning.append( "<p>Continue by ESC, SPACE, or BACKSPACE.<br>" );
-		help_frame_t *win = new help_frame_t();
-		win->set_text( overlaid_warning.c_str() );
-		modal_dialogue( win, magic_pakset_info_t, NULL, wait_for_key );
-		destroy_all_win(true);
+		if(  export_filename  ) {
+			// nobody can press a key in batch mode
+			dbg->warning( "simmain()", "pakset contains doubled objects, continuing anyway (-export)" );
+		}
+		else {
+			overlaid_warning.append( "<p>Continue by ESC, SPACE, or BACKSPACE.<br>" );
+			help_frame_t *win = new help_frame_t();
+			win->set_text( overlaid_warning.c_str() );
+			modal_dialogue( win, magic_pakset_info_t, NULL, wait_for_key );
+			destroy_all_win(true);
+		}
 	}
 
 	// load tool scripts
@@ -1375,6 +1386,18 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 		intr_set(welt, view);
 		win_set_world(welt);
 		tool_t::toolbar_tool[0]->init(welt->get_active_player());
+	}
+
+	// dump the loaded game as JSON and quit right away
+	if(  export_filename  ) {
+		if(  new_world  ) {
+			dbg->error( "simmain()", "-export needs a loadable game, use -load NAME" );
+		}
+		else {
+			const char *save_name = gimme_arg(argc, argv, "-load", 1);
+			savegame_export_t::write_json( welt, save_name ? save_name : loadgame.c_str(), export_filename );
+		}
+		env_t::quit_simutrans = true;
 	}
 
 	welt->set_fast_forward(false);
