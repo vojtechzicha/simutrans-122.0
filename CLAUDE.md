@@ -107,3 +107,37 @@ keys stable: the exporter and the viewer are the two halves of one format.
   `simutrans/pak*`, `simutrans/save/` or the copied binary; they are ignored already.
 - Never push tags or branches from `upstream` to `origin`; the fork's history is meant to stay small.
 - One feature per commit with a `ADD:`/`FIX:`/`CHG:`/`CODE:` prefix, matching upstream style.
+
+## Open task: run the export on the real save (Windows)
+
+Status 2026-09-11: `-export` and the viewer are done and verified on a pak64 save (macOS), but the
+owner's real saves could only be loaded on Windows (see the pakset note above). What is left:
+produce `czr.json` from `CZR.sve` there, open it in the viewer, and fix whatever breaks (a loader
+crash in export mode, an unfilled field, viewer speed with a real-size file).
+
+Build on Windows with MSYS2, MINGW64 shell, from the repo root (the upstream nightly recipe):
+
+```
+pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-freetype mingw-w64-x86_64-zstd \
+  mingw-w64-x86_64-libpng mingw-w64-x86_64-brotli mingw-w64-x86_64-bzip2 mingw-w64-x86_64-zlib \
+  mingw-w64-x86_64-pkg-config
+printf 'BACKEND = gdi\nOSTYPE = mingw\nDEBUG = 0\nOPTIMISE = 1\nMULTI_THREAD = 1\nUSE_FREETYPE = 1\nUSE_ZSTD = 1\nWITH_REVISION = 0\n' > config.default
+make -j8
+```
+
+Without `STATIC = 1` the exe needs the MinGW DLLs, so run it from the MSYS2 shell (or add
+`/mingw64/bin` to PATH). With `STATIC = 1` freetype needs the brotli static workaround the old
+`.github/build64-SDL2.sh` did (`git show 846457d54^:.github/build64-SDL2.sh`). Visual Studio
+(`Simutrans.sln`, GDI Release) also works but you must supply the .lib files it links against.
+
+Run the export from the Steam game folder so the pakset and the add-ons are found; the user dir
+(`Documents\Simutrans`, saves and add-ons) is picked up automatically:
+
+```
+cd /d/SteamLibrary/steamapps/common/Simutrans
+/path/to/repo/build/default/sim.exe -use_workdir -objects pak128.cs -load CZR \
+  -export /c/Users/<user>/Documents/Simutrans/czr.json -nosound -nomidi
+```
+
+Do not overwrite the Steam `simutrans.exe`. Loading takes minutes (175 MB save); watch for the
+export message in the log, then drop `czr.json` on `tools/saveviewer/index.html`.
