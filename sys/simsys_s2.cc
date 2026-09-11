@@ -274,7 +274,7 @@ int dr_os_open(int width, int height, int const fullscreen)
 	width = (w*x_scale)/32l;
 
 	Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP: SDL_WINDOW_RESIZABLE;
-	flags |= SDL_WINDOW_ALLOW_HIGHDPI; // apparently needed for Apple retina displays
+	// flags |= SDL_WINDOW_ALLOW_HIGHDPI; // disabled: with sdl2-compat/SDL3 on macOS mouse coordinates arrive in pixels, not points, so clicks miss
 	window = SDL_CreateWindow( SIM_TITLE, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, flags );
 	if(  window == NULL  ) {
 		fprintf( stderr, "Couldn't open the window: %s\n", SDL_GetError() );
