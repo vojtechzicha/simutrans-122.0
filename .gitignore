@@ -36,3 +36,6 @@
 /simutrans/save/
 /simutrans/settings.xml
 /simutrans/default.sve
+
+# dependency file windres writes into the repo root on the MinGW build
+/simres.d

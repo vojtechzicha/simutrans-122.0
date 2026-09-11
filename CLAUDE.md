@@ -125,36 +125,40 @@ Status 2026-09-12: built and checked on macOS (clock, old saves load, export). N
 hand: editing the minute input in the schedule dialog and a save/reload with a minute value set.
 Next step: fixed-grid departures (leave at :00, :12, :24 ... instead of N minutes after arrival).
 
-## Open task: run the export on the real save (Windows)
+## Windows build and export (verified 2026-09-11)
 
-Status 2026-09-11: `-export` and the viewer are done and verified on a pak64 save (macOS), but the
-owner's real saves could only be loaded on Windows (see the pakset note above). What is left:
-produce `czr.json` from `CZR.sve` there, open it in the viewer, and fix whatever breaks (a loader
-crash in export mode, an unfilled field, viewer speed with a real-size file).
+The export was run on the owner's real save (`CZR.sve`, 175 MB, pak128.cs plus add-ons) with the
+MinGW build below; loading plus export takes about a minute and writes a 65 MB `czr.json`.
 
-Build on Windows with MSYS2, MINGW64 shell, from the repo root (the upstream nightly recipe):
+MSYS2 is installed at `C:\msys64` (via `winget install MSYS2.MSYS2`). Build from the repo root in
+the MINGW64 shell (from Git Bash: `MSYSTEM=MINGW64 /c/msys64/usr/bin/bash.exe -lc 'cd <repo> && make -j20'`;
+the login shell ignores the caller's cwd, so always `cd` inside the command):
 
 ```
 pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-freetype mingw-w64-x86_64-zstd \
   mingw-w64-x86_64-libpng mingw-w64-x86_64-brotli mingw-w64-x86_64-bzip2 mingw-w64-x86_64-zlib \
   mingw-w64-x86_64-pkg-config
-printf 'BACKEND = gdi\nOSTYPE = mingw\nDEBUG = 0\nOPTIMISE = 1\nMULTI_THREAD = 1\nUSE_FREETYPE = 1\nUSE_ZSTD = 1\nWITH_REVISION = 0\n' > config.default
-make -j8
+printf 'BACKEND = gdi\nOSTYPE = mingw\nDEBUG = 0\nOPTIMISE = 1\nMULTI_THREAD = 1\nUSE_FREETYPE = 1\nUSE_ZSTD = 1\nWITH_REVISION = 0\nFREETYPE_CONFIG = pkg-config freetype2\n' > config.default
+make -j20
 ```
 
-Without `STATIC = 1` the exe needs the MinGW DLLs, so run it from the MSYS2 shell (or add
-`/mingw64/bin` to PATH). With `STATIC = 1` freetype needs the brotli static workaround the old
-`.github/build64-SDL2.sh` did (`git show 846457d54^:.github/build64-SDL2.sh`). Visual Studio
-(`Simutrans.sln`, GDI Release) also works but you must supply the .lib files it links against.
+`FREETYPE_CONFIG` is required: without it the Makefile never adds the freetype include path and
+`display/font.cc` fails on `ft2build.h`. Without `STATIC = 1` the exe needs the MinGW DLLs, so run
+it from the MSYS2 shell (or with `/mingw64/bin` on PATH). Visual Studio (`Simutrans.sln`, GDI
+Release) also works but you must supply the .lib files it links against.
 
-Run the export from the Steam game folder so the pakset and the add-ons are found; the user dir
-(`Documents\Simutrans`, saves and add-ons) is picked up automatically:
+Run the export from the Steam game folder so the pakset and the add-ons are found. The user dir is
+the redirected Documents folder (`D:\OneDrive\Documents\Simutrans`, saves and add-ons) and is
+picked up automatically; `-log` writes `simu.log` there:
 
 ```
 cd /d/SteamLibrary/steamapps/common/Simutrans
-/path/to/repo/build/default/sim.exe -use_workdir -objects pak128.cs -load CZR \
-  -export /c/Users/<user>/Documents/Simutrans/czr.json -nosound -nomidi
+/c/Users/vojte/Developer/simutrans-122.0/build/default/sim.exe -use_workdir -objects pak128.cs \
+  -load CZR -export /d/OneDrive/Documents/Simutrans/czr.json -nosound -nomidi -log
 ```
 
-Do not overwrite the Steam `simutrans.exe`. Loading takes minutes (175 MB save); watch for the
-export message in the log, then drop `czr.json` on `tools/saveviewer/index.html`.
+Do not overwrite the Steam `simutrans.exe`. The pakset reports "doubled objects" and missing
+producers for some goods; both are tolerated in export mode. To test the viewer with the real file,
+serve `tools/saveviewer/` and the JSON over http (see `tools/saveviewer/README.md`); Playwright for
+Python is installed and drives the installed Chrome (`channel="chrome"`), which is how the views
+were checked.
