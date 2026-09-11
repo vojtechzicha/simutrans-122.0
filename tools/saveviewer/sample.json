@@ -1,0 +1,11915 @@
+{
+ "format": 1,
+ "meta": {
+  "save_file": "CZR.sve",
+  "game_version": "0.122.0",
+  "pakset": "pak128.cs",
+  "exported_at": "2026-09-11T18:00:00Z",
+  "map": {
+   "width": 512,
+   "height": 512
+  },
+  "date": {
+   "year": 2031,
+   "month": 5,
+   "ticks": 123456
+  },
+  "player_count": 2
+ },
+ "settings": {
+  "starting_year": 1930,
+  "starting_month": 0,
+  "bits_per_month": 20,
+  "use_timeline": 2,
+  "freeplay": false,
+  "starting_money": 15000000,
+  "pay_for_total_distance": 0,
+  "factory_worker_percentage": 33,
+  "passenger_factor": 16,
+  "max_route_steps": 1000000,
+  "max_transfers": 7,
+  "max_hops": 2000,
+  "traffic_level": 5,
+  "separate_halt_capacities": false,
+  "avoid_overcrowding": false,
+  "no_routing_over_overcrowding": false,
+  "station_coverage": 2,
+  "allow_buying_obsolete_vehicles": 1,
+  "just_in_time": 1,
+  "industry_increase_every": 0,
+  "minimum_city_distance": 16,
+  "groundwater": -2,
+  "way_toll_runningcost_percentage": 0,
+  "way_toll_waycost_percentage": 0,
+  "way_toll_revenue_percentage": 0,
+  "maintenance_building": 5000,
+  "cst_multiply_dock": -50000,
+  "cst_multiply_station": -60000,
+  "cst_multiply_roadstop": -40000,
+  "cst_multiply_airterminal": -300000,
+  "cst_multiply_post": -30000,
+  "cst_multiply_headquarter": -100000,
+  "cst_depot_rail": -100000,
+  "cst_depot_road": -130000,
+  "cst_buy_land": -10000,
+  "cst_alter_land": -100000,
+  "cst_set_slope": -250000,
+  "cst_found_city": -5000000,
+  "numbered_stations": true,
+  "language": "cs",
+  "pak_name": "pak128.cs",
+  "allow_player_change": true,
+  "city_isolation_factor": 1,
+  "crossconnect_factories": false,
+  "electric_promille": 330,
+  "show_pax": true,
+  "beginner_mode": false,
+  "advance_speedbonus_year": 0
+ },
+ "goods": [
+  {
+   "index": 0,
+   "name": "Cestující",
+   "catg_index": 0,
+   "catg_name": "Passagiere",
+   "speed_bonus": 18,
+   "weight_per_unit": 0,
+   "value": 32
+  },
+  {
+   "index": 1,
+   "name": "Pošta",
+   "catg_index": 1,
+   "catg_name": "Post",
+   "speed_bonus": 12,
+   "weight_per_unit": 5,
+   "value": 42
+  },
+  {
+   "index": 2,
+   "name": "Uhlí",
+   "catg_index": 2,
+   "catg_name": "Bulk",
+   "speed_bonus": 0,
+   "weight_per_unit": 1000,
+   "value": 12
+  },
+  {
+   "index": 3,
+   "name": "Ocel",
+   "catg_index": 3,
+   "catg_name": "Piece goods",
+   "speed_bonus": 5,
+   "weight_per_unit": 1000,
+   "value": 28
+  },
+  {
+   "index": 4,
+   "name": "Dřevo",
+   "catg_index": 2,
+   "catg_name": "Bulk",
+   "speed_bonus": 0,
+   "weight_per_unit": 800,
+   "value": 14
+  },
+  {
+   "index": 5,
+   "name": "Ropa",
+   "catg_index": 4,
+   "catg_name": "Liquid",
+   "speed_bonus": 0,
+   "weight_per_unit": 1000,
+   "value": 30
+  }
+ ],
+ "players": [
+  {
+   "id": 0,
+   "name": "České dráhy",
+   "is_human": true,
+   "ai_type": null,
+   "active": true,
+   "color1": 3,
+   "color2": 7,
+   "cash": 1324916.28,
+   "net_wealth": 11388635.77,
+   "headquarters": {
+    "x": 120,
+    "y": 158
+   },
+   "finance": {
+    "revenue_this_month": 166994.03,
+    "profit_this_month": 195268.87,
+    "revenue_last_year": 4169939.12,
+    "profit_last_year": 613216.92
+   },
+   "convoy_count": 32,
+   "line_count": 12,
+   "halt_count": 30
+  },
+  {
+   "id": 1,
+   "name": "Dopravní podnik Města",
+   "is_human": false,
+   "ai_type": "goods_ai",
+   "active": true,
+   "color1": 12,
+   "color2": 2,
+   "cash": 531839.71,
+   "net_wealth": 3185087.3,
+   "headquarters": null,
+   "finance": {
+    "revenue_this_month": 65787.61,
+    "profit_this_month": 35246.47,
+    "revenue_last_year": 888101.54,
+    "profit_last_year": 264424.96
+   },
+   "convoy_count": 4,
+   "line_count": 2,
+   "halt_count": 6
+  }
+ ],
+ "lines": [
+  {
+   "id": 10,
+   "name": "R1 Praha - Kolín",
+   "owner_id": 0,
+   "type": "rail",
+   "state": "ok",
+   "goods_categories": [
+    1
+   ],
+   "convoy_ids": [
+    1
+   ],
+   "schedule": {
+    "current_stop": 2,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 304,
+       "y": 279,
+       "z": 0
+      },
+      "halt_id": 16,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 153,
+       "z": 0
+      },
+      "halt_id": 2,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 313,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 12,
+      "minimum_loading": 0,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 298,
+       "y": 271,
+       "z": 0
+      },
+      "halt_id": 14,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 50,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 94,
+       "y": 130,
+       "z": 0
+      },
+      "halt_id": 9,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 93,
+       "y": 155,
+       "z": 0
+      },
+      "halt_id": 3,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     5850,
+     8258,
+     1644,
+     2569,
+     2792,
+     3173,
+     5028,
+     7043,
+     3458,
+     5043,
+     1146,
+     6893
+    ],
+    "transported": [
+     6793,
+     50,
+     3643,
+     4242,
+     7570,
+     194,
+     2678,
+     2457,
+     5876,
+     2477,
+     1729,
+     544
+    ],
+    "revenue": [
+     121581.73,
+     136596.04,
+     121269.94,
+     130872.67,
+     65210.63,
+     164707.92,
+     104226.96,
+     136516.49,
+     171372.28,
+     120218.22,
+     163249.57,
+     153123.32
+    ],
+    "operations": [
+     64929.62,
+     45221.82,
+     47011.99,
+     64049.1,
+     46976.08,
+     15457.59,
+     35138.57,
+     38130.3,
+     13911.34,
+     62597.66,
+     98843.6,
+     95654.41
+    ],
+    "profit": [
+     4862.77,
+     98046.72,
+     88370.24,
+     41791.01,
+     1642.88,
+     34209.24,
+     2990.17,
+     26899.56,
+     28137.68,
+     46309.0,
+     100593.98,
+     117701.46
+    ],
+    "convoys": [
+     6,
+     2,
+     3,
+     3,
+     1,
+     0,
+     5,
+     4,
+     6,
+     0,
+     3,
+     2
+    ],
+    "distance": [
+     13515,
+     221,
+     11734,
+     746,
+     4865,
+     29156,
+     17867,
+     23363,
+     26441,
+     10001,
+     23243,
+     13060
+    ],
+    "maxspeed": [
+     111,
+     76,
+     155,
+     131,
+     150,
+     190,
+     125,
+     130,
+     174,
+     56,
+     82,
+     139
+    ]
+   }
+  },
+  {
+   "id": 13,
+   "name": "R2 Praha - Plzeň",
+   "owner_id": 0,
+   "type": "rail",
+   "state": "ok",
+   "goods_categories": [
+    1
+   ],
+   "convoy_ids": [
+    2,
+    3
+   ],
+   "schedule": {
+    "current_stop": 4,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 78,
+       "y": 222,
+       "z": 0
+      },
+      "halt_id": 18,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 73,
+       "y": 218,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 47,
+       "y": 226,
+       "z": 0
+      },
+      "halt_id": 23,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 51,
+       "y": 229,
+       "z": 0
+      },
+      "halt_id": 21,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 36,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 24,
+      "minimum_loading": 20,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 156,
+       "z": 0
+      },
+      "halt_id": 6,
+      "minimum_loading": 20,
+      "waiting_time": 8
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     5373,
+     8331,
+     2590,
+     5756,
+     7951,
+     5182,
+     6996,
+     7597,
+     1371,
+     7631,
+     4558,
+     647
+    ],
+    "transported": [
+     3447,
+     4081,
+     166,
+     7136,
+     4933,
+     7188,
+     1564,
+     319,
+     3158,
+     5972,
+     6188,
+     868
+    ],
+    "revenue": [
+     48179.49,
+     90782.41,
+     87956.02,
+     175631.68,
+     114766.83,
+     117250.69,
+     57863.6,
+     155208.72,
+     12729.18,
+     67083.31,
+     162688.85,
+     125594.28
+    ],
+    "operations": [
+     33776.84,
+     97732.25,
+     23219.56,
+     17470.19,
+     31832.77,
+     62176.69,
+     90469.73,
+     107171.34,
+     60255.2,
+     28354.1,
+     112520.18,
+     25407.48
+    ],
+    "profit": [
+     102624.04,
+     10700.71,
+     44272.57,
+     86620.0,
+     79156.04,
+     49214.03,
+     -26231.85,
+     67222.92,
+     51265.86,
+     26792.08,
+     45027.74,
+     80552.44
+    ],
+    "convoys": [
+     3,
+     3,
+     6,
+     6,
+     3,
+     1,
+     4,
+     5,
+     0,
+     0,
+     2,
+     1
+    ],
+    "distance": [
+     21344,
+     3920,
+     17080,
+     13930,
+     6660,
+     5050,
+     21119,
+     2365,
+     9567,
+     8716,
+     26130,
+     26985
+    ],
+    "maxspeed": [
+     137,
+     109,
+     160,
+     181,
+     126,
+     137,
+     170,
+     191,
+     186,
+     56,
+     128,
+     165
+    ]
+   }
+  },
+  {
+   "id": 16,
+   "name": "Ex 3 Praha - Ostrava",
+   "owner_id": 0,
+   "type": "rail",
+   "state": "obsolete",
+   "goods_categories": [
+    2
+   ],
+   "convoy_ids": [
+    4,
+    5
+   ],
+   "schedule": {
+    "current_stop": 6,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 95,
+       "y": 137,
+       "z": 0
+      },
+      "halt_id": 5,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 156,
+       "z": 0
+      },
+      "halt_id": 6,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 122,
+       "y": 135,
+       "z": 0
+      },
+      "halt_id": 8,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 127,
+       "y": 131,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 397,
+       "y": 94,
+       "z": 0
+      },
+      "halt_id": 26,
+      "minimum_loading": 20,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 411,
+       "y": 85,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     1167,
+     886,
+     3621,
+     4631,
+     7478,
+     7530,
+     3408,
+     3161,
+     2485,
+     4330,
+     3560,
+     2813
+    ],
+    "transported": [
+     2415,
+     5281,
+     5412,
+     5197,
+     2882,
+     7225,
+     4596,
+     1,
+     3283,
+     5594,
+     7842,
+     3498
+    ],
+    "revenue": [
+     74380.75,
+     82037.84,
+     87921.7,
+     169676.76,
+     114404.45,
+     149252.07,
+     76213.21,
+     13060.81,
+     93723.43,
+     53724.12,
+     135497.95,
+     5651.85
+    ],
+    "operations": [
+     105086.74,
+     108070.64,
+     67747.8,
+     87087.16,
+     19264.37,
+     76257.36,
+     3548.42,
+     17942.43,
+     76537.04,
+     17416.93,
+     97647.42,
+     71703.88
+    ],
+    "profit": [
+     8062.54,
+     74288.82,
+     57681.31,
+     53930.53,
+     69725.02,
+     117988.67,
+     -5939.05,
+     41321.91,
+     87162.6,
+     -38997.71,
+     -33036.8,
+     59248.39
+    ],
+    "convoys": [
+     4,
+     6,
+     1,
+     0,
+     4,
+     4,
+     5,
+     6,
+     0,
+     5,
+     2,
+     3
+    ],
+    "distance": [
+     5267,
+     28622,
+     795,
+     29307,
+     15730,
+     12387,
+     15026,
+     11676,
+     18746,
+     15610,
+     8810,
+     14465
+    ],
+    "maxspeed": [
+     138,
+     199,
+     190,
+     191,
+     42,
+     59,
+     157,
+     49,
+     49,
+     137,
+     104,
+     149
+    ]
+   }
+  },
+  {
+   "id": 19,
+   "name": "Nákladní uhlí Ostrava",
+   "owner_id": 0,
+   "type": "rail",
+   "state": "ok",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    6,
+    7
+   ],
+   "schedule": {
+    "current_stop": 2,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 386,
+       "y": 126,
+       "z": 0
+      },
+      "halt_id": 28,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 376,
+       "y": 136,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 397,
+       "y": 94,
+       "z": 0
+      },
+      "halt_id": 26,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 426,
+       "y": 115,
+       "z": 0
+      },
+      "halt_id": 27,
+      "minimum_loading": 50,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 117,
+       "z": 0
+      },
+      "halt_id": 29,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 399,
+       "y": 126,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 120,
+       "z": 0
+      },
+      "halt_id": 30,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 390,
+       "y": 143,
+       "z": 0
+      },
+      "halt_id": 25,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     2053,
+     2890,
+     6524,
+     3341,
+     5319,
+     3432,
+     4643,
+     1401,
+     3905,
+     1718,
+     8785,
+     7321
+    ],
+    "transported": [
+     3244,
+     3623,
+     1726,
+     6869,
+     5184,
+     4957,
+     5498,
+     2377,
+     3911,
+     2286,
+     1272,
+     4578
+    ],
+    "revenue": [
+     29443.46,
+     44492.63,
+     77717.16,
+     173851.69,
+     125045.09,
+     47521.56,
+     45654.53,
+     74393.8,
+     1466.96,
+     115792.87,
+     114504.07,
+     9823.58
+    ],
+    "operations": [
+     112759.92,
+     27474.37,
+     27391.27,
+     8294.65,
+     111282.67,
+     50213.91,
+     27041.16,
+     25415.79,
+     79199.72,
+     26510.95,
+     51410.21,
+     109886.17
+    ],
+    "profit": [
+     76772.58,
+     -9843.09,
+     5096.37,
+     29.12,
+     51219.19,
+     -15285.83,
+     -26608.42,
+     19120.54,
+     109631.78,
+     -32925.39,
+     1814.4,
+     -35184.77
+    ],
+    "convoys": [
+     2,
+     4,
+     6,
+     3,
+     3,
+     3,
+     6,
+     4,
+     3,
+     4,
+     2,
+     3
+    ],
+    "distance": [
+     267,
+     4689,
+     2832,
+     26750,
+     5479,
+     16307,
+     3503,
+     1882,
+     4209,
+     27950,
+     25724,
+     9257
+    ],
+    "maxspeed": [
+     93,
+     107,
+     134,
+     171,
+     178,
+     146,
+     75,
+     101,
+     110,
+     184,
+     73,
+     174
+    ]
+   }
+  },
+  {
+   "id": 22,
+   "name": "Os 9 Brno okruh",
+   "owner_id": 0,
+   "type": "rail",
+   "state": "nothing_moved",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    8
+   ],
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 276,
+       "y": 292,
+       "z": 0
+      },
+      "halt_id": 13,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 298,
+       "y": 271,
+       "z": 0
+      },
+      "halt_id": 14,
+      "minimum_loading": 50,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 313,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 12,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 284,
+       "y": 265,
+       "z": 0
+      },
+      "halt_id": 17,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 304,
+       "y": 279,
+       "z": 0
+      },
+      "halt_id": 16,
+      "minimum_loading": 50,
+      "waiting_time": 16
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     6066,
+     2768,
+     449,
+     8950,
+     7773,
+     395,
+     6192,
+     1653,
+     2208,
+     1808,
+     2416,
+     945
+    ],
+    "transported": [
+     7082,
+     7737,
+     288,
+     2645,
+     6085,
+     1551,
+     1786,
+     158,
+     4005,
+     1855,
+     5274,
+     2336
+    ],
+    "revenue": [
+     114356.71,
+     137431.49,
+     21281.83,
+     102186.56,
+     91716.8,
+     80111.66,
+     157357.81,
+     2627.26,
+     139165.61,
+     71724.23,
+     76015.22,
+     91585.22
+    ],
+    "operations": [
+     30878.87,
+     49862.14,
+     73228.7,
+     99094.07,
+     88924.66,
+     50259.29,
+     58810.83,
+     72962.23,
+     45546.02,
+     19550.52,
+     108028.86,
+     99229.0
+    ],
+    "profit": [
+     49724.96,
+     75616.03,
+     -18922.79,
+     43289.36,
+     47285.42,
+     19350.42,
+     79413.26,
+     -15452.18,
+     19502.53,
+     55825.06,
+     100552.84,
+     96874.63
+    ],
+    "convoys": [
+     3,
+     2,
+     2,
+     0,
+     4,
+     3,
+     4,
+     3,
+     1,
+     0,
+     1,
+     0
+    ],
+    "distance": [
+     18332,
+     4441,
+     1806,
+     27014,
+     268,
+     1689,
+     6460,
+     10245,
+     16049,
+     27820,
+     19384,
+     12716
+    ],
+    "maxspeed": [
+     102,
+     144,
+     102,
+     135,
+     93,
+     157,
+     149,
+     193,
+     188,
+     113,
+     123,
+     149
+    ]
+   }
+  },
+  {
+   "id": 25,
+   "name": "Autobus 101",
+   "owner_id": 0,
+   "type": "road",
+   "state": "loss",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    9,
+    10,
+    11
+   ],
+   "schedule": {
+    "current_stop": 1,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 114,
+       "y": 175,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 93,
+       "y": 155,
+       "z": 0
+      },
+      "halt_id": 3,
+      "minimum_loading": 20,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 122,
+       "y": 135,
+       "z": 0
+      },
+      "halt_id": 8,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     4709,
+     2685,
+     2338,
+     8501,
+     3998,
+     4512,
+     8577,
+     1786,
+     1203,
+     7540,
+     891,
+     1200
+    ],
+    "transported": [
+     1125,
+     2753,
+     7732,
+     3414,
+     7194,
+     4004,
+     3413,
+     4912,
+     7038,
+     1981,
+     333,
+     5541
+    ],
+    "revenue": [
+     15519.87,
+     157489.42,
+     7371.73,
+     46576.96,
+     23744.95,
+     178062.02,
+     75538.7,
+     109777.0,
+     149216.11,
+     173119.37,
+     72355.98,
+     126489.16
+    ],
+    "operations": [
+     14312.51,
+     88648.47,
+     14423.19,
+     117756.7,
+     117214.26,
+     19323.89,
+     107530.33,
+     6156.5,
+     2894.31,
+     42487.58,
+     19811.04,
+     97632.26
+    ],
+    "profit": [
+     -1975.25,
+     -4200.42,
+     116370.78,
+     15024.83,
+     64749.12,
+     -6202.8,
+     115221.96,
+     -7234.66,
+     35323.46,
+     78985.03,
+     102195.0,
+     97637.94
+    ],
+    "convoys": [
+     2,
+     1,
+     2,
+     5,
+     3,
+     1,
+     3,
+     2,
+     1,
+     1,
+     1,
+     5
+    ],
+    "distance": [
+     18791,
+     27419,
+     1555,
+     24052,
+     10510,
+     26601,
+     10346,
+     15165,
+     23332,
+     2534,
+     25245,
+     1013
+    ],
+    "maxspeed": [
+     163,
+     163,
+     130,
+     76,
+     166,
+     185,
+     64,
+     70,
+     135,
+     141,
+     181,
+     153
+    ]
+   }
+  },
+  {
+   "id": 28,
+   "name": "Autobus 205 Plzeň",
+   "owner_id": 1,
+   "type": "road",
+   "state": "obsolete",
+   "goods_categories": [
+    1
+   ],
+   "convoy_ids": [
+    12,
+    13
+   ],
+   "schedule": {
+    "current_stop": 5,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 51,
+       "y": 229,
+       "z": 0
+      },
+      "halt_id": 21,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 78,
+       "y": 222,
+       "z": 0
+      },
+      "halt_id": 18,
+      "minimum_loading": 0,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 56,
+       "y": 232,
+       "z": 0
+      },
+      "halt_id": 20,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 50,
+       "y": 232,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 36,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 24,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 47,
+       "y": 226,
+       "z": 0
+      },
+      "halt_id": 23,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 51,
+       "y": 214,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     6557,
+     2510,
+     872,
+     327,
+     844,
+     5493,
+     7809,
+     2669,
+     3909,
+     5209,
+     6893,
+     1461
+    ],
+    "transported": [
+     4956,
+     5487,
+     6690,
+     6454,
+     4351,
+     2251,
+     4677,
+     7081,
+     742,
+     3647,
+     416,
+     6980
+    ],
+    "revenue": [
+     18790.89,
+     131989.54,
+     144949.69,
+     21464.33,
+     19672.83,
+     153318.53,
+     40873.06,
+     35203.05,
+     90578.12,
+     19900.17,
+     143301.59,
+     77911.26
+    ],
+    "operations": [
+     85839.35,
+     41411.51,
+     83547.02,
+     31809.31,
+     95348.75,
+     61140.17,
+     79251.57,
+     6263.06,
+     15423.24,
+     104305.72,
+     103385.51,
+     111573.91
+    ],
+    "profit": [
+     -15034.21,
+     30015.8,
+     -9391.96,
+     47029.09,
+     -28029.36,
+     -12483.47,
+     9011.65,
+     69808.39,
+     94898.17,
+     83409.38,
+     -17909.35,
+     111771.27
+    ],
+    "convoys": [
+     6,
+     1,
+     0,
+     4,
+     1,
+     5,
+     4,
+     5,
+     2,
+     2,
+     6,
+     1
+    ],
+    "distance": [
+     14539,
+     13876,
+     2933,
+     11265,
+     4848,
+     9713,
+     3609,
+     17192,
+     5496,
+     22379,
+     8694,
+     8524
+    ],
+    "maxspeed": [
+     140,
+     144,
+     162,
+     127,
+     44,
+     72,
+     110,
+     79,
+     154,
+     127,
+     59,
+     114
+    ]
+   }
+  },
+  {
+   "id": 31,
+   "name": "Kamiony s ocelí",
+   "owner_id": 1,
+   "type": "road",
+   "state": "nothing_moved",
+   "goods_categories": [
+    1,
+    2
+   ],
+   "convoy_ids": [
+    14,
+    15
+   ],
+   "schedule": {
+    "current_stop": 4,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 314,
+       "y": 287,
+       "z": 0
+      },
+      "halt_id": 11,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 120,
+       "z": 0
+      },
+      "halt_id": 30,
+      "minimum_loading": 50,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 386,
+       "y": 126,
+       "z": 0
+      },
+      "halt_id": 28,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 390,
+       "y": 139,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 390,
+       "y": 143,
+       "z": 0
+      },
+      "halt_id": 25,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 302,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 15,
+      "minimum_loading": 50,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 117,
+       "z": 0
+      },
+      "halt_id": 29,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     3541,
+     4685,
+     595,
+     3242,
+     8664,
+     817,
+     4755,
+     2985,
+     3613,
+     1559,
+     8880,
+     3751
+    ],
+    "transported": [
+     6688,
+     4564,
+     3850,
+     4487,
+     987,
+     316,
+     7331,
+     902,
+     7858,
+     1110,
+     5770,
+     3815
+    ],
+    "revenue": [
+     149865.81,
+     168867.16,
+     150693.27,
+     131870.7,
+     9456.7,
+     135426.38,
+     89207.95,
+     66836.74,
+     27158.56,
+     29934.07,
+     114859.66,
+     59106.35
+    ],
+    "operations": [
+     16211.0,
+     39886.37,
+     20326.02,
+     87493.0,
+     91518.49,
+     91255.71,
+     73556.17,
+     25330.04,
+     119839.19,
+     99785.78,
+     83222.62,
+     55399.97
+    ],
+    "profit": [
+     10900.62,
+     72572.57,
+     12464.78,
+     16812.68,
+     80106.29,
+     69796.51,
+     20862.16,
+     80749.81,
+     108097.79,
+     13887.94,
+     -26963.12,
+     320.91
+    ],
+    "convoys": [
+     3,
+     4,
+     1,
+     4,
+     0,
+     6,
+     5,
+     3,
+     4,
+     1,
+     2,
+     3
+    ],
+    "distance": [
+     24394,
+     12434,
+     23528,
+     12121,
+     590,
+     3006,
+     3976,
+     8668,
+     21462,
+     8934,
+     6357,
+     26545
+    ],
+    "maxspeed": [
+     142,
+     158,
+     61,
+     109,
+     195,
+     192,
+     155,
+     114,
+     61,
+     75,
+     102,
+     92
+    ]
+   }
+  },
+  {
+   "id": 34,
+   "name": "Tramvaj 22",
+   "owner_id": 0,
+   "type": "tram",
+   "state": "ok",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    16,
+    17,
+    18,
+    19
+   ],
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 139,
+       "y": 180,
+       "z": 0
+      },
+      "halt_id": 7,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 153,
+       "z": 0
+      },
+      "halt_id": 2,
+      "minimum_loading": 100,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 117,
+       "y": 161,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 94,
+       "y": 130,
+       "z": 0
+      },
+      "halt_id": 9,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 95,
+       "y": 137,
+       "z": 0
+      },
+      "halt_id": 5,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 81,
+       "y": 127,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 115,
+       "y": 162,
+       "z": 0
+      },
+      "halt_id": 4,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 141,
+       "y": 160,
+       "z": 0
+      },
+      "halt_id": 10,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 50,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 122,
+       "y": 135,
+       "z": 0
+      },
+      "halt_id": 8,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     289,
+     4282,
+     319,
+     4455,
+     4647,
+     273,
+     6868,
+     7210,
+     6483,
+     6105,
+     3243,
+     6224
+    ],
+    "transported": [
+     639,
+     2488,
+     7364,
+     4033,
+     6104,
+     128,
+     7710,
+     238,
+     6085,
+     3018,
+     7671,
+     7386
+    ],
+    "revenue": [
+     48161.9,
+     6189.23,
+     10275.52,
+     162699.66,
+     169235.07,
+     165433.55,
+     45446.5,
+     118266.14,
+     163210.08,
+     108933.37,
+     120139.86,
+     57223.8
+    ],
+    "operations": [
+     64363.35,
+     70896.29,
+     82671.75,
+     19508.32,
+     96876.76,
+     111648.95,
+     70762.42,
+     30888.15,
+     113015.71,
+     96466.28,
+     112042.06,
+     94012.88
+    ],
+    "profit": [
+     94330.82,
+     -34611.74,
+     50861.29,
+     102168.67,
+     29397.96,
+     45283.38,
+     48966.12,
+     68445.64,
+     -7705.55,
+     23205.33,
+     45902.06,
+     62517.12
+    ],
+    "convoys": [
+     2,
+     2,
+     1,
+     5,
+     6,
+     5,
+     2,
+     4,
+     5,
+     6,
+     6,
+     2
+    ],
+    "distance": [
+     12225,
+     27014,
+     22028,
+     1815,
+     22114,
+     29733,
+     3372,
+     27660,
+     3476,
+     23651,
+     352,
+     26267
+    ],
+    "maxspeed": [
+     154,
+     129,
+     131,
+     104,
+     180,
+     83,
+     46,
+     45,
+     132,
+     104,
+     152,
+     71
+    ]
+   }
+  },
+  {
+   "id": 37,
+   "name": "Tramvaj 4 Brno",
+   "owner_id": 0,
+   "type": "tram",
+   "state": "ok",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    20
+   ],
+   "schedule": {
+    "current_stop": 3,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 314,
+       "y": 287,
+       "z": 0
+      },
+      "halt_id": 11,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 302,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 15,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 276,
+       "y": 292,
+       "z": 0
+      },
+      "halt_id": 13,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 304,
+       "y": 279,
+       "z": 0
+      },
+      "halt_id": 16,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 298,
+       "y": 271,
+       "z": 0
+      },
+      "halt_id": 14,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 313,
+       "y": 252,
+       "z": 0
+      },
+      "halt_id": 12,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 284,
+       "y": 265,
+       "z": 0
+      },
+      "halt_id": 17,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     1418,
+     8494,
+     5208,
+     4443,
+     3471,
+     2829,
+     721,
+     6761,
+     7935,
+     4229,
+     1603,
+     3192
+    ],
+    "transported": [
+     7688,
+     991,
+     4565,
+     4525,
+     4102,
+     7507,
+     6305,
+     1253,
+     3366,
+     7783,
+     7047,
+     5732
+    ],
+    "revenue": [
+     124799.34,
+     125691.83,
+     149863.9,
+     93231.14,
+     167398.09,
+     10841.13,
+     175222.26,
+     93901.85,
+     138493.75,
+     121141.58,
+     126652.71,
+     38899.61
+    ],
+    "operations": [
+     15782.38,
+     36083.89,
+     115563.36,
+     20415.86,
+     41092.58,
+     48603.27,
+     37632.51,
+     86375.26,
+     100077.31,
+     43732.87,
+     95662.62,
+     118627.24
+    ],
+    "profit": [
+     59345.02,
+     72816.77,
+     30669.65,
+     67894.8,
+     4927.18,
+     -28510.83,
+     -21515.71,
+     -32387.51,
+     90703.28,
+     45481.01,
+     90545.56,
+     11533.82
+    ],
+    "convoys": [
+     5,
+     1,
+     2,
+     6,
+     3,
+     3,
+     5,
+     3,
+     4,
+     0,
+     5,
+     3
+    ],
+    "distance": [
+     23677,
+     26599,
+     22520,
+     16309,
+     22700,
+     10723,
+     27945,
+     14091,
+     12681,
+     28548,
+     6940,
+     17166
+    ],
+    "maxspeed": [
+     165,
+     64,
+     142,
+     176,
+     165,
+     167,
+     133,
+     65,
+     106,
+     96,
+     105,
+     95
+    ]
+   }
+  },
+  {
+   "id": 40,
+   "name": "Lodní linka Vltava",
+   "owner_id": 0,
+   "type": "ship",
+   "state": "ok",
+   "goods_categories": [
+    0,
+    1
+   ],
+   "convoy_ids": [
+    21,
+    22
+   ],
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 166,
+       "y": 375,
+       "z": 0
+      },
+      "halt_id": 33,
+      "minimum_loading": 20,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 162,
+       "y": 364,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 188,
+       "y": 398,
+       "z": 0
+      },
+      "halt_id": 36,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 115,
+       "y": 162,
+       "z": 0
+      },
+      "halt_id": 4,
+      "minimum_loading": 0,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 141,
+       "y": 160,
+       "z": 0
+      },
+      "halt_id": 10,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     1576,
+     1492,
+     6163,
+     5091,
+     3656,
+     2832,
+     8748,
+     5562,
+     7078,
+     3861,
+     1787,
+     1743
+    ],
+    "transported": [
+     1999,
+     1459,
+     7347,
+     7414,
+     4278,
+     1723,
+     4667,
+     5522,
+     55,
+     1523,
+     73,
+     4863
+    ],
+    "revenue": [
+     11134.33,
+     48582.94,
+     135852.54,
+     82278.98,
+     9785.39,
+     101137.57,
+     78963.35,
+     2301.31,
+     162596.08,
+     52087.25,
+     87059.11,
+     111042.65
+    ],
+    "operations": [
+     48785.09,
+     46475.09,
+     28817.42,
+     46273.29,
+     38823.33,
+     102786.99,
+     41394.6,
+     100073.43,
+     76912.48,
+     36932.14,
+     86187.91,
+     68468.01
+    ],
+    "profit": [
+     8163.43,
+     101856.61,
+     7418.18,
+     -13030.76,
+     19474.59,
+     83633.01,
+     46257.1,
+     90405.63,
+     114266.69,
+     -1375.66,
+     -34989.09,
+     67655.6
+    ],
+    "convoys": [
+     5,
+     6,
+     4,
+     6,
+     4,
+     3,
+     3,
+     0,
+     6,
+     3,
+     3,
+     3
+    ],
+    "distance": [
+     15753,
+     20833,
+     5427,
+     1633,
+     16911,
+     7636,
+     20072,
+     5105,
+     21263,
+     10829,
+     3959,
+     25482
+    ],
+    "maxspeed": [
+     113,
+     165,
+     42,
+     149,
+     180,
+     196,
+     149,
+     193,
+     109,
+     173,
+     85,
+     74
+    ]
+   }
+  },
+  {
+   "id": 43,
+   "name": "Letecká linka PRG-OSR",
+   "owner_id": 0,
+   "type": "air",
+   "state": "loss",
+   "goods_categories": [
+    2
+   ],
+   "convoy_ids": [
+    23,
+    24
+   ],
+   "schedule": {
+    "current_stop": 6,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 123,
+       "y": 153,
+       "z": 0
+      },
+      "halt_id": 2,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 117,
+       "z": 0
+      },
+      "halt_id": 29,
+      "minimum_loading": 50,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 420,
+       "y": 107,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 95,
+       "y": 137,
+       "z": 0
+      },
+      "halt_id": 5,
+      "minimum_loading": 0,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 94,
+       "y": 130,
+       "z": 0
+      },
+      "halt_id": 9,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 97,
+       "y": 119,
+       "z": 0
+      },
+      "halt_id": null,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 386,
+       "y": 126,
+       "z": 0
+      },
+      "halt_id": 28,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     2096,
+     8626,
+     1310,
+     5885,
+     275,
+     8152,
+     2513,
+     7460,
+     8331,
+     1586,
+     1074,
+     5513
+    ],
+    "transported": [
+     6699,
+     7543,
+     7923,
+     7856,
+     1775,
+     6213,
+     5568,
+     554,
+     338,
+     3558,
+     7113,
+     1010
+    ],
+    "revenue": [
+     76256.75,
+     24378.1,
+     107972.84,
+     126375.22,
+     13615.58,
+     98774.53,
+     109769.04,
+     64794.21,
+     18104.39,
+     76642.5,
+     2988.29,
+     102172.96
+    ],
+    "operations": [
+     23343.86,
+     37823.7,
+     84180.89,
+     60459.68,
+     48743.06,
+     60530.35,
+     11294.41,
+     73678.54,
+     25619.67,
+     61141.24,
+     21406.58,
+     110106.8
+    ],
+    "profit": [
+     92634.49,
+     93855.53,
+     -1278.49,
+     100395.69,
+     95384.77,
+     83670.44,
+     47093.1,
+     -25317.29,
+     54199.65,
+     63790.17,
+     10448.85,
+     -34198.78
+    ],
+    "convoys": [
+     6,
+     2,
+     0,
+     6,
+     4,
+     6,
+     4,
+     0,
+     4,
+     4,
+     4,
+     2
+    ],
+    "distance": [
+     9334,
+     21366,
+     375,
+     3264,
+     10685,
+     5208,
+     5895,
+     13809,
+     6742,
+     24894,
+     27566,
+     2400
+    ],
+    "maxspeed": [
+     189,
+     175,
+     146,
+     49,
+     68,
+     41,
+     153,
+     62,
+     171,
+     124,
+     169,
+     41
+    ]
+   }
+  },
+  {
+   "id": 46,
+   "name": "Monorail Jižní Město",
+   "owner_id": 0,
+   "type": "monorail",
+   "state": "overcrowded",
+   "goods_categories": [
+    0
+   ],
+   "convoy_ids": [
+    25,
+    26,
+    27,
+    28
+   ],
+   "schedule": {
+    "current_stop": 4,
+    "bidirectional": true,
+    "mirrored": true,
+    "entries": [
+     {
+      "pos": {
+       "x": 123,
+       "y": 153,
+       "z": 0
+      },
+      "halt_id": 2,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 156,
+       "z": 0
+      },
+      "halt_id": 6,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 122,
+       "y": 135,
+       "z": 0
+      },
+      "halt_id": 8,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 95,
+       "y": 137,
+       "z": 0
+      },
+      "halt_id": 5,
+      "minimum_loading": 50,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 141,
+       "y": 160,
+       "z": 0
+      },
+      "halt_id": 10,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 93,
+       "y": 155,
+       "z": 0
+      },
+      "halt_id": 3,
+      "minimum_loading": 100,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 110,
+       "y": 182,
+       "z": 0
+      },
+      "halt_id": 1,
+      "minimum_loading": 0,
+      "waiting_time": 16
+     },
+     {
+      "pos": {
+       "x": 94,
+       "y": 130,
+       "z": 0
+      },
+      "halt_id": 9,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     2360,
+     4243,
+     1256,
+     933,
+     7343,
+     5610,
+     8204,
+     7299,
+     6025,
+     391,
+     3682,
+     2706
+    ],
+    "transported": [
+     4822,
+     3189,
+     309,
+     5724,
+     5965,
+     2208,
+     3512,
+     67,
+     4508,
+     2897,
+     2872,
+     3251
+    ],
+    "revenue": [
+     29010.03,
+     77655.13,
+     119267.94,
+     179873.92,
+     20414.96,
+     33133.61,
+     8794.03,
+     163068.92,
+     120223.49,
+     69396.95,
+     119414.61,
+     149079.27
+    ],
+    "operations": [
+     92425.88,
+     5405.82,
+     53566.03,
+     85481.87,
+     94587.57,
+     101718.03,
+     84332.42,
+     16245.61,
+     27928.14,
+     70273.83,
+     48384.75,
+     94162.27
+    ],
+    "profit": [
+     101414.18,
+     27489.58,
+     24895.83,
+     98507.45,
+     26496.41,
+     77990.18,
+     63166.22,
+     -31725.33,
+     13140.51,
+     -19306.87,
+     20669.7,
+     100990.47
+    ],
+    "convoys": [
+     6,
+     6,
+     0,
+     3,
+     5,
+     2,
+     4,
+     1,
+     2,
+     1,
+     3,
+     6
+    ],
+    "distance": [
+     28953,
+     6699,
+     27084,
+     4824,
+     10077,
+     20306,
+     29464,
+     18847,
+     13032,
+     25004,
+     9000,
+     17480
+    ],
+    "maxspeed": [
+     43,
+     96,
+     155,
+     170,
+     176,
+     93,
+     144,
+     114,
+     109,
+     109,
+     151,
+     59
+    ]
+   }
+  },
+  {
+   "id": 49,
+   "name": "Úzkokolejka Jindřichův Hradec",
+   "owner_id": 0,
+   "type": "narrowgauge",
+   "state": "loss",
+   "goods_categories": [
+    1,
+    3
+   ],
+   "convoy_ids": [
+    29,
+    30,
+    31,
+    32
+   ],
+   "schedule": {
+    "current_stop": 1,
+    "bidirectional": false,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 162,
+       "y": 394,
+       "z": 0
+      },
+      "halt_id": 34,
+      "minimum_loading": 50,
+      "waiting_time": 8
+     },
+     {
+      "pos": {
+       "x": 156,
+       "y": 393,
+       "z": 0
+      },
+      "halt_id": 35,
+      "minimum_loading": 0,
+      "waiting_time": 4
+     },
+     {
+      "pos": {
+       "x": 173,
+       "y": 382,
+       "z": 0
+      },
+      "halt_id": 31,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 166,
+       "y": 375,
+       "z": 0
+      },
+      "halt_id": 33,
+      "minimum_loading": 20,
+      "waiting_time": 0
+     }
+    ]
+   },
+   "stats": {
+    "capacity": [
+     1146,
+     1024,
+     5217,
+     5226,
+     6077,
+     5280,
+     2513,
+     3375,
+     6926,
+     1333,
+     8000,
+     7440
+    ],
+    "transported": [
+     3679,
+     6829,
+     2199,
+     2784,
+     960,
+     7430,
+     3853,
+     7429,
+     6561,
+     5678,
+     4691,
+     6345
+    ],
+    "revenue": [
+     148348.06,
+     121301.91,
+     32028.3,
+     69320.92,
+     2000.08,
+     112475.81,
+     113128.14,
+     12957.32,
+     92492.9,
+     836.54,
+     98093.47,
+     155960.44
+    ],
+    "operations": [
+     69686.97,
+     113066.89,
+     116281.34,
+     23250.69,
+     105564.04,
+     16819.39,
+     41854.86,
+     31226.37,
+     46547.5,
+     82462.63,
+     44417.87,
+     8618.21
+    ],
+    "profit": [
+     -7046.21,
+     -25841.05,
+     1246.64,
+     -27196.12,
+     -13928.66,
+     17596.32,
+     83983.05,
+     -34410.33,
+     30737.0,
+     58647.55,
+     111210.18,
+     -28321.34
+    ],
+    "convoys": [
+     6,
+     2,
+     4,
+     1,
+     3,
+     1,
+     6,
+     3,
+     6,
+     5,
+     4,
+     4
+    ],
+    "distance": [
+     27494,
+     15528,
+     25411,
+     16990,
+     25052,
+     8395,
+     26519,
+     18068,
+     12219,
+     5572,
+     17521,
+     28571
+    ],
+    "maxspeed": [
+     128,
+     78,
+     73,
+     137,
+     133,
+     95,
+     114,
+     193,
+     64,
+     121,
+     167,
+     99
+    ]
+   }
+  }
+ ],
+ "stops": [
+  {
+   "id": 1,
+   "name": "Praha hl.n.",
+   "owner_id": 0,
+   "pos": {
+    "x": 110,
+    "y": 182,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 110,
+     "y": 182,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1234,
+    "unhappy": 209,
+    "no_route": 53
+   },
+   "line_ids": [
+    10,
+    13,
+    16,
+    25,
+    34,
+    46
+   ],
+   "convoy_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    9,
+    10,
+    11,
+    16,
+    17,
+    18,
+    19,
+    25,
+    26,
+    27,
+    28
+   ],
+   "connections": [
+    {
+     "halt_id": 14,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 24,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 6,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 26,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 3,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 10,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 8,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     197,
+     654,
+     2296,
+     146,
+     1628,
+     2917,
+     804,
+     360,
+     2882,
+     2870,
+     2831,
+     1047
+    ],
+    "departed": [
+     2941,
+     1075,
+     901,
+     1018,
+     3093,
+     3168,
+     1354,
+     500,
+     2507,
+     1654,
+     398,
+     1250
+    ],
+    "waiting": [
+     174,
+     17,
+     77,
+     99,
+     222,
+     339,
+     383,
+     214,
+     93,
+     268,
+     689,
+     464
+    ],
+    "happy": [
+     918,
+     2090,
+     1760,
+     1960,
+     1933,
+     737,
+     2117,
+     275,
+     1717,
+     1147,
+     481,
+     1327
+    ],
+    "unhappy": [
+     259,
+     205,
+     173,
+     4,
+     175,
+     170,
+     26,
+     187,
+     225,
+     191,
+     294,
+     300
+    ],
+    "no_route": [
+     34,
+     11,
+     5,
+     35,
+     40,
+     15,
+     80,
+     15,
+     70,
+     28,
+     15,
+     41
+    ],
+    "convoys_arrived": [
+     95,
+     61,
+     118,
+     92,
+     154,
+     112,
+     73,
+     148,
+     142,
+     118,
+     126,
+     48
+    ]
+   }
+  },
+  {
+   "id": 2,
+   "name": "Praha hlavní nádraží",
+   "owner_id": 0,
+   "pos": {
+    "x": 123,
+    "y": 153,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 123,
+     "y": 153,
+     "z": 0
+    },
+    {
+     "x": 123,
+     "y": 154,
+     "z": 0
+    },
+    {
+     "x": 124,
+     "y": 153,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road",
+    "truck"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 80,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 166
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 15
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 87
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 166,
+    "goods": 102
+   },
+   "pax": {
+    "happy": 766,
+    "unhappy": 257,
+    "no_route": 17
+   },
+   "line_ids": [
+    10,
+    34,
+    43,
+    46
+   ],
+   "convoy_ids": [
+    1,
+    16,
+    17,
+    18,
+    19,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    35
+   ],
+   "connections": [
+    {
+     "halt_id": 16,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 12,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 7,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 29,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 6,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2776,
+     2859,
+     2653,
+     1704,
+     2097,
+     3158,
+     3053,
+     1385,
+     2268,
+     2313,
+     926,
+     268
+    ],
+    "departed": [
+     2132,
+     616,
+     1468,
+     3110,
+     2546,
+     1932,
+     353,
+     1957,
+     3002,
+     1227,
+     642,
+     3011
+    ],
+    "waiting": [
+     20,
+     636,
+     767,
+     273,
+     852,
+     55,
+     78,
+     889,
+     751,
+     446,
+     792,
+     891
+    ],
+    "happy": [
+     1998,
+     1123,
+     1548,
+     1360,
+     389,
+     1721,
+     1852,
+     1181,
+     23,
+     1833,
+     2268,
+     2393
+    ],
+    "unhappy": [
+     97,
+     114,
+     279,
+     65,
+     34,
+     246,
+     134,
+     242,
+     278,
+     106,
+     0,
+     282
+    ],
+    "no_route": [
+     3,
+     59,
+     35,
+     56,
+     88,
+     0,
+     85,
+     66,
+     64,
+     83,
+     25,
+     29
+    ],
+    "convoys_arrived": [
+     127,
+     48,
+     124,
+     66,
+     103,
+     140,
+     10,
+     59,
+     61,
+     84,
+     125,
+     41
+    ]
+   }
+  },
+  {
+   "id": 3,
+   "name": "Praha západní nádraží",
+   "owner_id": 1,
+   "pos": {
+    "x": 93,
+    "y": 155,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 93,
+     "y": 155,
+     "z": 0
+    },
+    {
+     "x": 94,
+     "y": 155,
+     "z": 0
+    },
+    {
+     "x": 95,
+     "y": 155,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 40,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 191
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 191,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1386,
+    "unhappy": 172,
+    "no_route": 68
+   },
+   "line_ids": [
+    10,
+    25,
+    46
+   ],
+   "convoy_ids": [
+    1,
+    9,
+    10,
+    11,
+    25,
+    26,
+    27,
+    28,
+    33
+   ],
+   "connections": [
+    {
+     "halt_id": 9,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 8,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 10,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1624,
+     2637,
+     2196,
+     945,
+     1466,
+     120,
+     2681,
+     3127,
+     1648,
+     3124,
+     3006,
+     2395
+    ],
+    "departed": [
+     2715,
+     2909,
+     2667,
+     1876,
+     76,
+     1055,
+     430,
+     512,
+     1034,
+     2701,
+     1248,
+     1385
+    ],
+    "waiting": [
+     478,
+     396,
+     173,
+     65,
+     545,
+     176,
+     810,
+     718,
+     29,
+     132,
+     779,
+     290
+    ],
+    "happy": [
+     272,
+     1818,
+     1107,
+     316,
+     2398,
+     319,
+     1292,
+     1838,
+     1715,
+     1124,
+     951,
+     1931
+    ],
+    "unhappy": [
+     286,
+     198,
+     136,
+     105,
+     268,
+     115,
+     202,
+     142,
+     264,
+     139,
+     74,
+     268
+    ],
+    "no_route": [
+     11,
+     8,
+     53,
+     50,
+     47,
+     18,
+     13,
+     33,
+     68,
+     0,
+     89,
+     3
+    ],
+    "convoys_arrived": [
+     119,
+     133,
+     115,
+     47,
+     23,
+     131,
+     127,
+     133,
+     45,
+     58,
+     125,
+     154
+    ]
+   }
+  },
+  {
+   "id": 4,
+   "name": "Praha Jižní Město",
+   "owner_id": 0,
+   "pos": {
+    "x": 115,
+    "y": 162,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 115,
+     "y": 162,
+     "z": 0
+    },
+    {
+     "x": 115,
+     "y": 163,
+     "z": 0
+    },
+    {
+     "x": 116,
+     "y": 162,
+     "z": 0
+    },
+    {
+     "x": 116,
+     "y": 163,
+     "z": 0
+    },
+    {
+     "x": 117,
+     "y": 162,
+     "z": 0
+    },
+    {
+     "x": 117,
+     "y": 163,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 160,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 201
+    },
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 239
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 225
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 107
+    }
+   ],
+   "waiting_total": {
+    "passengers": 201,
+    "mail": 239,
+    "goods": 332
+   },
+   "pax": {
+    "happy": 707,
+    "unhappy": 136,
+    "no_route": 87
+   },
+   "line_ids": [
+    34,
+    40
+   ],
+   "convoy_ids": [
+    16,
+    17,
+    18,
+    19,
+    21,
+    22
+   ],
+   "connections": [
+    {
+     "halt_id": 5,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 10,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 36,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 36,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 10,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1977,
+     438,
+     1751,
+     856,
+     1522,
+     114,
+     3163,
+     2828,
+     164,
+     3096,
+     1177,
+     1293
+    ],
+    "departed": [
+     263,
+     3110,
+     1942,
+     1716,
+     834,
+     3068,
+     1516,
+     631,
+     2050,
+     2389,
+     72,
+     349
+    ],
+    "waiting": [
+     261,
+     356,
+     481,
+     421,
+     249,
+     550,
+     688,
+     319,
+     49,
+     306,
+     715,
+     484
+    ],
+    "happy": [
+     2342,
+     1556,
+     1576,
+     2307,
+     2131,
+     1448,
+     449,
+     2105,
+     1746,
+     2330,
+     2223,
+     803
+    ],
+    "unhappy": [
+     135,
+     37,
+     148,
+     288,
+     12,
+     84,
+     37,
+     56,
+     101,
+     296,
+     227,
+     165
+    ],
+    "no_route": [
+     42,
+     67,
+     9,
+     33,
+     43,
+     20,
+     38,
+     37,
+     53,
+     4,
+     34,
+     34
+    ],
+    "convoys_arrived": [
+     83,
+     125,
+     124,
+     81,
+     43,
+     49,
+     100,
+     118,
+     150,
+     126,
+     63,
+     70
+    ]
+   }
+  },
+  {
+   "id": 5,
+   "name": "Praha Holešovice",
+   "owner_id": 0,
+   "pos": {
+    "x": 95,
+    "y": 137,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 95,
+     "y": 137,
+     "z": 0
+    },
+    {
+     "x": 95,
+     "y": 138,
+     "z": 0
+    },
+    {
+     "x": 96,
+     "y": 137,
+     "z": 0
+    },
+    {
+     "x": 96,
+     "y": 138,
+     "z": 0
+    },
+    {
+     "x": 97,
+     "y": 137,
+     "z": 0
+    },
+    {
+     "x": 97,
+     "y": 138,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 80,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 197
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 100
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 241
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 120
+    }
+   ],
+   "waiting_total": {
+    "passengers": 197,
+    "mail": 0,
+    "goods": 461
+   },
+   "pax": {
+    "happy": 971,
+    "unhappy": 167,
+    "no_route": 35
+   },
+   "line_ids": [
+    16,
+    34,
+    43,
+    46
+   ],
+   "convoy_ids": [
+    4,
+    5,
+    16,
+    17,
+    18,
+    19,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28
+   ],
+   "connections": [
+    {
+     "halt_id": 6,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 4,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 29,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 8,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 10,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     3185,
+     3022,
+     2041,
+     234,
+     2702,
+     599,
+     2131,
+     2615,
+     840,
+     2127,
+     1269,
+     2220
+    ],
+    "departed": [
+     2548,
+     1345,
+     3131,
+     2025,
+     705,
+     1702,
+     138,
+     2920,
+     175,
+     383,
+     896,
+     1985
+    ],
+    "waiting": [
+     552,
+     12,
+     790,
+     543,
+     191,
+     652,
+     428,
+     834,
+     166,
+     335,
+     93,
+     256
+    ],
+    "happy": [
+     629,
+     610,
+     923,
+     1890,
+     693,
+     1982,
+     2097,
+     1283,
+     879,
+     2165,
+     564,
+     633
+    ],
+    "unhappy": [
+     108,
+     224,
+     26,
+     173,
+     165,
+     112,
+     157,
+     216,
+     300,
+     120,
+     133,
+     132
+    ],
+    "no_route": [
+     20,
+     78,
+     3,
+     35,
+     47,
+     43,
+     73,
+     81,
+     73,
+     46,
+     67,
+     50
+    ],
+    "convoys_arrived": [
+     101,
+     139,
+     48,
+     46,
+     83,
+     75,
+     136,
+     4,
+     63,
+     114,
+     67,
+     118
+    ]
+   }
+  },
+  {
+   "id": 6,
+   "name": "Praha Smíchov",
+   "owner_id": 0,
+   "pos": {
+    "x": 123,
+    "y": 156,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 123,
+     "y": 156,
+     "z": 0
+    },
+    {
+     "x": 124,
+     "y": 156,
+     "z": 0
+    },
+    {
+     "x": 124,
+     "y": 157,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "ship"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1660,
+    "unhappy": 218,
+    "no_route": 53
+   },
+   "line_ids": [
+    13,
+    16,
+    46
+   ],
+   "convoy_ids": [
+    2,
+    3,
+    4,
+    5,
+    25,
+    26,
+    27,
+    28
+   ],
+   "connections": [
+    {
+     "halt_id": 1,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 8,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 2,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 8,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     261,
+     1780,
+     2510,
+     525,
+     1839,
+     2465,
+     852,
+     893,
+     2011,
+     1776,
+     1034,
+     3090
+    ],
+    "departed": [
+     605,
+     1376,
+     2648,
+     3004,
+     2526,
+     2013,
+     2741,
+     3159,
+     2699,
+     1230,
+     1007,
+     1443
+    ],
+    "waiting": [
+     25,
+     767,
+     734,
+     217,
+     758,
+     326,
+     415,
+     797,
+     178,
+     772,
+     379,
+     122
+    ],
+    "happy": [
+     588,
+     1562,
+     315,
+     1368,
+     1714,
+     539,
+     2021,
+     276,
+     265,
+     1098,
+     1023,
+     1920
+    ],
+    "unhappy": [
+     93,
+     208,
+     128,
+     135,
+     16,
+     193,
+     298,
+     29,
+     134,
+     207,
+     153,
+     215
+    ],
+    "no_route": [
+     42,
+     1,
+     53,
+     3,
+     82,
+     50,
+     50,
+     60,
+     4,
+     29,
+     79,
+     46
+    ],
+    "convoys_arrived": [
+     150,
+     147,
+     12,
+     47,
+     120,
+     55,
+     6,
+     69,
+     17,
+     88,
+     153,
+     24
+    ]
+   }
+  },
+  {
+   "id": 7,
+   "name": "Praha Vršovice",
+   "owner_id": 0,
+   "pos": {
+    "x": 139,
+    "y": 180,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 139,
+     "y": 180,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "air"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 240,
+    "mail": 160,
+    "goods": 100
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 190
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 81
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 7
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 190,
+    "goods": 88
+   },
+   "pax": {
+    "happy": 2073,
+    "unhappy": 61,
+    "no_route": 79
+   },
+   "line_ids": [
+    34
+   ],
+   "convoy_ids": [
+    16,
+    17,
+    18,
+    19,
+    33,
+    36
+   ],
+   "connections": [
+    {
+     "halt_id": 2,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2495,
+     2403,
+     2337,
+     214,
+     1224,
+     609,
+     1366,
+     596,
+     2053,
+     1545,
+     152,
+     1459
+    ],
+    "departed": [
+     2659,
+     1662,
+     144,
+     1,
+     971,
+     1954,
+     2844,
+     521,
+     1794,
+     1486,
+     1604,
+     2674
+    ],
+    "waiting": [
+     782,
+     335,
+     612,
+     836,
+     730,
+     647,
+     860,
+     207,
+     160,
+     194,
+     143,
+     138
+    ],
+    "happy": [
+     365,
+     1466,
+     1119,
+     712,
+     765,
+     2231,
+     296,
+     1200,
+     445,
+     1726,
+     1362,
+     1857
+    ],
+    "unhappy": [
+     138,
+     114,
+     170,
+     212,
+     126,
+     209,
+     284,
+     144,
+     158,
+     159,
+     191,
+     54
+    ],
+    "no_route": [
+     25,
+     64,
+     30,
+     48,
+     16,
+     36,
+     52,
+     1,
+     16,
+     23,
+     53,
+     10
+    ],
+    "convoys_arrived": [
+     17,
+     85,
+     36,
+     59,
+     17,
+     111,
+     99,
+     108,
+     45,
+     154,
+     153,
+     138
+    ]
+   }
+  },
+  {
+   "id": 8,
+   "name": "Praha Libeň",
+   "owner_id": 0,
+   "pos": {
+    "x": 122,
+    "y": 135,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 122,
+     "y": 135,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 80,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 97
+    },
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 73
+    }
+   ],
+   "waiting_total": {
+    "passengers": 97,
+    "mail": 73,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1769,
+    "unhappy": 186,
+    "no_route": 23
+   },
+   "line_ids": [
+    16,
+    25,
+    34,
+    46
+   ],
+   "convoy_ids": [
+    4,
+    5,
+    9,
+    10,
+    11,
+    16,
+    17,
+    18,
+    19,
+    25,
+    26,
+    27,
+    28,
+    35
+   ],
+   "connections": [
+    {
+     "halt_id": 6,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 26,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 3,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 6,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     554,
+     250,
+     2200,
+     28,
+     686,
+     698,
+     2731,
+     2416,
+     358,
+     3003,
+     1679,
+     769
+    ],
+    "departed": [
+     1073,
+     2833,
+     933,
+     804,
+     501,
+     192,
+     2546,
+     1406,
+     147,
+     1930,
+     2779,
+     771
+    ],
+    "waiting": [
+     428,
+     588,
+     543,
+     735,
+     215,
+     720,
+     80,
+     142,
+     113,
+     284,
+     677,
+     117
+    ],
+    "happy": [
+     340,
+     1159,
+     1877,
+     258,
+     1700,
+     764,
+     115,
+     1834,
+     2281,
+     644,
+     1123,
+     1667
+    ],
+    "unhappy": [
+     83,
+     281,
+     292,
+     140,
+     37,
+     238,
+     204,
+     249,
+     296,
+     117,
+     73,
+     243
+    ],
+    "no_route": [
+     2,
+     78,
+     71,
+     3,
+     30,
+     81,
+     49,
+     20,
+     45,
+     62,
+     48,
+     3
+    ],
+    "convoys_arrived": [
+     155,
+     153,
+     155,
+     91,
+     66,
+     124,
+     145,
+     141,
+     70,
+     83,
+     94,
+     11
+    ]
+   }
+  },
+  {
+   "id": 9,
+   "name": "Praha Dejvická",
+   "owner_id": 0,
+   "pos": {
+    "x": 94,
+    "y": 130,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 94,
+     "y": 130,
+     "z": 0
+    },
+    {
+     "x": 94,
+     "y": 131,
+     "z": 0
+    },
+    {
+     "x": 95,
+     "y": 130,
+     "z": 0
+    },
+    {
+     "x": 96,
+     "y": 130,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail",
+    "road"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": false,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 100
+   },
+   "waiting": [
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 215
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 215
+   },
+   "pax": {
+    "happy": 706,
+    "unhappy": 42,
+    "no_route": 14
+   },
+   "line_ids": [
+    10,
+    34,
+    43,
+    46
+   ],
+   "convoy_ids": [
+    1,
+    16,
+    17,
+    18,
+    19,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28
+   ],
+   "connections": [
+    {
+     "halt_id": 1,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 3,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 2,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2467,
+     485,
+     11,
+     3111,
+     2836,
+     1149,
+     1313,
+     89,
+     1516,
+     2324,
+     2956,
+     1239
+    ],
+    "departed": [
+     966,
+     278,
+     774,
+     81,
+     2571,
+     1748,
+     1646,
+     250,
+     2641,
+     2553,
+     2891,
+     2047
+    ],
+    "waiting": [
+     631,
+     203,
+     501,
+     778,
+     413,
+     388,
+     327,
+     895,
+     344,
+     316,
+     501,
+     541
+    ],
+    "happy": [
+     1008,
+     1194,
+     2141,
+     41,
+     791,
+     612,
+     1304,
+     742,
+     889,
+     1681,
+     505,
+     836
+    ],
+    "unhappy": [
+     72,
+     256,
+     295,
+     65,
+     88,
+     242,
+     253,
+     54,
+     202,
+     152,
+     266,
+     230
+    ],
+    "no_route": [
+     46,
+     80,
+     71,
+     63,
+     56,
+     16,
+     44,
+     50,
+     77,
+     63,
+     74,
+     78
+    ],
+    "convoys_arrived": [
+     30,
+     146,
+     157,
+     114,
+     9,
+     64,
+     5,
+     85,
+     153,
+     160,
+     4,
+     34
+    ]
+   }
+  },
+  {
+   "id": 10,
+   "name": "Praha Náměstí Míru",
+   "owner_id": 0,
+   "pos": {
+    "x": 141,
+    "y": 160,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 141,
+     "y": 160,
+     "z": 0
+    },
+    {
+     "x": 141,
+     "y": 161,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 152
+    },
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 84
+    }
+   ],
+   "waiting_total": {
+    "passengers": 152,
+    "mail": 84,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1265,
+    "unhappy": 86,
+    "no_route": 16
+   },
+   "line_ids": [
+    34,
+    40,
+    46
+   ],
+   "convoy_ids": [
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    25,
+    26,
+    27,
+    28
+   ],
+   "connections": [
+    {
+     "halt_id": 4,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 4,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 3,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2019,
+     2913,
+     1248,
+     360,
+     1944,
+     2120,
+     2818,
+     778,
+     3027,
+     3176,
+     2463,
+     1199
+    ],
+    "departed": [
+     1357,
+     1917,
+     2092,
+     652,
+     2357,
+     762,
+     511,
+     2232,
+     1493,
+     2639,
+     2337,
+     2765
+    ],
+    "waiting": [
+     739,
+     334,
+     494,
+     653,
+     230,
+     668,
+     822,
+     368,
+     414,
+     497,
+     371,
+     640
+    ],
+    "happy": [
+     2069,
+     308,
+     1766,
+     733,
+     2306,
+     2392,
+     2060,
+     2196,
+     1669,
+     2365,
+     2334,
+     797
+    ],
+    "unhappy": [
+     231,
+     287,
+     68,
+     283,
+     164,
+     200,
+     147,
+     237,
+     136,
+     44,
+     169,
+     215
+    ],
+    "no_route": [
+     7,
+     89,
+     29,
+     70,
+     57,
+     48,
+     5,
+     14,
+     58,
+     31,
+     47,
+     44
+    ],
+    "convoys_arrived": [
+     120,
+     120,
+     117,
+     144,
+     135,
+     42,
+     125,
+     132,
+     58,
+     96,
+     91,
+     49
+    ]
+   }
+  },
+  {
+   "id": 11,
+   "name": "Brno Smíchov",
+   "owner_id": 0,
+   "pos": {
+    "x": 314,
+    "y": 287,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 314,
+     "y": 287,
+     "z": 0
+    },
+    {
+     "x": 314,
+     "y": 288,
+     "z": 0
+    },
+    {
+     "x": 315,
+     "y": 287,
+     "z": 0
+    },
+    {
+     "x": 315,
+     "y": 288,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail",
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 40,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 48
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 48,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 2013,
+    "unhappy": 276,
+    "no_route": 46
+   },
+   "line_ids": [
+    31,
+    37
+   ],
+   "convoy_ids": [
+    14,
+    15,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 30,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 30,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     3036,
+     18,
+     1539,
+     3020,
+     1200,
+     29,
+     1662,
+     2332,
+     2034,
+     362,
+     3109,
+     509
+    ],
+    "departed": [
+     2537,
+     876,
+     1176,
+     462,
+     2990,
+     562,
+     2894,
+     1919,
+     1685,
+     2703,
+     3115,
+     2544
+    ],
+    "waiting": [
+     827,
+     772,
+     480,
+     494,
+     486,
+     27,
+     37,
+     93,
+     755,
+     875,
+     443,
+     389
+    ],
+    "happy": [
+     1720,
+     1176,
+     2006,
+     1475,
+     1409,
+     334,
+     2260,
+     1678,
+     1050,
+     1392,
+     529,
+     1408
+    ],
+    "unhappy": [
+     238,
+     20,
+     110,
+     169,
+     201,
+     43,
+     136,
+     166,
+     205,
+     248,
+     176,
+     117
+    ],
+    "no_route": [
+     77,
+     69,
+     41,
+     17,
+     14,
+     47,
+     72,
+     90,
+     29,
+     34,
+     38,
+     10
+    ],
+    "convoys_arrived": [
+     143,
+     142,
+     108,
+     5,
+     91,
+     106,
+     75,
+     119,
+     107,
+     112,
+     139,
+     6
+    ]
+   }
+  },
+  {
+   "id": 12,
+   "name": "Brno Vršovice",
+   "owner_id": 0,
+   "pos": {
+    "x": 313,
+    "y": 252,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 313,
+     "y": 252,
+     "z": 0
+    },
+    {
+     "x": 313,
+     "y": 253,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "monorail"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 155
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 155,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1659,
+    "unhappy": 139,
+    "no_route": 36
+   },
+   "line_ids": [
+    10,
+    22,
+    37
+   ],
+   "convoy_ids": [
+    1,
+    8,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 2,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 14,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 14,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 17,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2810,
+     490,
+     143,
+     447,
+     1032,
+     2436,
+     2463,
+     386,
+     883,
+     2343,
+     2430,
+     1390
+    ],
+    "departed": [
+     2256,
+     2464,
+     2349,
+     1307,
+     101,
+     1635,
+     2431,
+     53,
+     339,
+     2543,
+     1605,
+     2546
+    ],
+    "waiting": [
+     318,
+     806,
+     486,
+     845,
+     153,
+     645,
+     788,
+     330,
+     887,
+     52,
+     519,
+     174
+    ],
+    "happy": [
+     1566,
+     2340,
+     1748,
+     1921,
+     158,
+     1025,
+     391,
+     504,
+     1250,
+     1337,
+     977,
+     2308
+    ],
+    "unhappy": [
+     194,
+     43,
+     159,
+     196,
+     248,
+     153,
+     272,
+     96,
+     178,
+     248,
+     282,
+     271
+    ],
+    "no_route": [
+     19,
+     81,
+     53,
+     68,
+     52,
+     38,
+     32,
+     7,
+     48,
+     53,
+     54,
+     38
+    ],
+    "convoys_arrived": [
+     24,
+     101,
+     25,
+     5,
+     5,
+     14,
+     94,
+     21,
+     101,
+     122,
+     150,
+     20
+    ]
+   }
+  },
+  {
+   "id": 13,
+   "name": "Brno Libeň",
+   "owner_id": 0,
+   "pos": {
+    "x": 276,
+    "y": 292,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 276,
+     "y": 292,
+     "z": 0
+    },
+    {
+     "x": 276,
+     "y": 293,
+     "z": 0
+    },
+    {
+     "x": 277,
+     "y": 292,
+     "z": 0
+    },
+    {
+     "x": 277,
+     "y": 293,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "ship"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 240,
+    "mail": 0,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 213
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 254
+    }
+   ],
+   "waiting_total": {
+    "passengers": 213,
+    "mail": 0,
+    "goods": 254
+   },
+   "pax": {
+    "happy": 1022,
+    "unhappy": 146,
+    "no_route": 35
+   },
+   "line_ids": [
+    22,
+    37
+   ],
+   "convoy_ids": [
+    8,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 14,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 16,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2919,
+     2889,
+     895,
+     2120,
+     887,
+     336,
+     3130,
+     1482,
+     1531,
+     2403,
+     2787,
+     749
+    ],
+    "departed": [
+     1127,
+     2371,
+     521,
+     706,
+     343,
+     1300,
+     2971,
+     2999,
+     3112,
+     1508,
+     2600,
+     349
+    ],
+    "waiting": [
+     100,
+     375,
+     123,
+     126,
+     542,
+     356,
+     762,
+     634,
+     113,
+     600,
+     715,
+     816
+    ],
+    "happy": [
+     351,
+     1159,
+     1331,
+     1238,
+     943,
+     2087,
+     1855,
+     901,
+     725,
+     1206,
+     1950,
+     879
+    ],
+    "unhappy": [
+     240,
+     226,
+     209,
+     293,
+     207,
+     273,
+     246,
+     185,
+     102,
+     281,
+     167,
+     112
+    ],
+    "no_route": [
+     32,
+     72,
+     76,
+     80,
+     80,
+     74,
+     63,
+     46,
+     39,
+     48,
+     56,
+     60
+    ],
+    "convoys_arrived": [
+     61,
+     31,
+     117,
+     1,
+     105,
+     35,
+     108,
+     48,
+     129,
+     101,
+     46,
+     111
+    ]
+   }
+  },
+  {
+   "id": 14,
+   "name": "Brno Dejvická",
+   "owner_id": 0,
+   "pos": {
+    "x": 298,
+    "y": 271,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 298,
+     "y": 271,
+     "z": 0
+    },
+    {
+     "x": 298,
+     "y": 272,
+     "z": 0
+    },
+    {
+     "x": 299,
+     "y": 271,
+     "z": 0
+    },
+    {
+     "x": 300,
+     "y": 271,
+     "z": 0
+    },
+    {
+     "x": 300,
+     "y": 272,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 160,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 58
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 85
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 256
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 55
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 58,
+    "goods": 396
+   },
+   "pax": {
+    "happy": 677,
+    "unhappy": 239,
+    "no_route": 12
+   },
+   "line_ids": [
+    10,
+    22,
+    37
+   ],
+   "convoy_ids": [
+    1,
+    8,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 12,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 13,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 12,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 16,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     3116,
+     2477,
+     1750,
+     2953,
+     733,
+     172,
+     2112,
+     2344,
+     2238,
+     1793,
+     261,
+     2861
+    ],
+    "departed": [
+     1364,
+     288,
+     104,
+     1464,
+     125,
+     2220,
+     3172,
+     1688,
+     921,
+     966,
+     342,
+     2405
+    ],
+    "waiting": [
+     514,
+     582,
+     354,
+     864,
+     527,
+     420,
+     205,
+     239,
+     617,
+     312,
+     464,
+     436
+    ],
+    "happy": [
+     1054,
+     1378,
+     1758,
+     1765,
+     2078,
+     2180,
+     2234,
+     1504,
+     852,
+     936,
+     1300,
+     307
+    ],
+    "unhappy": [
+     115,
+     171,
+     278,
+     30,
+     143,
+     195,
+     85,
+     296,
+     56,
+     283,
+     134,
+     233
+    ],
+    "no_route": [
+     72,
+     79,
+     30,
+     79,
+     4,
+     59,
+     36,
+     16,
+     19,
+     21,
+     30,
+     67
+    ],
+    "convoys_arrived": [
+     99,
+     91,
+     132,
+     134,
+     145,
+     139,
+     126,
+     155,
+     97,
+     3,
+     97,
+     3
+    ]
+   }
+  },
+  {
+   "id": 15,
+   "name": "Brno Náměstí Míru",
+   "owner_id": 0,
+   "pos": {
+    "x": 302,
+    "y": 252,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 302,
+     "y": 252,
+     "z": 0
+    },
+    {
+     "x": 302,
+     "y": 253,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "air"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 2313,
+    "unhappy": 292,
+    "no_route": 15
+   },
+   "line_ids": [
+    31,
+    37
+   ],
+   "convoy_ids": [
+    14,
+    15,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 25,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 25,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 29,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 29,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 11,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 13,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2905,
+     512,
+     440,
+     1103,
+     2620,
+     2958,
+     3037,
+     2417,
+     157,
+     1148,
+     438,
+     2062
+    ],
+    "departed": [
+     73,
+     485,
+     2079,
+     1119,
+     783,
+     289,
+     2371,
+     2071,
+     1391,
+     2388,
+     2045,
+     2004
+    ],
+    "waiting": [
+     742,
+     549,
+     783,
+     707,
+     108,
+     369,
+     843,
+     613,
+     652,
+     858,
+     660,
+     592
+    ],
+    "happy": [
+     623,
+     605,
+     662,
+     983,
+     87,
+     1257,
+     315,
+     1054,
+     1961,
+     1713,
+     251,
+     1260
+    ],
+    "unhappy": [
+     248,
+     136,
+     236,
+     72,
+     161,
+     201,
+     141,
+     298,
+     137,
+     155,
+     21,
+     11
+    ],
+    "no_route": [
+     7,
+     57,
+     55,
+     37,
+     63,
+     85,
+     71,
+     9,
+     69,
+     23,
+     45,
+     28
+    ],
+    "convoys_arrived": [
+     9,
+     137,
+     106,
+     47,
+     108,
+     97,
+     142,
+     54,
+     0,
+     44,
+     108,
+     62
+    ]
+   }
+  },
+  {
+   "id": 16,
+   "name": "Brno Florenc ÚAN",
+   "owner_id": 1,
+   "pos": {
+    "x": 304,
+    "y": 279,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 304,
+     "y": 279,
+     "z": 0
+    },
+    {
+     "x": 304,
+     "y": 280,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 2299,
+    "unhappy": 159,
+    "no_route": 43
+   },
+   "line_ids": [
+    10,
+    22,
+    37
+   ],
+   "convoy_ids": [
+    1,
+    8,
+    20,
+    34
+   ],
+   "connections": [
+    {
+     "halt_id": 2,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 17,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 13,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 14,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2389,
+     3006,
+     2420,
+     691,
+     2746,
+     2178,
+     3142,
+     2542,
+     1688,
+     674,
+     2442,
+     2843
+    ],
+    "departed": [
+     2125,
+     786,
+     1318,
+     722,
+     74,
+     443,
+     159,
+     1567,
+     1522,
+     1933,
+     2048,
+     634
+    ],
+    "waiting": [
+     581,
+     740,
+     380,
+     410,
+     216,
+     23,
+     404,
+     630,
+     433,
+     742,
+     159,
+     637
+    ],
+    "happy": [
+     340,
+     1022,
+     1426,
+     465,
+     1424,
+     144,
+     401,
+     1911,
+     1722,
+     975,
+     320,
+     2214
+    ],
+    "unhappy": [
+     285,
+     204,
+     60,
+     62,
+     164,
+     179,
+     166,
+     297,
+     183,
+     106,
+     98,
+     58
+    ],
+    "no_route": [
+     26,
+     25,
+     84,
+     38,
+     12,
+     31,
+     66,
+     14,
+     59,
+     8,
+     79,
+     37
+    ],
+    "convoys_arrived": [
+     108,
+     143,
+     4,
+     120,
+     22,
+     58,
+     58,
+     78,
+     41,
+     74,
+     101,
+     82
+    ]
+   }
+  },
+  {
+   "id": 17,
+   "name": "Brno Zastávka u lesa",
+   "owner_id": 0,
+   "pos": {
+    "x": 284,
+    "y": 265,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 284,
+     "y": 265,
+     "z": 0
+    },
+    {
+     "x": 284,
+     "y": 266,
+     "z": 0
+    },
+    {
+     "x": 285,
+     "y": 265,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 80,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 73
+    }
+   ],
+   "waiting_total": {
+    "passengers": 73,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 636,
+    "unhappy": 267,
+    "no_route": 58
+   },
+   "line_ids": [
+    22,
+    37
+   ],
+   "convoy_ids": [
+    8,
+    20
+   ],
+   "connections": [
+    {
+     "halt_id": 12,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 16,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2043,
+     2065,
+     1928,
+     1183,
+     2155,
+     1321,
+     1295,
+     2709,
+     1184,
+     2245,
+     2202,
+     415
+    ],
+    "departed": [
+     1851,
+     3113,
+     1044,
+     2597,
+     1080,
+     2056,
+     1773,
+     371,
+     1931,
+     110,
+     1492,
+     224
+    ],
+    "waiting": [
+     616,
+     297,
+     351,
+     842,
+     349,
+     444,
+     895,
+     527,
+     362,
+     272,
+     464,
+     61
+    ],
+    "happy": [
+     1157,
+     2223,
+     425,
+     214,
+     466,
+     1129,
+     1558,
+     297,
+     1424,
+     2074,
+     2220,
+     92
+    ],
+    "unhappy": [
+     190,
+     5,
+     4,
+     187,
+     109,
+     118,
+     12,
+     164,
+     62,
+     225,
+     186,
+     188
+    ],
+    "no_route": [
+     30,
+     6,
+     50,
+     56,
+     46,
+     45,
+     75,
+     35,
+     90,
+     63,
+     65,
+     15
+    ],
+    "convoys_arrived": [
+     92,
+     107,
+     12,
+     32,
+     70,
+     39,
+     134,
+     16,
+     98,
+     35,
+     138,
+     88
+    ]
+   }
+  },
+  {
+   "id": 18,
+   "name": "Plzeň Florenc ÚAN",
+   "owner_id": 0,
+   "pos": {
+    "x": 78,
+    "y": 222,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 78,
+     "y": 222,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 80,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 35
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 233
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 268
+   },
+   "pax": {
+    "happy": 2363,
+    "unhappy": 16,
+    "no_route": 26
+   },
+   "line_ids": [
+    13,
+    28
+   ],
+   "convoy_ids": [
+    2,
+    3,
+    12,
+    13
+   ],
+   "connections": [
+    {
+     "halt_id": 23,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 21,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 20,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2870,
+     1225,
+     577,
+     1468,
+     2706,
+     186,
+     2281,
+     850,
+     848,
+     1628,
+     1861,
+     36
+    ],
+    "departed": [
+     167,
+     1445,
+     12,
+     126,
+     1244,
+     2211,
+     2550,
+     1427,
+     1144,
+     645,
+     795,
+     2749
+    ],
+    "waiting": [
+     344,
+     288,
+     720,
+     245,
+     151,
+     710,
+     290,
+     342,
+     886,
+     34,
+     710,
+     280
+    ],
+    "happy": [
+     63,
+     1838,
+     1235,
+     1247,
+     606,
+     464,
+     34,
+     529,
+     2326,
+     188,
+     2198,
+     1963
+    ],
+    "unhappy": [
+     297,
+     262,
+     136,
+     42,
+     72,
+     84,
+     73,
+     145,
+     1,
+     9,
+     41,
+     175
+    ],
+    "no_route": [
+     37,
+     35,
+     27,
+     78,
+     25,
+     88,
+     88,
+     71,
+     53,
+     85,
+     7,
+     77
+    ],
+    "convoys_arrived": [
+     59,
+     146,
+     19,
+     82,
+     28,
+     99,
+     58,
+     57,
+     80,
+     4,
+     145,
+     113
+    ]
+   }
+  },
+  {
+   "id": 19,
+   "name": "Plzeň Zastávka u lesa",
+   "owner_id": 0,
+   "pos": {
+    "x": 59,
+    "y": 230,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 59,
+     "y": 230,
+     "z": 0
+    },
+    {
+     "x": 60,
+     "y": 230,
+     "z": 0
+    },
+    {
+     "x": 60,
+     "y": 231,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 320,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1496,
+    "unhappy": 229,
+    "no_route": 18
+   },
+   "line_ids": [],
+   "convoy_ids": [
+    35
+   ],
+   "connections": [],
+   "stats": {
+    "arrived": [
+     1963,
+     1653,
+     1760,
+     2447,
+     1772,
+     1771,
+     2739,
+     13,
+     2520,
+     577,
+     3129,
+     892
+    ],
+    "departed": [
+     2076,
+     2460,
+     2122,
+     2159,
+     1274,
+     2885,
+     1960,
+     2351,
+     2412,
+     2971,
+     1313,
+     2980
+    ],
+    "waiting": [
+     668,
+     320,
+     514,
+     180,
+     742,
+     513,
+     533,
+     798,
+     685,
+     410,
+     372,
+     356
+    ],
+    "happy": [
+     1097,
+     963,
+     1684,
+     1354,
+     1840,
+     1435,
+     798,
+     1581,
+     2390,
+     1910,
+     1034,
+     322
+    ],
+    "unhappy": [
+     269,
+     65,
+     189,
+     165,
+     242,
+     102,
+     56,
+     197,
+     103,
+     201,
+     7,
+     121
+    ],
+    "no_route": [
+     58,
+     19,
+     19,
+     38,
+     44,
+     82,
+     61,
+     21,
+     15,
+     60,
+     18,
+     84
+    ],
+    "convoys_arrived": [
+     17,
+     135,
+     49,
+     146,
+     83,
+     40,
+     58,
+     97,
+     122,
+     95,
+     154,
+     133
+    ]
+   }
+  },
+  {
+   "id": 20,
+   "name": "Plzeň Přístaviště",
+   "owner_id": 1,
+   "pos": {
+    "x": 56,
+    "y": 232,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 56,
+     "y": 232,
+     "z": 0
+    },
+    {
+     "x": 56,
+     "y": 233,
+     "z": 0
+    },
+    {
+     "x": 57,
+     "y": 232,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 40,
+    "goods": 100
+   },
+   "waiting": [
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 50
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 50
+   },
+   "pax": {
+    "happy": 22,
+    "unhappy": 186,
+    "no_route": 86
+   },
+   "line_ids": [
+    28
+   ],
+   "convoy_ids": [
+    12,
+    13,
+    33
+   ],
+   "connections": [
+    {
+     "halt_id": 18,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 24,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2540,
+     2479,
+     2945,
+     1790,
+     2355,
+     1049,
+     1367,
+     1053,
+     1403,
+     966,
+     1128,
+     792
+    ],
+    "departed": [
+     758,
+     1848,
+     2322,
+     1635,
+     1287,
+     1401,
+     629,
+     942,
+     1592,
+     2571,
+     2987,
+     1936
+    ],
+    "waiting": [
+     672,
+     878,
+     437,
+     472,
+     322,
+     404,
+     108,
+     841,
+     268,
+     358,
+     496,
+     63
+    ],
+    "happy": [
+     1027,
+     267,
+     1697,
+     1360,
+     1431,
+     783,
+     375,
+     109,
+     1742,
+     720,
+     695,
+     100
+    ],
+    "unhappy": [
+     53,
+     180,
+     192,
+     148,
+     22,
+     146,
+     6,
+     52,
+     123,
+     298,
+     104,
+     82
+    ],
+    "no_route": [
+     13,
+     56,
+     21,
+     75,
+     63,
+     32,
+     5,
+     29,
+     16,
+     37,
+     10,
+     16
+    ],
+    "convoys_arrived": [
+     88,
+     117,
+     82,
+     72,
+     43,
+     91,
+     68,
+     27,
+     136,
+     46,
+     101,
+     22
+    ]
+   }
+  },
+  {
+   "id": 21,
+   "name": "Plzeň letiště",
+   "owner_id": 1,
+   "pos": {
+    "x": 51,
+    "y": 229,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 51,
+     "y": 229,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 40,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 103
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 188
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 291
+   },
+   "pax": {
+    "happy": 1079,
+    "unhappy": 34,
+    "no_route": 62
+   },
+   "line_ids": [
+    13,
+    28
+   ],
+   "convoy_ids": [
+    2,
+    3,
+    12,
+    13,
+    36
+   ],
+   "connections": [
+    {
+     "halt_id": 23,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 24,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 18,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2725,
+     499,
+     1290,
+     1392,
+     2465,
+     876,
+     3084,
+     549,
+     2349,
+     2090,
+     243,
+     1010
+    ],
+    "departed": [
+     1734,
+     464,
+     1905,
+     241,
+     1590,
+     2604,
+     1165,
+     2739,
+     2980,
+     3126,
+     2915,
+     1275
+    ],
+    "waiting": [
+     282,
+     661,
+     490,
+     810,
+     632,
+     479,
+     503,
+     626,
+     305,
+     257,
+     470,
+     698
+    ],
+    "happy": [
+     1860,
+     2210,
+     2095,
+     1612,
+     1440,
+     39,
+     357,
+     2309,
+     108,
+     550,
+     811,
+     1037
+    ],
+    "unhappy": [
+     36,
+     134,
+     135,
+     5,
+     71,
+     195,
+     79,
+     211,
+     165,
+     229,
+     71,
+     277
+    ],
+    "no_route": [
+     89,
+     6,
+     8,
+     74,
+     33,
+     0,
+     43,
+     77,
+     51,
+     59,
+     77,
+     6
+    ],
+    "convoys_arrived": [
+     82,
+     159,
+     118,
+     67,
+     43,
+     126,
+     108,
+     23,
+     2,
+     50,
+     41,
+     27
+    ]
+   }
+  },
+  {
+   "id": 22,
+   "name": "Plzeň Přívoz",
+   "owner_id": 1,
+   "pos": {
+    "x": 77,
+    "y": 255,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 77,
+     "y": 255,
+     "z": 0
+    },
+    {
+     "x": 77,
+     "y": 256,
+     "z": 0
+    },
+    {
+     "x": 78,
+     "y": 255,
+     "z": 0
+    },
+    {
+     "x": 78,
+     "y": 256,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail",
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 160,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 51
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 242
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 217
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 510
+   },
+   "pax": {
+    "happy": 1701,
+    "unhappy": 46,
+    "no_route": 62
+   },
+   "line_ids": [],
+   "convoy_ids": [],
+   "connections": [],
+   "stats": {
+    "arrived": [
+     2342,
+     1616,
+     2152,
+     1698,
+     2306,
+     2562,
+     1362,
+     726,
+     1387,
+     2331,
+     1294,
+     44
+    ],
+    "departed": [
+     434,
+     1851,
+     3020,
+     2870,
+     1910,
+     251,
+     2901,
+     739,
+     1777,
+     733,
+     537,
+     2139
+    ],
+    "waiting": [
+     316,
+     610,
+     220,
+     225,
+     771,
+     833,
+     660,
+     159,
+     175,
+     659,
+     491,
+     557
+    ],
+    "happy": [
+     2037,
+     632,
+     2062,
+     241,
+     1496,
+     289,
+     298,
+     1880,
+     537,
+     1273,
+     579,
+     898
+    ],
+    "unhappy": [
+     280,
+     272,
+     162,
+     40,
+     9,
+     191,
+     197,
+     276,
+     66,
+     285,
+     53,
+     279
+    ],
+    "no_route": [
+     87,
+     84,
+     74,
+     29,
+     55,
+     89,
+     1,
+     7,
+     14,
+     77,
+     18,
+     25
+    ],
+    "convoys_arrived": [
+     143,
+     112,
+     149,
+     6,
+     126,
+     59,
+     56,
+     139,
+     29,
+     43,
+     89,
+     4
+    ]
+   }
+  },
+  {
+   "id": 23,
+   "name": "Plzeň Staré Město",
+   "owner_id": 0,
+   "pos": {
+    "x": 47,
+    "y": 226,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 47,
+     "y": 226,
+     "z": 0
+    },
+    {
+     "x": 47,
+     "y": 227,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "monorail"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 255,
+    "unhappy": 242,
+    "no_route": 77
+   },
+   "line_ids": [
+    13,
+    28
+   ],
+   "convoy_ids": [
+    2,
+    3,
+    12,
+    13
+   ],
+   "connections": [
+    {
+     "halt_id": 18,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 21,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 24,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     809,
+     2174,
+     3131,
+     2726,
+     425,
+     2577,
+     3108,
+     1849,
+     350,
+     2487,
+     1429,
+     688
+    ],
+    "departed": [
+     3057,
+     1686,
+     1113,
+     1890,
+     946,
+     886,
+     1092,
+     1249,
+     1101,
+     2747,
+     229,
+     2139
+    ],
+    "waiting": [
+     110,
+     275,
+     95,
+     322,
+     665,
+     527,
+     397,
+     98,
+     446,
+     62,
+     626,
+     110
+    ],
+    "happy": [
+     1887,
+     538,
+     708,
+     2096,
+     2008,
+     1479,
+     1390,
+     1803,
+     2365,
+     1088,
+     1027,
+     1095
+    ],
+    "unhappy": [
+     206,
+     86,
+     120,
+     218,
+     56,
+     194,
+     220,
+     122,
+     286,
+     245,
+     65,
+     269
+    ],
+    "no_route": [
+     60,
+     47,
+     80,
+     5,
+     34,
+     60,
+     81,
+     45,
+     31,
+     29,
+     86,
+     78
+    ],
+    "convoys_arrived": [
+     85,
+     94,
+     120,
+     40,
+     130,
+     97,
+     69,
+     133,
+     154,
+     158,
+     160,
+     58
+    ]
+   }
+  },
+  {
+   "id": 24,
+   "name": "Plzeň Nové Sady",
+   "owner_id": 0,
+   "pos": {
+    "x": 36,
+    "y": 252,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 36,
+     "y": 252,
+     "z": 0
+    },
+    {
+     "x": 36,
+     "y": 253,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "air"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 160,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 144
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 159
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 303
+   },
+   "pax": {
+    "happy": 2264,
+    "unhappy": 104,
+    "no_route": 76
+   },
+   "line_ids": [
+    13,
+    28
+   ],
+   "convoy_ids": [
+    2,
+    3,
+    12,
+    13
+   ],
+   "connections": [
+    {
+     "halt_id": 21,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 20,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 23,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     610,
+     126,
+     2757,
+     2011,
+     1392,
+     1502,
+     2122,
+     547,
+     2230,
+     2317,
+     2558,
+     2156
+    ],
+    "departed": [
+     1652,
+     1875,
+     2630,
+     1818,
+     211,
+     364,
+     2855,
+     2264,
+     1915,
+     2664,
+     2054,
+     54
+    ],
+    "waiting": [
+     419,
+     9,
+     237,
+     709,
+     568,
+     606,
+     696,
+     49,
+     15,
+     404,
+     842,
+     569
+    ],
+    "happy": [
+     1198,
+     241,
+     963,
+     2319,
+     1951,
+     2089,
+     1019,
+     880,
+     2024,
+     2052,
+     329,
+     909
+    ],
+    "unhappy": [
+     141,
+     184,
+     172,
+     134,
+     203,
+     110,
+     257,
+     58,
+     198,
+     201,
+     71,
+     235
+    ],
+    "no_route": [
+     77,
+     80,
+     65,
+     84,
+     16,
+     71,
+     20,
+     54,
+     57,
+     5,
+     54,
+     82
+    ],
+    "convoys_arrived": [
+     89,
+     148,
+     160,
+     109,
+     148,
+     144,
+     115,
+     134,
+     40,
+     55,
+     63,
+     132
+    ]
+   }
+  },
+  {
+   "id": 25,
+   "name": "Ostrava Staré Město",
+   "owner_id": 0,
+   "pos": {
+    "x": 390,
+    "y": 143,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 390,
+     "y": 143,
+     "z": 0
+    },
+    {
+     "x": 390,
+     "y": 144,
+     "z": 0
+    },
+    {
+     "x": 391,
+     "y": 143,
+     "z": 0
+    },
+    {
+     "x": 391,
+     "y": 144,
+     "z": 0
+    },
+    {
+     "x": 392,
+     "y": 143,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram",
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 160,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 81
+    },
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 249
+    }
+   ],
+   "waiting_total": {
+    "passengers": 81,
+    "mail": 249,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 2283,
+    "unhappy": 84,
+    "no_route": 33
+   },
+   "line_ids": [
+    19,
+    31
+   ],
+   "convoy_ids": [
+    6,
+    7,
+    14,
+    15
+   ],
+   "connections": [
+    {
+     "halt_id": 30,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 2
+    }
+   ],
+   "stats": {
+    "arrived": [
+     3048,
+     477,
+     1230,
+     475,
+     2067,
+     1388,
+     2547,
+     600,
+     2246,
+     2130,
+     2745,
+     1665
+    ],
+    "departed": [
+     1610,
+     252,
+     2119,
+     1315,
+     3048,
+     1412,
+     561,
+     356,
+     3190,
+     835,
+     2074,
+     1591
+    ],
+    "waiting": [
+     486,
+     545,
+     467,
+     333,
+     357,
+     30,
+     159,
+     880,
+     201,
+     431,
+     171,
+     485
+    ],
+    "happy": [
+     1732,
+     2010,
+     382,
+     198,
+     2249,
+     1297,
+     610,
+     274,
+     2367,
+     526,
+     2278,
+     1028
+    ],
+    "unhappy": [
+     275,
+     268,
+     246,
+     122,
+     144,
+     128,
+     17,
+     244,
+     186,
+     262,
+     286,
+     13
+    ],
+    "no_route": [
+     65,
+     56,
+     43,
+     16,
+     30,
+     89,
+     69,
+     15,
+     66,
+     53,
+     26,
+     67
+    ],
+    "convoys_arrived": [
+     138,
+     57,
+     0,
+     152,
+     27,
+     24,
+     137,
+     90,
+     160,
+     101,
+     149,
+     137
+    ]
+   }
+  },
+  {
+   "id": 26,
+   "name": "Ostrava Nové Sady",
+   "owner_id": 0,
+   "pos": {
+    "x": 397,
+    "y": 94,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 397,
+     "y": 94,
+     "z": 0
+    },
+    {
+     "x": 398,
+     "y": 94,
+     "z": 0
+    },
+    {
+     "x": 399,
+     "y": 94,
+     "z": 0
+    },
+    {
+     "x": 399,
+     "y": 95,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram",
+    "road"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 40,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 31
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 217
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 148
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 62
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 31,
+    "goods": 427
+   },
+   "pax": {
+    "happy": 1365,
+    "unhappy": 29,
+    "no_route": 83
+   },
+   "line_ids": [
+    16,
+    19
+   ],
+   "convoy_ids": [
+    4,
+    5,
+    6,
+    7
+   ],
+   "connections": [
+    {
+     "halt_id": 8,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 1,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 27,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     3021,
+     810,
+     2846,
+     2966,
+     1405,
+     1664,
+     2535,
+     961,
+     541,
+     1233,
+     3137,
+     2773
+    ],
+    "departed": [
+     373,
+     974,
+     2884,
+     2630,
+     1261,
+     221,
+     2094,
+     2395,
+     2301,
+     1176,
+     962,
+     2395
+    ],
+    "waiting": [
+     286,
+     846,
+     247,
+     868,
+     161,
+     140,
+     19,
+     191,
+     774,
+     745,
+     553,
+     455
+    ],
+    "happy": [
+     1050,
+     582,
+     721,
+     451,
+     471,
+     283,
+     1293,
+     1875,
+     1791,
+     1579,
+     1749,
+     23
+    ],
+    "unhappy": [
+     248,
+     235,
+     161,
+     294,
+     172,
+     237,
+     142,
+     157,
+     240,
+     34,
+     139,
+     55
+    ],
+    "no_route": [
+     48,
+     52,
+     50,
+     10,
+     85,
+     43,
+     61,
+     76,
+     39,
+     25,
+     8,
+     51
+    ],
+    "convoys_arrived": [
+     5,
+     60,
+     56,
+     99,
+     145,
+     17,
+     42,
+     97,
+     122,
+     77,
+     3,
+     24
+    ]
+   }
+  },
+  {
+   "id": 27,
+   "name": "Ostrava U cukrovaru",
+   "owner_id": 0,
+   "pos": {
+    "x": 426,
+    "y": 115,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 426,
+     "y": 115,
+     "z": 0
+    },
+    {
+     "x": 426,
+     "y": 116,
+     "z": 0
+    },
+    {
+     "x": 427,
+     "y": 115,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "air"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 240,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1242,
+    "unhappy": 103,
+    "no_route": 57
+   },
+   "line_ids": [
+    19
+   ],
+   "convoy_ids": [
+    6,
+    7,
+    34
+   ],
+   "connections": [
+    {
+     "halt_id": 26,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 29,
+     "catg_index": 0
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2828,
+     2311,
+     3099,
+     244,
+     1697,
+     3096,
+     97,
+     2998,
+     862,
+     742,
+     475,
+     210
+    ],
+    "departed": [
+     1742,
+     3169,
+     2924,
+     2055,
+     2589,
+     363,
+     150,
+     1269,
+     2805,
+     830,
+     2802,
+     108
+    ],
+    "waiting": [
+     469,
+     669,
+     777,
+     715,
+     889,
+     262,
+     27,
+     734,
+     159,
+     130,
+     260,
+     778
+    ],
+    "happy": [
+     626,
+     1781,
+     748,
+     2171,
+     50,
+     1784,
+     2175,
+     1213,
+     1177,
+     721,
+     197,
+     588
+    ],
+    "unhappy": [
+     289,
+     137,
+     160,
+     131,
+     283,
+     269,
+     182,
+     80,
+     145,
+     133,
+     146,
+     158
+    ],
+    "no_route": [
+     58,
+     7,
+     10,
+     29,
+     27,
+     55,
+     69,
+     85,
+     24,
+     26,
+     74,
+     74
+    ],
+    "convoys_arrived": [
+     10,
+     19,
+     95,
+     80,
+     82,
+     118,
+     49,
+     154,
+     54,
+     64,
+     117,
+     139
+    ]
+   }
+  },
+  {
+   "id": 28,
+   "name": "Ostrava Dolní nádraží",
+   "owner_id": 0,
+   "pos": {
+    "x": 386,
+    "y": 126,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 386,
+     "y": 126,
+     "z": 0
+    },
+    {
+     "x": 386,
+     "y": 127,
+     "z": 0
+    },
+    {
+     "x": 387,
+     "y": 126,
+     "z": 0
+    },
+    {
+     "x": 388,
+     "y": 126,
+     "z": 0
+    },
+    {
+     "x": 388,
+     "y": 127,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 240,
+    "mail": 40,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 211
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 217
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 36
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 77
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 211,
+    "goods": 330
+   },
+   "pax": {
+    "happy": 1041,
+    "unhappy": 43,
+    "no_route": 21
+   },
+   "line_ids": [
+    19,
+    31,
+    43
+   ],
+   "convoy_ids": [
+    6,
+    7,
+    14,
+    15,
+    23,
+    24
+   ],
+   "connections": [
+    {
+     "halt_id": 26,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 30,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 30,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 25,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 25,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 9,
+     "catg_index": 2
+    }
+   ],
+   "stats": {
+    "arrived": [
+     233,
+     3142,
+     2450,
+     737,
+     2461,
+     1948,
+     2821,
+     905,
+     423,
+     538,
+     903,
+     370
+    ],
+    "departed": [
+     1460,
+     1442,
+     839,
+     1891,
+     2790,
+     2615,
+     664,
+     2744,
+     2816,
+     2133,
+     985,
+     3186
+    ],
+    "waiting": [
+     455,
+     265,
+     556,
+     451,
+     95,
+     849,
+     345,
+     182,
+     163,
+     173,
+     852,
+     759
+    ],
+    "happy": [
+     1810,
+     940,
+     1456,
+     1865,
+     685,
+     883,
+     546,
+     1011,
+     1891,
+     839,
+     1333,
+     321
+    ],
+    "unhappy": [
+     261,
+     195,
+     193,
+     248,
+     247,
+     154,
+     14,
+     172,
+     170,
+     1,
+     265,
+     241
+    ],
+    "no_route": [
+     14,
+     24,
+     18,
+     26,
+     67,
+     56,
+     32,
+     47,
+     25,
+     66,
+     12,
+     24
+    ],
+    "convoys_arrived": [
+     142,
+     111,
+     24,
+     105,
+     71,
+     14,
+     88,
+     138,
+     90,
+     88,
+     75,
+     139
+    ]
+   }
+  },
+  {
+   "id": 29,
+   "name": "Ostrava Horní náměstí",
+   "owner_id": 0,
+   "pos": {
+    "x": 408,
+    "y": 117,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 408,
+     "y": 117,
+     "z": 0
+    },
+    {
+     "x": 408,
+     "y": 118,
+     "z": 0
+    },
+    {
+     "x": 409,
+     "y": 117,
+     "z": 0
+    },
+    {
+     "x": 409,
+     "y": 118,
+     "z": 0
+    },
+    {
+     "x": 410,
+     "y": 117,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "road",
+    "truck"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 80,
+    "goods": 100
+   },
+   "waiting": [
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 79
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 14
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 79,
+    "goods": 14
+   },
+   "pax": {
+    "happy": 1744,
+    "unhappy": 178,
+    "no_route": 3
+   },
+   "line_ids": [
+    19,
+    31,
+    43
+   ],
+   "convoy_ids": [
+    6,
+    7,
+    14,
+    15,
+    23,
+    24
+   ],
+   "connections": [
+    {
+     "halt_id": 27,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 30,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 15,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 2,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 5,
+     "catg_index": 2
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1794,
+     937,
+     2708,
+     2206,
+     229,
+     1970,
+     2199,
+     113,
+     1880,
+     706,
+     2853,
+     1116
+    ],
+    "departed": [
+     887,
+     1289,
+     2503,
+     1383,
+     2019,
+     991,
+     2202,
+     2063,
+     216,
+     114,
+     1314,
+     1674
+    ],
+    "waiting": [
+     5,
+     471,
+     341,
+     337,
+     160,
+     363,
+     855,
+     74,
+     471,
+     299,
+     537,
+     140
+    ],
+    "happy": [
+     2354,
+     1454,
+     2399,
+     416,
+     1232,
+     1832,
+     495,
+     373,
+     808,
+     1709,
+     1577,
+     1645
+    ],
+    "unhappy": [
+     116,
+     223,
+     276,
+     177,
+     206,
+     261,
+     70,
+     125,
+     196,
+     117,
+     36,
+     248
+    ],
+    "no_route": [
+     17,
+     37,
+     79,
+     48,
+     78,
+     63,
+     79,
+     6,
+     39,
+     14,
+     74,
+     45
+    ],
+    "convoys_arrived": [
+     157,
+     114,
+     49,
+     159,
+     62,
+     115,
+     56,
+     115,
+     94,
+     136,
+     110,
+     45
+    ]
+   }
+  },
+  {
+   "id": 30,
+   "name": "Ostrava Tovární",
+   "owner_id": 0,
+   "pos": {
+    "x": 408,
+    "y": 120,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 408,
+     "y": 120,
+     "z": 0
+    },
+    {
+     "x": 408,
+     "y": 121,
+     "z": 0
+    },
+    {
+     "x": 409,
+     "y": 120,
+     "z": 0
+    },
+    {
+     "x": 410,
+     "y": 120,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "air"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 13
+    }
+   ],
+   "waiting_total": {
+    "passengers": 13,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 631,
+    "unhappy": 173,
+    "no_route": 68
+   },
+   "line_ids": [
+    19,
+    31
+   ],
+   "convoy_ids": [
+    6,
+    7,
+    14,
+    15,
+    34,
+    36
+   ],
+   "connections": [
+    {
+     "halt_id": 29,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 25,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 11,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 11,
+     "catg_index": 2
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 28,
+     "catg_index": 2
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2212,
+     419,
+     903,
+     1979,
+     2655,
+     100,
+     190,
+     2038,
+     3120,
+     1684,
+     121,
+     2237
+    ],
+    "departed": [
+     2161,
+     1117,
+     1140,
+     1489,
+     1893,
+     2585,
+     1369,
+     2387,
+     41,
+     2030,
+     2785,
+     2521
+    ],
+    "waiting": [
+     107,
+     679,
+     689,
+     549,
+     271,
+     695,
+     377,
+     485,
+     10,
+     472,
+     527,
+     357
+    ],
+    "happy": [
+     726,
+     77,
+     1045,
+     527,
+     1486,
+     2010,
+     1212,
+     2197,
+     399,
+     1594,
+     1823,
+     218
+    ],
+    "unhappy": [
+     232,
+     18,
+     108,
+     227,
+     294,
+     299,
+     198,
+     140,
+     266,
+     131,
+     149,
+     14
+    ],
+    "no_route": [
+     27,
+     67,
+     55,
+     36,
+     50,
+     78,
+     8,
+     52,
+     34,
+     89,
+     15,
+     74
+    ],
+    "convoys_arrived": [
+     140,
+     129,
+     105,
+     151,
+     94,
+     141,
+     115,
+     135,
+     11,
+     46,
+     26,
+     94
+    ]
+   }
+  },
+  {
+   "id": 31,
+   "name": "České Budějovice Tovární",
+   "owner_id": 0,
+   "pos": {
+    "x": 173,
+    "y": 382,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 173,
+     "y": 382,
+     "z": 0
+    },
+    {
+     "x": 173,
+     "y": 383,
+     "z": 0
+    },
+    {
+     "x": 174,
+     "y": 382,
+     "z": 0
+    },
+    {
+     "x": 175,
+     "y": 382,
+     "z": 0
+    },
+    {
+     "x": 175,
+     "y": 383,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 40,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 213
+    },
+    {
+     "goods_index": 1,
+     "goods_name": "Pošta",
+     "amount": 53
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 130
+    }
+   ],
+   "waiting_total": {
+    "passengers": 213,
+    "mail": 53,
+    "goods": 130
+   },
+   "pax": {
+    "happy": 642,
+    "unhappy": 101,
+    "no_route": 36
+   },
+   "line_ids": [
+    49
+   ],
+   "convoy_ids": [
+    29,
+    30,
+    31,
+    32
+   ],
+   "connections": [
+    {
+     "halt_id": 35,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 35,
+     "catg_index": 3
+    },
+    {
+     "halt_id": 33,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 33,
+     "catg_index": 3
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1487,
+     2549,
+     404,
+     1107,
+     1184,
+     2609,
+     284,
+     3106,
+     2071,
+     599,
+     2535,
+     753
+    ],
+    "departed": [
+     2759,
+     1635,
+     1813,
+     616,
+     727,
+     1271,
+     1743,
+     2671,
+     592,
+     2777,
+     238,
+     1795
+    ],
+    "waiting": [
+     240,
+     798,
+     49,
+     468,
+     20,
+     723,
+     539,
+     429,
+     361,
+     290,
+     285,
+     645
+    ],
+    "happy": [
+     343,
+     1953,
+     1081,
+     1353,
+     1031,
+     162,
+     1281,
+     1713,
+     778,
+     1854,
+     1569,
+     590
+    ],
+    "unhappy": [
+     58,
+     194,
+     278,
+     165,
+     135,
+     140,
+     125,
+     83,
+     11,
+     291,
+     46,
+     125
+    ],
+    "no_route": [
+     76,
+     6,
+     43,
+     18,
+     37,
+     21,
+     58,
+     85,
+     2,
+     7,
+     58,
+     35
+    ],
+    "convoys_arrived": [
+     116,
+     48,
+     49,
+     36,
+     129,
+     98,
+     151,
+     156,
+     112,
+     140,
+     128,
+     150
+    ]
+   }
+  },
+  {
+   "id": 32,
+   "name": "České Budějovice Koupaliště",
+   "owner_id": 0,
+   "pos": {
+    "x": 199,
+    "y": 393,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 199,
+     "y": 393,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 40,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 243
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 68
+    },
+    {
+     "goods_index": 4,
+     "goods_name": "Dřevo",
+     "amount": 186
+    }
+   ],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 497
+   },
+   "pax": {
+    "happy": 2103,
+    "unhappy": 275,
+    "no_route": 18
+   },
+   "line_ids": [],
+   "convoy_ids": [],
+   "connections": [],
+   "stats": {
+    "arrived": [
+     2845,
+     824,
+     950,
+     1129,
+     1533,
+     876,
+     2157,
+     3094,
+     2344,
+     1516,
+     692,
+     1985
+    ],
+    "departed": [
+     502,
+     1689,
+     1962,
+     1,
+     204,
+     942,
+     2189,
+     618,
+     1391,
+     2006,
+     666,
+     2813
+    ],
+    "waiting": [
+     606,
+     409,
+     675,
+     720,
+     189,
+     171,
+     599,
+     138,
+     744,
+     747,
+     414,
+     414
+    ],
+    "happy": [
+     1342,
+     2048,
+     842,
+     241,
+     1051,
+     703,
+     1459,
+     1623,
+     1388,
+     1622,
+     1322,
+     801
+    ],
+    "unhappy": [
+     140,
+     270,
+     25,
+     185,
+     237,
+     74,
+     299,
+     235,
+     79,
+     271,
+     158,
+     118
+    ],
+    "no_route": [
+     80,
+     60,
+     41,
+     67,
+     27,
+     15,
+     77,
+     54,
+     62,
+     60,
+     39,
+     47
+    ],
+    "convoys_arrived": [
+     89,
+     82,
+     159,
+     133,
+     3,
+     107,
+     160,
+     77,
+     129,
+     157,
+     29,
+     98
+    ]
+   }
+  },
+  {
+   "id": 33,
+   "name": "České Budějovice Sídliště",
+   "owner_id": 0,
+   "pos": {
+    "x": 166,
+    "y": 375,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 166,
+     "y": 375,
+     "z": 0
+    },
+    {
+     "x": 166,
+     "y": 376,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "ship"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 733,
+    "unhappy": 199,
+    "no_route": 7
+   },
+   "line_ids": [
+    40,
+    49
+   ],
+   "convoy_ids": [
+    21,
+    22,
+    29,
+    30,
+    31,
+    32
+   ],
+   "connections": [
+    {
+     "halt_id": 36,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 36,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 31,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 31,
+     "catg_index": 3
+    }
+   ],
+   "stats": {
+    "arrived": [
+     347,
+     886,
+     2075,
+     2758,
+     573,
+     1636,
+     1834,
+     1843,
+     2506,
+     2570,
+     1577,
+     2574
+    ],
+    "departed": [
+     932,
+     874,
+     526,
+     2004,
+     2302,
+     2699,
+     1000,
+     2388,
+     2885,
+     293,
+     3193,
+     1599
+    ],
+    "waiting": [
+     435,
+     6,
+     41,
+     16,
+     76,
+     84,
+     420,
+     279,
+     579,
+     54,
+     852,
+     603
+    ],
+    "happy": [
+     544,
+     735,
+     249,
+     1390,
+     1073,
+     827,
+     1359,
+     240,
+     2308,
+     1882,
+     770,
+     2320
+    ],
+    "unhappy": [
+     13,
+     59,
+     81,
+     249,
+     134,
+     78,
+     56,
+     20,
+     176,
+     287,
+     297,
+     134
+    ],
+    "no_route": [
+     65,
+     42,
+     57,
+     53,
+     33,
+     36,
+     49,
+     83,
+     6,
+     11,
+     81,
+     12
+    ],
+    "convoys_arrived": [
+     141,
+     139,
+     88,
+     75,
+     78,
+     129,
+     13,
+     120,
+     4,
+     67,
+     130,
+     80
+    ]
+   }
+  },
+  {
+   "id": 34,
+   "name": "České Budějovice Nemocnice",
+   "owner_id": 0,
+   "pos": {
+    "x": 162,
+    "y": 394,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 162,
+     "y": 394,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "monorail"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": true
+   },
+   "capacity": {
+    "passengers": 120,
+    "mail": 80,
+    "goods": 250
+   },
+   "waiting": [
+    {
+     "goods_index": 0,
+     "goods_name": "Cestující",
+     "amount": 205
+    },
+    {
+     "goods_index": 2,
+     "goods_name": "Uhlí",
+     "amount": 187
+    },
+    {
+     "goods_index": 3,
+     "goods_name": "Ocel",
+     "amount": 69
+    },
+    {
+     "goods_index": 5,
+     "goods_name": "Ropa",
+     "amount": 130
+    }
+   ],
+   "waiting_total": {
+    "passengers": 205,
+    "mail": 0,
+    "goods": 386
+   },
+   "pax": {
+    "happy": 1976,
+    "unhappy": 31,
+    "no_route": 88
+   },
+   "line_ids": [
+    49
+   ],
+   "convoy_ids": [
+    29,
+    30,
+    31,
+    32
+   ],
+   "connections": [
+    {
+     "halt_id": 35,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 35,
+     "catg_index": 3
+    }
+   ],
+   "stats": {
+    "arrived": [
+     2634,
+     1631,
+     2432,
+     1276,
+     1324,
+     1490,
+     1696,
+     175,
+     744,
+     3042,
+     2689,
+     249
+    ],
+    "departed": [
+     707,
+     1903,
+     1730,
+     906,
+     1918,
+     88,
+     1697,
+     1565,
+     849,
+     1599,
+     1360,
+     1690
+    ],
+    "waiting": [
+     344,
+     123,
+     343,
+     372,
+     334,
+     617,
+     744,
+     295,
+     493,
+     47,
+     796,
+     39
+    ],
+    "happy": [
+     74,
+     1694,
+     2230,
+     2005,
+     1230,
+     2068,
+     1093,
+     1075,
+     2231,
+     181,
+     1452,
+     2180
+    ],
+    "unhappy": [
+     187,
+     167,
+     127,
+     48,
+     13,
+     10,
+     82,
+     282,
+     0,
+     218,
+     69,
+     213
+    ],
+    "no_route": [
+     81,
+     7,
+     3,
+     0,
+     24,
+     41,
+     42,
+     47,
+     64,
+     8,
+     45,
+     53
+    ],
+    "convoys_arrived": [
+     151,
+     27,
+     119,
+     110,
+     91,
+     129,
+     107,
+     70,
+     80,
+     99,
+     64,
+     105
+    ]
+   }
+  },
+  {
+   "id": 35,
+   "name": "České Budějovice Pod Špičákem",
+   "owner_id": 0,
+   "pos": {
+    "x": 156,
+    "y": 393,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 156,
+     "y": 393,
+     "z": 0
+    },
+    {
+     "x": 156,
+     "y": 394,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "rail",
+    "road"
+   ],
+   "enabled": {
+    "passengers": true,
+    "mail": true,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 640,
+    "mail": 80,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 516,
+    "unhappy": 243,
+    "no_route": 46
+   },
+   "line_ids": [
+    49
+   ],
+   "convoy_ids": [
+    29,
+    30,
+    31,
+    32
+   ],
+   "connections": [
+    {
+     "halt_id": 34,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 34,
+     "catg_index": 3
+    },
+    {
+     "halt_id": 31,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 31,
+     "catg_index": 3
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1141,
+     855,
+     951,
+     2606,
+     2289,
+     1055,
+     2428,
+     132,
+     1480,
+     64,
+     2365,
+     1324
+    ],
+    "departed": [
+     1846,
+     1410,
+     3086,
+     1472,
+     712,
+     2854,
+     2482,
+     972,
+     1102,
+     2595,
+     2683,
+     2418
+    ],
+    "waiting": [
+     814,
+     477,
+     313,
+     492,
+     5,
+     643,
+     832,
+     867,
+     781,
+     402,
+     742,
+     841
+    ],
+    "happy": [
+     2145,
+     280,
+     1136,
+     1248,
+     2267,
+     1069,
+     1244,
+     284,
+     766,
+     1340,
+     1833,
+     805
+    ],
+    "unhappy": [
+     243,
+     48,
+     28,
+     164,
+     195,
+     22,
+     142,
+     114,
+     290,
+     78,
+     82,
+     26
+    ],
+    "no_route": [
+     5,
+     36,
+     35,
+     37,
+     84,
+     27,
+     88,
+     1,
+     36,
+     52,
+     30,
+     16
+    ],
+    "convoys_arrived": [
+     55,
+     64,
+     150,
+     70,
+     106,
+     156,
+     107,
+     104,
+     38,
+     36,
+     148,
+     141
+    ]
+   }
+  },
+  {
+   "id": 36,
+   "name": "České Budějovice hl.n.",
+   "owner_id": 1,
+   "pos": {
+    "x": 188,
+    "y": 398,
+    "z": 0
+   },
+   "tiles": [
+    {
+     "x": 188,
+     "y": 398,
+     "z": 0
+    },
+    {
+     "x": 188,
+     "y": 399,
+     "z": 0
+    }
+   ],
+   "station_types": [
+    "tram"
+   ],
+   "enabled": {
+    "passengers": false,
+    "mail": false,
+    "goods": false
+   },
+   "capacity": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "waiting": [],
+   "waiting_total": {
+    "passengers": 0,
+    "mail": 0,
+    "goods": 0
+   },
+   "pax": {
+    "happy": 1273,
+    "unhappy": 245,
+    "no_route": 0
+   },
+   "line_ids": [
+    40
+   ],
+   "convoy_ids": [
+    21,
+    22
+   ],
+   "connections": [
+    {
+     "halt_id": 33,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 33,
+     "catg_index": 1
+    },
+    {
+     "halt_id": 4,
+     "catg_index": 0
+    },
+    {
+     "halt_id": 4,
+     "catg_index": 1
+    }
+   ],
+   "stats": {
+    "arrived": [
+     1677,
+     1213,
+     2062,
+     2478,
+     2362,
+     2580,
+     1500,
+     229,
+     2794,
+     126,
+     3038,
+     2638
+    ],
+    "departed": [
+     351,
+     924,
+     2853,
+     2894,
+     2321,
+     2319,
+     2988,
+     279,
+     2825,
+     729,
+     947,
+     928
+    ],
+    "waiting": [
+     816,
+     455,
+     439,
+     552,
+     418,
+     162,
+     499,
+     689,
+     52,
+     738,
+     847,
+     250
+    ],
+    "happy": [
+     1736,
+     1377,
+     836,
+     1394,
+     166,
+     388,
+     2198,
+     1473,
+     647,
+     2363,
+     972,
+     1589
+    ],
+    "unhappy": [
+     215,
+     104,
+     257,
+     255,
+     119,
+     247,
+     247,
+     216,
+     7,
+     288,
+     272,
+     215
+    ],
+    "no_route": [
+     60,
+     4,
+     76,
+     29,
+     48,
+     29,
+     7,
+     85,
+     48,
+     22,
+     34,
+     10
+    ],
+    "convoys_arrived": [
+     156,
+     98,
+     143,
+     73,
+     146,
+     120,
+     84,
+     88,
+     139,
+     53,
+     17,
+     116
+    ]
+   }
+  }
+ ],
+ "convoys": [
+  {
+   "id": 1,
+   "name": "R1 Praha - Kolín 1",
+   "owner_id": 0,
+   "line_id": 10,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 307,
+    "y": 282,
+    "z": 0
+   },
+   "vehicle_count": 5,
+   "vehicles": [
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    },
+    {
+     "name": "Falls",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 0
+    },
+    {
+     "name": "Bmz",
+     "capacity": 72,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Aby",
+     "capacity": 48,
+     "goods_catg": 0,
+     "loaded": 24,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Es slide",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 80,
+     "power": 0
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 20,
+   "loading_limit": 50,
+   "total_capacity": 120,
+   "total_loaded": 24,
+   "home_depot": {
+    "x": 304,
+    "y": 279,
+    "z": 0
+   },
+   "profit_this_month": 10974.38,
+   "profit_last_year": 315068.15,
+   "revenue_this_month": 48346.77,
+   "schedule": null
+  },
+  {
+   "id": 2,
+   "name": "R2 Praha - Plzeň 1",
+   "owner_id": 0,
+   "line_id": 13,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 116,
+    "y": 179,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Bmz",
+     "capacity": 72,
+     "goods_catg": 0,
+     "loaded": 11,
+     "max_speed": 140,
+     "power": 0
+    }
+   ],
+   "max_speed": 140,
+   "loading_level": 15,
+   "loading_limit": 0,
+   "total_capacity": 72,
+   "total_loaded": 11,
+   "home_depot": {
+    "x": 110,
+    "y": 182,
+    "z": 0
+   },
+   "profit_this_month": 29038.99,
+   "profit_last_year": 191381.53,
+   "revenue_this_month": 82108.55,
+   "schedule": null
+  },
+  {
+   "id": 3,
+   "name": "R2 Praha - Plzeň 2",
+   "owner_id": 0,
+   "line_id": 13,
+   "state": "loading",
+   "pos": {
+    "x": 124,
+    "y": 150,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Aby",
+     "capacity": 48,
+     "goods_catg": 0,
+     "loaded": 29,
+     "max_speed": 140,
+     "power": 0
+    }
+   ],
+   "max_speed": 140,
+   "loading_level": 60,
+   "loading_limit": 0,
+   "total_capacity": 48,
+   "total_loaded": 29,
+   "home_depot": {
+    "x": 123,
+    "y": 156,
+    "z": 0
+   },
+   "profit_this_month": -249.6,
+   "profit_last_year": 359148.88,
+   "revenue_this_month": 55682.72,
+   "schedule": null
+  },
+  {
+   "id": 4,
+   "name": "Ex 3 Praha - Ostrava 1",
+   "owner_id": 0,
+   "line_id": 16,
+   "state": "self_destruct",
+   "pos": {
+    "x": 125,
+    "y": 150,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Es slide",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 80,
+     "power": 0
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 0,
+   "loading_limit": 0,
+   "total_capacity": 0,
+   "total_loaded": 0,
+   "home_depot": {
+    "x": 123,
+    "y": 156,
+    "z": 0
+   },
+   "profit_this_month": 37618.76,
+   "profit_last_year": 40465.7,
+   "revenue_this_month": 20344.35,
+   "schedule": null
+  },
+  {
+   "id": 5,
+   "name": "Ex 3 Praha - Ostrava 2",
+   "owner_id": 0,
+   "line_id": 16,
+   "state": "no_route",
+   "pos": {
+    "x": 116,
+    "y": 134,
+    "z": 0
+   },
+   "vehicle_count": 5,
+   "vehicles": [
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    },
+    {
+     "name": "Bdmtee",
+     "capacity": 64,
+     "goods_catg": 0,
+     "loaded": 11,
+     "max_speed": 120,
+     "power": 0
+    },
+    {
+     "name": "Bmz",
+     "capacity": 72,
+     "goods_catg": 0,
+     "loaded": 55,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    },
+    {
+     "name": "Es slide",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 80,
+     "power": 0
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 48,
+   "loading_limit": 50,
+   "total_capacity": 136,
+   "total_loaded": 66,
+   "home_depot": {
+    "x": 122,
+    "y": 135,
+    "z": 0
+   },
+   "profit_this_month": 21207.91,
+   "profit_last_year": 171054.74,
+   "revenue_this_month": 2669.14,
+   "schedule": null
+  },
+  {
+   "id": 6,
+   "name": "Nákladní uhlí Ostrava 1",
+   "owner_id": 0,
+   "line_id": 19,
+   "state": "loading",
+   "pos": {
+    "x": 413,
+    "y": 121,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Es slide",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 80,
+     "power": 0
+    },
+    {
+     "name": "Aby",
+     "capacity": 48,
+     "goods_catg": 0,
+     "loaded": 31,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 64,
+   "loading_limit": 0,
+   "total_capacity": 48,
+   "total_loaded": 31,
+   "home_depot": {
+    "x": 408,
+    "y": 117,
+    "z": 0
+   },
+   "profit_this_month": 8214.35,
+   "profit_last_year": 76177.88,
+   "revenue_this_month": 31197.73,
+   "schedule": null
+  },
+  {
+   "id": 7,
+   "name": "Nákladní uhlí Ostrava 2",
+   "owner_id": 0,
+   "line_id": 19,
+   "state": "in_depot",
+   "pos": {
+    "x": 380,
+    "y": 123,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Falls",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 0
+    },
+    {
+     "name": "Bmz",
+     "capacity": 72,
+     "goods_catg": 0,
+     "loaded": 7,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    }
+   ],
+   "max_speed": 90,
+   "loading_level": 9,
+   "loading_limit": 0,
+   "total_capacity": 72,
+   "total_loaded": 7,
+   "home_depot": {
+    "x": 386,
+    "y": 126,
+    "z": 0
+   },
+   "profit_this_month": 5954.7,
+   "profit_last_year": 43854.63,
+   "revenue_this_month": 89319.45,
+   "schedule": null
+  },
+  {
+   "id": 8,
+   "name": "Os 9 Brno okruh 1",
+   "owner_id": 0,
+   "line_id": 22,
+   "state": "driving",
+   "pos": {
+    "x": 306,
+    "y": 283,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Falls",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 0
+    },
+    {
+     "name": "Aby",
+     "capacity": 48,
+     "goods_catg": 0,
+     "loaded": 28,
+     "max_speed": 140,
+     "power": 0
+    },
+    {
+     "name": "Br 754",
+     "capacity": 0,
+     "goods_catg": 0,
+     "loaded": 0,
+     "max_speed": 120,
+     "power": 1400
+    }
+   ],
+   "max_speed": 90,
+   "loading_level": 58,
+   "loading_limit": 50,
+   "total_capacity": 48,
+   "total_loaded": 28,
+   "home_depot": {
+    "x": 304,
+    "y": 279,
+    "z": 0
+   },
+   "profit_this_month": 21059.8,
+   "profit_last_year": 280543.94,
+   "revenue_this_month": 28521.43,
+   "schedule": null
+  },
+  {
+   "id": 9,
+   "name": "Autobus 101 1",
+   "owner_id": 0,
+   "line_id": 25,
+   "state": "driving",
+   "pos": {
+    "x": 120,
+    "y": 139,
+    "z": 0
+   },
+   "vehicle_count": 5,
+   "vehicles": [
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 5,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 6,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 10,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 4,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 21,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 38,
+   "loading_limit": 100,
+   "total_capacity": 118,
+   "total_loaded": 46,
+   "home_depot": {
+    "x": 122,
+    "y": 135,
+    "z": 0
+   },
+   "profit_this_month": -2046.32,
+   "profit_last_year": 266159.38,
+   "revenue_this_month": 2083.31,
+   "schedule": null
+  },
+  {
+   "id": 10,
+   "name": "Autobus 101 2",
+   "owner_id": 0,
+   "line_id": 25,
+   "state": "waiting_for_clearance",
+   "pos": {
+    "x": 128,
+    "y": 139,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 15,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 9,
+     "max_speed": 65,
+     "power": 175
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 40,
+   "loading_limit": 0,
+   "total_capacity": 60,
+   "total_loaded": 24,
+   "home_depot": {
+    "x": 122,
+    "y": 135,
+    "z": 0
+   },
+   "profit_this_month": 12368.84,
+   "profit_last_year": 116233.5,
+   "revenue_this_month": 41258.01,
+   "schedule": null
+  },
+  {
+   "id": 11,
+   "name": "Autobus 101 3",
+   "owner_id": 0,
+   "line_id": 25,
+   "state": "no_route",
+   "pos": {
+    "x": 89,
+    "y": 150,
+    "z": 0
+   },
+   "vehicle_count": 6,
+   "vehicles": [
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 7,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 23,
+   "loading_limit": 0,
+   "total_capacity": 30,
+   "total_loaded": 7,
+   "home_depot": {
+    "x": 93,
+    "y": 155,
+    "z": 0
+   },
+   "profit_this_month": 34569.73,
+   "profit_last_year": 267203.86,
+   "revenue_this_month": 12369.41,
+   "schedule": null
+  },
+  {
+   "id": 12,
+   "name": "Autobus 205 Plzeň 1",
+   "owner_id": 1,
+   "line_id": 28,
+   "state": "self_destruct",
+   "pos": {
+    "x": 75,
+    "y": 221,
+    "z": 0
+   },
+   "vehicle_count": 5,
+   "vehicles": [
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 11,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 19,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 16,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 23,
+     "max_speed": 65,
+     "power": 175
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 71,
+   "loading_limit": 50,
+   "total_capacity": 96,
+   "total_loaded": 69,
+   "home_depot": {
+    "x": 78,
+    "y": 222,
+    "z": 0
+   },
+   "profit_this_month": 34643.01,
+   "profit_last_year": 208972.18,
+   "revenue_this_month": 60815.58,
+   "schedule": null
+  },
+  {
+   "id": 13,
+   "name": "Autobus 205 Plzeň 2",
+   "owner_id": 1,
+   "line_id": 28,
+   "state": "in_depot",
+   "pos": {
+    "x": 48,
+    "y": 223,
+    "z": 0
+   },
+   "vehicle_count": 5,
+   "vehicles": [
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 15,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 1,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 30,
+   "loading_limit": 50,
+   "total_capacity": 52,
+   "total_loaded": 16,
+   "home_depot": {
+    "x": 47,
+    "y": 226,
+    "z": 0
+   },
+   "profit_this_month": 24534.86,
+   "profit_last_year": 324708.55,
+   "revenue_this_month": 82158.39,
+   "schedule": null
+  },
+  {
+   "id": 14,
+   "name": "Kamiony s ocelí 1",
+   "owner_id": 1,
+   "line_id": 31,
+   "state": "no_route",
+   "pos": {
+    "x": 310,
+    "y": 288,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 5,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 19,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 46,
+   "loading_limit": 0,
+   "total_capacity": 52,
+   "total_loaded": 24,
+   "home_depot": {
+    "x": 314,
+    "y": 287,
+    "z": 0
+   },
+   "profit_this_month": 12525.5,
+   "profit_last_year": 363733.71,
+   "revenue_this_month": 76924.42,
+   "schedule": null
+  },
+  {
+   "id": 15,
+   "name": "Kamiony s ocelí 2",
+   "owner_id": 1,
+   "line_id": 31,
+   "state": "driving",
+   "pos": {
+    "x": 384,
+    "y": 142,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 9,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 40,
+   "loading_limit": 0,
+   "total_capacity": 22,
+   "total_loaded": 9,
+   "home_depot": {
+    "x": 390,
+    "y": 143,
+    "z": 0
+   },
+   "profit_this_month": 15775.01,
+   "profit_last_year": 71080.02,
+   "revenue_this_month": 88405.81,
+   "schedule": null
+  },
+  {
+   "id": 16,
+   "name": "Tramvaj 22 1",
+   "owner_id": 0,
+   "line_id": 34,
+   "state": "waiting_for_clearance",
+   "pos": {
+    "x": 114,
+    "y": 166,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Tatra T3",
+     "capacity": 24,
+     "goods_catg": 0,
+     "loaded": 6,
+     "max_speed": 65,
+     "power": 160
+    },
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 34,
+     "max_speed": 70,
+     "power": 480
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 47,
+   "loading_limit": 50,
+   "total_capacity": 84,
+   "total_loaded": 40,
+   "home_depot": {
+    "x": 115,
+    "y": 162,
+    "z": 0
+   },
+   "profit_this_month": 39348.79,
+   "profit_last_year": 259533.99,
+   "revenue_this_month": 36674.13,
+   "schedule": null
+  },
+  {
+   "id": 17,
+   "name": "Tramvaj 22 2",
+   "owner_id": 0,
+   "line_id": 34,
+   "state": "driving",
+   "pos": {
+    "x": 133,
+    "y": 174,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 8,
+     "max_speed": 70,
+     "power": 480
+    },
+    {
+     "name": "Tatra T3",
+     "capacity": 24,
+     "goods_catg": 0,
+     "loaded": 4,
+     "max_speed": 65,
+     "power": 160
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 14,
+   "loading_limit": 100,
+   "total_capacity": 84,
+   "total_loaded": 12,
+   "home_depot": {
+    "x": 139,
+    "y": 180,
+    "z": 0
+   },
+   "profit_this_month": 34348.18,
+   "profit_last_year": 136857.42,
+   "revenue_this_month": 79033.27,
+   "schedule": null
+  },
+  {
+   "id": 18,
+   "name": "Tramvaj 22 3",
+   "owner_id": 0,
+   "line_id": 34,
+   "state": "no_route",
+   "pos": {
+    "x": 107,
+    "y": 180,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Tatra T3",
+     "capacity": 24,
+     "goods_catg": 0,
+     "loaded": 21,
+     "max_speed": 65,
+     "power": 160
+    },
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 28,
+     "max_speed": 70,
+     "power": 480
+    },
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 41,
+     "max_speed": 70,
+     "power": 480
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 62,
+   "loading_limit": 0,
+   "total_capacity": 144,
+   "total_loaded": 90,
+   "home_depot": {
+    "x": 110,
+    "y": 182,
+    "z": 0
+   },
+   "profit_this_month": -6048.14,
+   "profit_last_year": 212923.04,
+   "revenue_this_month": 18056.07,
+   "schedule": null
+  },
+  {
+   "id": 19,
+   "name": "Tramvaj 22 4",
+   "owner_id": 0,
+   "line_id": 34,
+   "state": "loading",
+   "pos": {
+    "x": 121,
+    "y": 156,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 42,
+     "max_speed": 70,
+     "power": 480
+    },
+    {
+     "name": "Škoda 15T",
+     "capacity": 60,
+     "goods_catg": 0,
+     "loaded": 35,
+     "max_speed": 70,
+     "power": 480
+    }
+   ],
+   "max_speed": 70,
+   "loading_level": 64,
+   "loading_limit": 0,
+   "total_capacity": 120,
+   "total_loaded": 77,
+   "home_depot": {
+    "x": 123,
+    "y": 153,
+    "z": 0
+   },
+   "profit_this_month": 22209.84,
+   "profit_last_year": 15897.9,
+   "revenue_this_month": 36966.74,
+   "schedule": null
+  },
+  {
+   "id": 20,
+   "name": "Tramvaj 4 Brno 1",
+   "owner_id": 0,
+   "line_id": 37,
+   "state": "in_depot",
+   "pos": {
+    "x": 302,
+    "y": 277,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Tatra T3",
+     "capacity": 24,
+     "goods_catg": 0,
+     "loaded": 10,
+     "max_speed": 65,
+     "power": 160
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 41,
+   "loading_limit": 0,
+   "total_capacity": 24,
+   "total_loaded": 10,
+   "home_depot": {
+    "x": 304,
+    "y": 279,
+    "z": 0
+   },
+   "profit_this_month": 19644.56,
+   "profit_last_year": -37659.58,
+   "revenue_this_month": 13129.39,
+   "schedule": null
+  },
+  {
+   "id": 21,
+   "name": "Lodní linka Vltava 1",
+   "owner_id": 0,
+   "line_id": 40,
+   "state": "in_depot",
+   "pos": {
+    "x": 165,
+    "y": 373,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Nákladní člun",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 20,
+     "power": 400
+    },
+    {
+     "name": "Nákladní člun",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 20,
+     "power": 400
+    },
+    {
+     "name": "Nákladní člun",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 20,
+     "power": 400
+    }
+   ],
+   "max_speed": 20,
+   "loading_level": 0,
+   "loading_limit": 0,
+   "total_capacity": 0,
+   "total_loaded": 0,
+   "home_depot": {
+    "x": 166,
+    "y": 375,
+    "z": 0
+   },
+   "profit_this_month": 4601.78,
+   "profit_last_year": 334190.13,
+   "revenue_this_month": 48445.49,
+   "schedule": null
+  },
+  {
+   "id": 22,
+   "name": "Lodní linka Vltava 2",
+   "owner_id": 0,
+   "line_id": 40,
+   "state": "driving",
+   "pos": {
+    "x": 113,
+    "y": 165,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Nákladní člun",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 20,
+     "power": 400
+    }
+   ],
+   "max_speed": 20,
+   "loading_level": 0,
+   "loading_limit": 0,
+   "total_capacity": 0,
+   "total_loaded": 0,
+   "home_depot": {
+    "x": 115,
+    "y": 162,
+    "z": 0
+   },
+   "profit_this_month": 13037.71,
+   "profit_last_year": 150285.51,
+   "revenue_this_month": 34901.42,
+   "schedule": null
+  },
+  {
+   "id": 23,
+   "name": "Letecká linka PRG-OSR 1",
+   "owner_id": 0,
+   "line_id": 43,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 122,
+    "y": 156,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Boeing 737",
+     "capacity": 140,
+     "goods_catg": 0,
+     "loaded": 16,
+     "max_speed": 840,
+     "power": 9000
+    },
+    {
+     "name": "ATR 72",
+     "capacity": 68,
+     "goods_catg": 0,
+     "loaded": 49,
+     "max_speed": 480,
+     "power": 2000
+    },
+    {
+     "name": "ATR 72",
+     "capacity": 68,
+     "goods_catg": 0,
+     "loaded": 42,
+     "max_speed": 480,
+     "power": 2000
+    }
+   ],
+   "max_speed": 480,
+   "loading_level": 38,
+   "loading_limit": 100,
+   "total_capacity": 276,
+   "total_loaded": 107,
+   "home_depot": {
+    "x": 123,
+    "y": 153,
+    "z": 0
+   },
+   "profit_this_month": 25104.13,
+   "profit_last_year": 354735.13,
+   "revenue_this_month": 56184.03,
+   "schedule": null
+  },
+  {
+   "id": 24,
+   "name": "Letecká linka PRG-OSR 2",
+   "owner_id": 0,
+   "line_id": 43,
+   "state": "waiting_for_clearance",
+   "pos": {
+    "x": 123,
+    "y": 156,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Boeing 737",
+     "capacity": 140,
+     "goods_catg": 0,
+     "loaded": 139,
+     "max_speed": 840,
+     "power": 9000
+    },
+    {
+     "name": "Boeing 737",
+     "capacity": 140,
+     "goods_catg": 0,
+     "loaded": 117,
+     "max_speed": 840,
+     "power": 9000
+    }
+   ],
+   "max_speed": 840,
+   "loading_level": 91,
+   "loading_limit": 0,
+   "total_capacity": 280,
+   "total_loaded": 256,
+   "home_depot": {
+    "x": 123,
+    "y": 153,
+    "z": 0
+   },
+   "profit_this_month": 35947.9,
+   "profit_last_year": 36781.18,
+   "revenue_this_month": 36988.63,
+   "schedule": null
+  },
+  {
+   "id": 25,
+   "name": "Monorail Jižní Město 1",
+   "owner_id": 0,
+   "line_id": 46,
+   "state": "self_destruct",
+   "pos": {
+    "x": 110,
+    "y": 182,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 75,
+     "max_speed": 160,
+     "power": 900
+    },
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 29,
+     "max_speed": 160,
+     "power": 900
+    },
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 23,
+     "max_speed": 160,
+     "power": 900
+    }
+   ],
+   "max_speed": 160,
+   "loading_level": 52,
+   "loading_limit": 50,
+   "total_capacity": 240,
+   "total_loaded": 127,
+   "home_depot": {
+    "x": 110,
+    "y": 182,
+    "z": 0
+   },
+   "profit_this_month": 18434.35,
+   "profit_last_year": 217427.84,
+   "revenue_this_month": 57722.29,
+   "schedule": null
+  },
+  {
+   "id": 26,
+   "name": "Monorail Jižní Město 2",
+   "owner_id": 0,
+   "line_id": 46,
+   "state": "waiting_for_clearance",
+   "pos": {
+    "x": 118,
+    "y": 154,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 46,
+     "max_speed": 160,
+     "power": 900
+    },
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 35,
+     "max_speed": 160,
+     "power": 900
+    }
+   ],
+   "max_speed": 160,
+   "loading_level": 50,
+   "loading_limit": 0,
+   "total_capacity": 160,
+   "total_loaded": 81,
+   "home_depot": {
+    "x": 123,
+    "y": 156,
+    "z": 0
+   },
+   "profit_this_month": -755.98,
+   "profit_last_year": 177288.36,
+   "revenue_this_month": 56650.8,
+   "schedule": null
+  },
+  {
+   "id": 27,
+   "name": "Monorail Jižní Město 3",
+   "owner_id": 0,
+   "line_id": 46,
+   "state": "self_destruct",
+   "pos": {
+    "x": 120,
+    "y": 151,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 59,
+     "max_speed": 160,
+     "power": 900
+    }
+   ],
+   "max_speed": 160,
+   "loading_level": 73,
+   "loading_limit": 0,
+   "total_capacity": 80,
+   "total_loaded": 59,
+   "home_depot": {
+    "x": 123,
+    "y": 153,
+    "z": 0
+   },
+   "profit_this_month": 6683.13,
+   "profit_last_year": 231942.64,
+   "revenue_this_month": 25787.74,
+   "schedule": null
+  },
+  {
+   "id": 28,
+   "name": "Monorail Jižní Město 4",
+   "owner_id": 0,
+   "line_id": 46,
+   "state": "no_route",
+   "pos": {
+    "x": 138,
+    "y": 157,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Monorail vůz",
+     "capacity": 80,
+     "goods_catg": 0,
+     "loaded": 48,
+     "max_speed": 160,
+     "power": 900
+    }
+   ],
+   "max_speed": 160,
+   "loading_level": 60,
+   "loading_limit": 0,
+   "total_capacity": 80,
+   "total_loaded": 48,
+   "home_depot": {
+    "x": 141,
+    "y": 160,
+    "z": 0
+   },
+   "profit_this_month": 3155.38,
+   "profit_last_year": 146674.05,
+   "revenue_this_month": 11354.75,
+   "schedule": null
+  },
+  {
+   "id": 29,
+   "name": "Úzkokolejka Jindřichův Hradec 1",
+   "owner_id": 0,
+   "line_id": 49,
+   "state": "self_destruct",
+   "pos": {
+    "x": 172,
+    "y": 382,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 34,
+     "max_speed": 50,
+     "power": 120
+    }
+   ],
+   "max_speed": 50,
+   "loading_level": 85,
+   "loading_limit": 0,
+   "total_capacity": 40,
+   "total_loaded": 34,
+   "home_depot": {
+    "x": 173,
+    "y": 382,
+    "z": 0
+   },
+   "profit_this_month": 35950.81,
+   "profit_last_year": 97792.9,
+   "revenue_this_month": 5541.99,
+   "schedule": null
+  },
+  {
+   "id": 30,
+   "name": "Úzkokolejka Jindřichův Hradec 2",
+   "owner_id": 0,
+   "line_id": 49,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 157,
+    "y": 393,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 23,
+     "max_speed": 50,
+     "power": 120
+    },
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 1,
+     "max_speed": 50,
+     "power": 120
+    },
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 22,
+     "max_speed": 50,
+     "power": 120
+    }
+   ],
+   "max_speed": 50,
+   "loading_level": 38,
+   "loading_limit": 100,
+   "total_capacity": 120,
+   "total_loaded": 46,
+   "home_depot": {
+    "x": 156,
+    "y": 393,
+    "z": 0
+   },
+   "profit_this_month": 32521.35,
+   "profit_last_year": 65378.71,
+   "revenue_this_month": 31562.6,
+   "schedule": null
+  },
+  {
+   "id": 31,
+   "name": "Úzkokolejka Jindřichův Hradec 3",
+   "owner_id": 0,
+   "line_id": 49,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 154,
+    "y": 391,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 1,
+     "max_speed": 50,
+     "power": 120
+    },
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 14,
+     "max_speed": 50,
+     "power": 120
+    },
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 17,
+     "max_speed": 50,
+     "power": 120
+    }
+   ],
+   "max_speed": 50,
+   "loading_level": 26,
+   "loading_limit": 0,
+   "total_capacity": 120,
+   "total_loaded": 32,
+   "home_depot": {
+    "x": 156,
+    "y": 393,
+    "z": 0
+   },
+   "profit_this_month": 35660.48,
+   "profit_last_year": 3645.91,
+   "revenue_this_month": 40072.53,
+   "schedule": null
+  },
+  {
+   "id": 32,
+   "name": "Úzkokolejka Jindřichův Hradec 4",
+   "owner_id": 0,
+   "line_id": 49,
+   "state": "leaving_depot",
+   "pos": {
+    "x": 151,
+    "y": 388,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 5,
+     "max_speed": 50,
+     "power": 120
+    },
+    {
+     "name": "M 27.0",
+     "capacity": 40,
+     "goods_catg": 0,
+     "loaded": 5,
+     "max_speed": 50,
+     "power": 120
+    }
+   ],
+   "max_speed": 50,
+   "loading_level": 12,
+   "loading_limit": 100,
+   "total_capacity": 80,
+   "total_loaded": 10,
+   "home_depot": {
+    "x": 156,
+    "y": 393,
+    "z": 0
+   },
+   "profit_this_month": 35004.55,
+   "profit_last_year": 378111.58,
+   "revenue_this_month": 59790.69,
+   "schedule": null
+  },
+  {
+   "id": 33,
+   "name": "Volný spoj 33",
+   "owner_id": 0,
+   "line_id": null,
+   "state": "loading",
+   "pos": {
+    "x": 139,
+    "y": 180,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 25,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 8,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 63,
+   "loading_limit": 0,
+   "total_capacity": 52,
+   "total_loaded": 33,
+   "home_depot": null,
+   "profit_this_month": -2728.21,
+   "profit_last_year": 7987.29,
+   "revenue_this_month": 16131.54,
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 139,
+       "y": 180,
+       "z": 0
+      },
+      "halt_id": 7,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 93,
+       "y": 155,
+       "z": 0
+      },
+      "halt_id": 3,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 56,
+       "y": 232,
+       "z": 0
+      },
+      "halt_id": 20,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": 34,
+   "name": "Volný spoj 34",
+   "owner_id": 0,
+   "line_id": null,
+   "state": "waiting_for_clearance",
+   "pos": {
+    "x": 426,
+    "y": 115,
+    "z": 0
+   },
+   "vehicle_count": 1,
+   "vehicles": [
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 12,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 80,
+   "loading_level": 54,
+   "loading_limit": 0,
+   "total_capacity": 22,
+   "total_loaded": 12,
+   "home_depot": null,
+   "profit_this_month": -3776.0,
+   "profit_last_year": 12887.12,
+   "revenue_this_month": 18883.75,
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 426,
+       "y": 115,
+       "z": 0
+      },
+      "halt_id": 27,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 120,
+       "z": 0
+      },
+      "halt_id": 30,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 304,
+       "y": 279,
+       "z": 0
+      },
+      "halt_id": 16,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": 35,
+   "name": "Volný spoj 35",
+   "owner_id": 0,
+   "line_id": null,
+   "state": "no_route",
+   "pos": {
+    "x": 59,
+    "y": 230,
+    "z": 0
+   },
+   "vehicle_count": 3,
+   "vehicles": [
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 10,
+     "max_speed": 80,
+     "power": 180
+    },
+    {
+     "name": "Tatra 815 sklápěč",
+     "capacity": 0,
+     "goods_catg": 2,
+     "loaded": 0,
+     "max_speed": 90,
+     "power": 270
+    },
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 23,
+     "max_speed": 65,
+     "power": 175
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 63,
+   "loading_limit": 0,
+   "total_capacity": 52,
+   "total_loaded": 33,
+   "home_depot": null,
+   "profit_this_month": 8165.91,
+   "profit_last_year": 24861.54,
+   "revenue_this_month": 19252.77,
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 59,
+       "y": 230,
+       "z": 0
+      },
+      "halt_id": 19,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 123,
+       "y": 153,
+       "z": 0
+      },
+      "halt_id": 2,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 122,
+       "y": 135,
+       "z": 0
+      },
+      "halt_id": 8,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": 36,
+   "name": "Volný spoj 36",
+   "owner_id": 0,
+   "line_id": null,
+   "state": "loading",
+   "pos": {
+    "x": 139,
+    "y": 180,
+    "z": 0
+   },
+   "vehicle_count": 2,
+   "vehicles": [
+    {
+     "name": "Škoda 21Ab",
+     "capacity": 30,
+     "goods_catg": 0,
+     "loaded": 2,
+     "max_speed": 65,
+     "power": 175
+    },
+    {
+     "name": "Karosa B732",
+     "capacity": 22,
+     "goods_catg": 0,
+     "loaded": 10,
+     "max_speed": 80,
+     "power": 180
+    }
+   ],
+   "max_speed": 65,
+   "loading_level": 23,
+   "loading_limit": 0,
+   "total_capacity": 52,
+   "total_loaded": 12,
+   "home_depot": null,
+   "profit_this_month": 4014.06,
+   "profit_last_year": 46808.33,
+   "revenue_this_month": 3199.8,
+   "schedule": {
+    "current_stop": 0,
+    "bidirectional": true,
+    "mirrored": false,
+    "entries": [
+     {
+      "pos": {
+       "x": 139,
+       "y": 180,
+       "z": 0
+      },
+      "halt_id": 7,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 51,
+       "y": 229,
+       "z": 0
+      },
+      "halt_id": 21,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     },
+     {
+      "pos": {
+       "x": 408,
+       "y": 120,
+       "z": 0
+      },
+      "halt_id": 30,
+      "minimum_loading": 0,
+      "waiting_time": 0
+     }
+    ]
+   }
+  }
+ ],
+ "cities": [
+  {
+   "name": "Praha",
+   "pos": {
+    "x": 118,
+    "y": 156
+   },
+   "population": 152821,
+   "buildings": 3288,
+   "growth": 73
+  },
+  {
+   "name": "Brno",
+   "pos": {
+    "x": 302,
+    "y": 268
+   },
+   "population": 73736,
+   "buildings": 1688,
+   "growth": 41
+  },
+  {
+   "name": "Plzeň",
+   "pos": {
+    "x": 62,
+    "y": 244
+   },
+   "population": 48235,
+   "buildings": 911,
+   "growth": 35
+  },
+  {
+   "name": "Ostrava",
+   "pos": {
+    "x": 404,
+    "y": 118
+   },
+   "population": 55509,
+   "buildings": 1288,
+   "growth": 0
+  },
+  {
+   "name": "České Budějovice",
+   "pos": {
+    "x": 176,
+    "y": 372
+   },
+   "population": 29738,
+   "buildings": 644,
+   "growth": 47
+  }
+ ],
+ "factories": [
+  {
+   "name": "Uhelný důl",
+   "pos": {
+    "x": 81,
+    "y": 201,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 322
+  },
+  {
+   "name": "Ocelárna",
+   "pos": {
+    "x": 246,
+    "y": 225,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 32
+  },
+  {
+   "name": "Rafinerie",
+   "pos": {
+    "x": 117,
+    "y": 210,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 378
+  },
+  {
+   "name": "Pila",
+   "pos": {
+    "x": 452,
+    "y": 90,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 265
+  },
+  {
+   "name": "Cukrovar",
+   "pos": {
+    "x": 181,
+    "y": 395,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 806
+  },
+  {
+   "name": "Elektrárna",
+   "pos": {
+    "x": 92,
+    "y": 163,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 507
+  },
+  {
+   "name": "Automobilka",
+   "pos": {
+    "x": 276,
+    "y": 253,
+    "z": 0
+   },
+   "owner_id": 0,
+   "production": 498
+  },
+  {
+   "name": "Pivovar",
+   "pos": {
+    "x": 15,
+    "y": 197,
+    "z": 0
+   },
+   "owner_id": 0,
+   "production": 765
+  },
+  {
+   "name": "Papírna",
+   "pos": {
+    "x": 352,
+    "y": 67,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 466
+  },
+  {
+   "name": "Cementárna",
+   "pos": {
+    "x": 200,
+    "y": 390,
+    "z": 0
+   },
+   "owner_id": null,
+   "production": 21
+  }
+ ]
+}

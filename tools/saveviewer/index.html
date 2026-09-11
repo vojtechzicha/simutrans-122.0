@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simutrans save viewer</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #fbfbfc;
+  --text: #1d2126;
+  --text-dim: #636b75;
+  --text-faint: #8b939d;
+  --border: #dfe3e8;
+  --border-strong: #c7ccd3;
+  --accent: #2f6fb5;
+  --accent-bg: rgba(47, 111, 181, 0.10);
+  --row-hover: #eef2f7;
+  --pos: #1f7a4d;
+  --neg: #b1382f;
+  --warn: #9a6b16;
+  --t-road: #a87424;
+  --t-rail: #35699c;
+  --t-tram: #3f8a63;
+  --t-monorail: #7256a3;
+  --t-maglev: #a2558a;
+  --t-narrowgauge: #8d5f3d;
+  --t-ship: #2e8496;
+  --t-air: #a04f4f;
+  --t-truck: #7d7d3f;
+  --t-bus: #a87424;
+  --t-other: #6f7680;
+  --badge-alpha: 0.13;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181c;
+    --panel: #1c2025;
+    --panel-2: #202429;
+    --text: #dfe3e8;
+    --text-dim: #99a2ad;
+    --text-faint: #727b86;
+    --border: #2c3138;
+    --border-strong: #3b424b;
+    --accent: #6aa8e8;
+    --accent-bg: rgba(106, 168, 232, 0.14);
+    --row-hover: #23282e;
+    --pos: #5cbd8a;
+    --neg: #e2756a;
+    --warn: #d3a54e;
+    --t-road: #d3a55c;
+    --t-rail: #6fa6dd;
+    --t-tram: #6fbf94;
+    --t-monorail: #a68ada;
+    --t-maglev: #d18ab8;
+    --t-narrowgauge: #bf9270;
+    --t-ship: #5ec0d1;
+    --t-air: #d68585;
+    --t-truck: #b6b66a;
+    --t-bus: #d3a55c;
+    --t-other: #98a0aa;
+    --badge-alpha: 0.18;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, input, select { font: inherit; color: inherit; }
+
+#app { display: flex; flex-direction: column; height: 100%; }
+
+/* top bar */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 14px; height: 42px; flex: 0 0 42px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.topbar .brand { font-weight: 600; letter-spacing: 0.2px; }
+.topbar .sep { color: var(--text-faint); }
+.topbar .meta { color: var(--text-dim); display: flex; gap: 14px; flex-wrap: wrap; min-width: 0; }
+.topbar .meta b { font-weight: 600; color: var(--text); }
+.topbar .spacer { flex: 1 1 auto; }
+.btn {
+  background: var(--panel-2); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 4px; padding: 3px 9px; cursor: pointer;
+}
+.btn:hover { background: var(--row-hover); }
+
+/* body */
+.body { display: flex; flex: 1 1 auto; min-height: 0; }
+.sidebar {
+  flex: 0 0 172px; background: var(--panel); border-right: 1px solid var(--border);
+  padding: 8px 0; overflow-y: auto;
+}
+.sidebar .group { padding: 10px 14px 4px; color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+.sidebar a.nav {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  padding: 5px 14px; color: var(--text); border-left: 2px solid transparent;
+}
+.sidebar a.nav:hover { background: var(--row-hover); text-decoration: none; }
+.sidebar a.nav.active { background: var(--accent-bg); border-left-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sidebar a.nav .count { color: var(--text-faint); font-variant-numeric: tabular-nums; font-weight: 400; }
+
+.main { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 14px; }
+.main.nopad { padding: 0; }
+
+h1 { font-size: 16px; margin: 0 0 10px; font-weight: 600; }
+h2 { font-size: 13px; margin: 18px 0 7px; font-weight: 600; color: var(--text); }
+h2:first-child { margin-top: 0; }
+
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 10px 12px; }
+.cards { display: flex; flex-wrap: wrap; gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 8px 12px; min-width: 104px; }
+.stat .n { font-size: 19px; font-variant-numeric: tabular-nums; }
+.stat .l { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat .l .badge { text-transform: none; letter-spacing: 0; }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; }
+.kv dt { color: var(--text-dim); }
+.kv dd { margin: 0; }
+
+/* toolbar */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.toolbar input[type=text], .toolbar select {
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: 4px;
+  padding: 3px 7px; min-width: 0;
+}
+.toolbar input[type=text] { width: 230px; }
+.toolbar input[type=text]:focus, .toolbar select:focus { outline: 2px solid var(--accent-bg); border-color: var(--accent); }
+.toolbar .count { color: var(--text-dim); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* tables */
+.twrap { border: 1px solid var(--border); border-radius: 5px; background: var(--panel); overflow: auto; max-height: calc(100vh - 150px); }
+.twrap.short { max-height: 340px; }
+table.grid { border-collapse: separate; border-spacing: 0; width: 100%; }
+table.grid th, table.grid td { padding: 4px 8px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+table.grid th {
+  position: sticky; top: 0; z-index: 2; background: var(--panel-2);
+  font-weight: 600; color: var(--text-dim); border-bottom: 1px solid var(--border-strong);
+  cursor: pointer; user-select: none;
+}
+table.grid th.nosort { cursor: default; }
+table.grid th .arrow { color: var(--accent); margin-left: 3px; }
+table.grid tbody tr:hover { background: var(--row-hover); }
+table.grid tbody tr.clickable { cursor: pointer; }
+table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid td.wide { white-space: normal; max-width: 420px; }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.dim { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+
+.badge {
+  display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 11px; line-height: 17px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.badge + .badge { margin-left: 3px; }
+.state { color: var(--text-dim); background: rgba(128,128,128,0.13); }
+.state.ok { color: var(--pos); background: rgba(60,150,100,0.13); }
+.state.bad { color: var(--neg); background: rgba(180,70,60,0.13); }
+.state.warn { color: var(--warn); background: rgba(170,130,40,0.15); }
+
+.bar { display: inline-block; width: 54px; height: 9px; background: var(--border); border-radius: 2px; overflow: hidden; vertical-align: -1px; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+
+.backlink { display: inline-block; margin-bottom: 8px; }
+.detail-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.detail-head h1 { margin: 0; }
+.cols { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.cols > * { flex: 1 1 340px; min-width: 300px; }
+.empty { color: var(--text-dim); padding: 8px 2px; }
+
+ol.sched { margin: 0; padding-left: 26px; }
+ol.sched li { padding: 2px 0; border-bottom: 1px solid var(--border); }
+ol.sched li:last-child { border-bottom: 0; }
+ol.sched li.here { background: var(--accent-bg); }
+ol.sched .wp { color: var(--text-faint); font-style: italic; }
+ol.sched .opts { color: var(--text-dim); }
+
+/* loader */
+.loader { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.drop {
+  border: 2px dashed var(--border-strong); border-radius: 8px; background: var(--panel);
+  padding: 34px 44px; text-align: center; max-width: 520px;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-bg); }
+.drop h1 { font-size: 17px; margin-bottom: 6px; }
+.drop p { color: var(--text-dim); margin: 6px 0 14px; }
+.drop .err { color: var(--neg); margin-top: 10px; min-height: 18px; }
+.dropmask {
+  position: fixed; inset: 0; z-index: 60; background: var(--accent-bg);
+  border: 3px dashed var(--accent); display: flex; align-items: center; justify-content: center;
+  font-size: 15px; color: var(--accent); pointer-events: none;
+}
+
+/* map */
+.maproot { display: flex; flex-direction: column; height: 100%; }
+.mapbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.mapbar label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.mapbar .hint { color: var(--text-faint); margin-left: auto; }
+.mapholder { position: relative; flex: 1 1 auto; min-height: 0; }
+#mapcanvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#mapcanvas.drag { cursor: grabbing; }
+.maptip {
+  position: absolute; pointer-events: none; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 4px; padding: 2px 7px;
+  font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.18); z-index: 3;
+}
+.swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: -1px; margin-right: 2px; }
+</style>
+</head>
+<body>
+
+<div id="app" hidden>
+  <div class="topbar">
+    <span class="brand">Simutrans save viewer</span>
+    <span class="meta" id="topmeta"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="btn-open">Open another file</button>
+  </div>
+  <div class="body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <div class="main" id="main"></div>
+  </div>
+</div>
+
+<div class="loader" id="loader">
+  <div class="drop" id="drop">
+    <h1>Simutrans save viewer</h1>
+    <p>No file loaded. Drop an export JSON here or choose a file.</p>
+    <button class="btn" id="btn-pick">Choose file</button>
+    <p class="faint" style="margin-top:14px">Make one with: simutrans -load CZR -export czr.json</p>
+    <div class="err" id="loaderr"></div>
+  </div>
+</div>
+
+<input type="file" id="fileinput" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------- helpers */
+
+var MONTH_NAMES = ["January","February","March","April","May","June",
+                   "July","August","September","October","November","December"];
+var TYPES = ["road","rail","tram","monorail","maglev","narrowgauge","ship","air","truck","bus","other"];
+var LINE_TYPES = ["road","rail","tram","monorail","maglev","narrowgauge","ship","air","other"];
+
+function esc(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function num(v, d) { return (typeof v === "number" && isFinite(v)) ? v : (d === undefined ? 0 : d); }
+function arr(v) { return Array.isArray(v) ? v : []; }
+function obj(v) { return (v && typeof v === "object" && !Array.isArray(v)) ? v : {}; }
+function str(v, d) { return (typeof v === "string" && v.length) ? v : (d === undefined ? "" : d); }
+
+function fmtInt(n) {
+  n = num(n);
+  var neg = n < 0;
+  var s = Math.abs(Math.round(n)).toString();
+  var out = "";
+  while (s.length > 3) { out = " " + s.slice(-3) + out; s = s.slice(0, -3); }
+  return (neg ? "-" : "") + s + out;
+}
+function fmtMoney(n) {
+  n = num(n);
+  var neg = n < 0;
+  var a = Math.abs(n).toFixed(2).split(".");
+  var s = a[0], out = "";
+  while (s.length > 3) { out = " " + s.slice(-3) + out; s = s.slice(0, -3); }
+  return (neg ? "-" : "") + s + out + "." + a[1];
+}
+function signed(n, money) {
+  var t = money ? fmtMoney(n) : fmtInt(n);
+  var c = num(n) > 0 ? "pos" : (num(n) < 0 ? "neg" : "dim");
+  return '<span class="' + c + '">' + t + "</span>";
+}
+function fmtPos(p) {
+  if (!p || typeof p.x !== "number") return '<span class="faint">-</span>';
+  var t = p.x + ", " + p.y + (typeof p.z === "number" ? ", " + p.z : "");
+  return '<span class="mono">(' + t + ")</span>";
+}
+function posText(p) {
+  if (!p || typeof p.x !== "number") return "-";
+  return "(" + p.x + ", " + p.y + (typeof p.z === "number" ? ", " + p.z : "") + ")";
+}
+function titleOf(s) { return str(s).replace(/_/g, " "); }
+function typeBadge(t) {
+  t = str(t, "other");
+  var known = TYPES.indexOf(t) >= 0 ? t : "other";
+  return '<span class="badge" style="color:var(--t-' + known + ');background:color-mix(in srgb, var(--t-' +
+         known + ') calc(var(--badge-alpha) * 100%), transparent)">' + esc(titleOf(t)) + "</span>";
+}
+var BAD_STATES = { loss: 1, no_convoys: 1, nothing_moved: 1, missing_scheduled_slots: 1 };
+var WARN_STATES = { overcrowded: 1, obsolete: 1, no_route: 1, self_destruct: 1 };
+function stateBadge(s) {
+  s = str(s, "unknown");
+  var cls = s === "ok" || s === "driving" || s === "loading" ? "ok"
+          : BAD_STATES[s] ? "bad" : WARN_STATES[s] ? "warn" : "";
+  return '<span class="badge state ' + cls + '">' + esc(titleOf(s)) + "</span>";
+}
+function loadBar(pct) {
+  pct = Math.max(0, Math.min(100, Math.round(num(pct))));
+  return '<span class="bar" title="' + pct + '%"><i style="width:' + pct + '%"></i></span> ' +
+         '<span class="dim">' + pct + "%</span>";
+}
+function monthLabel(i) {
+  var d = obj(D && D.meta && D.meta.date);
+  var y = num(d.year, 0), m = num(d.month, 1) - 1 - i;
+  while (m < 0) { m += 12; y -= 1; }
+  if (!y) return i === 0 ? "This month" : (i === 1 ? "1 month back" : i + " months back");
+  return MONTH_NAMES[((m % 12) + 12) % 12] + " " + y;
+}
+
+/* ------------------------------------------------------------------ state */
+
+var D = null;          // raw export
+var IDX = null;        // lookup maps
+var route = { view: "overview", id: null };
+var filters = {};      // per view filter state
+
+function buildIndex() {
+  var i = {
+    line: {}, stop: {}, convoy: {}, player: {}, goods: {},
+    lineTypes: {}, stopTypes: {}
+  };
+  arr(D.lines).forEach(function (l) { i.line[l.id] = l; i.lineTypes[str(l.type, "other")] = 1; });
+  arr(D.stops).forEach(function (s) {
+    i.stop[s.id] = s;
+    arr(s.station_types).forEach(function (t) { i.stopTypes[t] = 1; });
+  });
+  arr(D.convoys).forEach(function (c) { i.convoy[c.id] = c; });
+  arr(D.players).forEach(function (p) { i.player[p.id] = p; });
+  arr(D.goods).forEach(function (g) { i.goods[g.index] = g; });
+  IDX = i;
+}
+function playerName(id) {
+  if (id === null || id === undefined) return "-";
+  var p = IDX.player[id];
+  return p ? str(p.name, "Player " + id) : "Player " + id;
+}
+function lineLink(id) {
+  var l = IDX.line[id];
+  if (!l) return '<span class="faint">-</span>';
+  return '<a href="#line/' + id + '">' + esc(str(l.name, "Line " + id)) + "</a>";
+}
+function stopLink(id) {
+  var s = IDX.stop[id];
+  if (!s) return '<span class="faint">-</span>';
+  return '<a href="#stop/' + id + '">' + esc(str(s.name, "Stop " + id)) + "</a>";
+}
+function convoyLink(id) {
+  var c = IDX.convoy[id];
+  if (!c) return '<span class="faint">-</span>';
+  return '<a href="#convoy/' + id + '">' + esc(str(c.name, "Convoy " + id)) + "</a>";
+}
+function goodsName(index) {
+  var g = IDX.goods[index];
+  return g ? str(g.name, "Goods " + index) : "Goods " + index;
+}
+function catgName(index) {
+  var found = null;
+  arr(D.goods).forEach(function (g) { if (found === null && num(g.catg_index, -1) === index) found = g; });
+  return found ? str(found.catg_name, str(found.name, "Category " + index)) : "Category " + index;
+}
+
+/* ---------------------------------------------------------------- loading */
+
+function loadJSON(text, sourceName) {
+  var data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error("Could not parse this file as JSON.");
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("This file does not contain a Simutrans export object.");
+  }
+  if (!data.meta && !data.lines && !data.stops && !data.convoys) {
+    throw new Error("This JSON has none of the expected sections (meta, lines, stops, convoys).");
+  }
+  D = data;
+  if (!D.meta) D.meta = {};
+  if (sourceName && !str(D.meta.save_file)) D.meta.save_file = sourceName;
+  buildIndex();
+  filters = {};
+  document.getElementById("loader").hidden = true;
+  document.getElementById("app").hidden = false;
+  renderTop();
+  renderSidebar();
+  if (!location.hash) {
+    var last = "overview";
+    try { last = localStorage.getItem("simutrans-saveviewer-tab") || "overview"; } catch (e) {}
+    location.hash = "#" + last;
+  }
+  onHash();
+}
+
+function handleFile(file) {
+  var r = new FileReader();
+  r.onload = function () {
+    try { loadJSON(String(r.result), file.name); }
+    catch (e) { showLoadError(e.message); }
+  };
+  r.onerror = function () { showLoadError("Could not read the file."); };
+  r.readAsText(file);
+}
+function showLoadError(msg) {
+  document.getElementById("loader").hidden = false;
+  document.getElementById("app").hidden = true;
+  document.getElementById("loaderr").textContent = msg;
+}
+
+/* -------------------------------------------------------------- top + nav */
+
+function renderTop() {
+  var m = obj(D.meta), d = obj(m.date), mp = obj(m.map);
+  var bits = [];
+  bits.push("<b>" + esc(str(m.save_file, "unnamed save")) + "</b>");
+  if (d.year) bits.push(MONTH_NAMES[Math.max(0, Math.min(11, num(d.month, 1) - 1))] + " " + d.year);
+  if (str(m.pakset)) bits.push(esc(m.pakset));
+  if (str(m.game_version)) bits.push("version " + esc(m.game_version));
+  if (mp.width) bits.push(mp.width + " x " + mp.height);
+  document.getElementById("topmeta").innerHTML = bits.join('<span class="sep"> / </span>');
+}
+
+var NAV = [
+  { id: "overview", label: "Overview" },
+  { id: "lines", label: "Lines", count: function () { return arr(D.lines).length; } },
+  { id: "stops", label: "Stops", count: function () { return arr(D.stops).length; } },
+  { id: "convoys", label: "Convoys", count: function () { return arr(D.convoys).length; } },
+  { id: "map", label: "Map" },
+  { id: "cities", label: "Cities", count: function () { return arr(D.cities).length; } },
+  { id: "factories", label: "Factories", count: function () { return arr(D.factories).length; } },
+  { id: "goods", label: "Goods", count: function () { return arr(D.goods).length; } },
+  { id: "settings", label: "Settings", count: function () { return Object.keys(obj(D.settings)).length; } }
+];
+
+function renderSidebar() {
+  var h = '<div class="group">Views</div>';
+  NAV.forEach(function (n) {
+    var c = n.count ? '<span class="count">' + fmtInt(n.count()) + "</span>" : "";
+    h += '<a class="nav" data-view="' + n.id + '" href="#' + n.id + '"><span>' + n.label + "</span>" + c + "</a>";
+  });
+  document.getElementById("sidebar").innerHTML = h;
+}
+function markNav(view) {
+  var links = document.querySelectorAll("#sidebar a.nav");
+  for (var i = 0; i < links.length; i++) {
+    links[i].classList.toggle("active", links[i].getAttribute("data-view") === view);
+  }
+}
+
+/* ----------------------------------------------------------- table engine */
+
+/* cols: [{ key, label, num, sortable, value(row), html(row) }] */
+function renderTable(host, cols, rows, opt) {
+  opt = opt || {};
+  var state = opt.state || (opt.state = { sort: null, dir: 1 });
+  var wrap = document.createElement("div");
+  wrap.className = "twrap" + (opt.short ? " short" : "");
+  var table = document.createElement("table");
+  table.className = "grid";
+  var thead = document.createElement("thead");
+  var tbody = document.createElement("tbody");
+  table.appendChild(thead); table.appendChild(tbody);
+  wrap.appendChild(table); host.appendChild(wrap);
+
+  var sorted = rows.slice();
+  if (state.sort) {
+    var col = null;
+    cols.forEach(function (c) { if (c.key === state.sort) col = c; });
+    if (col) {
+      var dir = state.dir;
+      sorted.sort(function (a, b) {
+        var va = col.value ? col.value(a) : "", vb = col.value ? col.value(b) : "";
+        if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+        va = String(va === null || va === undefined ? "" : va);
+        vb = String(vb === null || vb === undefined ? "" : vb);
+        return va.localeCompare(vb, undefined, { numeric: true, sensitivity: "base" }) * dir;
+      });
+    }
+  }
+
+  var hh = "<tr>";
+  cols.forEach(function (c) {
+    var sortable = c.sortable !== false;
+    var a = state.sort === c.key ? '<span class="arrow">' + (state.dir > 0 ? "▲" : "▼") + "</span>" : "";
+    hh += '<th class="' + (c.num ? "num " : "") + (sortable ? "" : "nosort") + '" data-key="' +
+          esc(c.key) + '" title="' + esc(c.title || c.label) + '">' + esc(c.label) + a + "</th>";
+  });
+  hh += "</tr>";
+  thead.innerHTML = hh;
+  if (opt.onSort !== false) {
+    thead.addEventListener("click", function (ev) {
+      var th = ev.target.closest ? ev.target.closest("th") : null;
+      if (!th || th.classList.contains("nosort")) return;
+      var k = th.getAttribute("data-key");
+      if (state.sort === k) state.dir = -state.dir; else { state.sort = k; state.dir = 1; }
+      if (opt.rerender) opt.rerender();
+    });
+  }
+
+  /* chunked rendering keeps big exports responsive */
+  var pos = 0, CHUNK = 150;
+  function more() {
+    if (pos >= sorted.length) return;
+    var end = Math.min(sorted.length, pos + CHUNK), h = "";
+    for (var i = pos; i < end; i++) {
+      var row = sorted[i];
+      var href = opt.href ? opt.href(row) : null;
+      h += "<tr" + (href ? ' class="clickable" data-href="' + esc(href) + '"' : "") + ">";
+      for (var j = 0; j < cols.length; j++) {
+        var c = cols[j];
+        h += "<td" + (c.num ? ' class="num"' : (c.wide ? ' class="wide"' : "")) + ">" +
+             (c.html ? c.html(row) : esc(c.value ? c.value(row) : "")) + "</td>";
+      }
+      h += "</tr>";
+    }
+    tbody.insertAdjacentHTML("beforeend", h);
+    pos = end;
+  }
+  more();
+  wrap.addEventListener("scroll", function () {
+    if (wrap.scrollTop + wrap.clientHeight > wrap.scrollHeight - 220) more();
+  });
+  if (opt.href) {
+    tbody.addEventListener("click", function (ev) {
+      if (ev.target.tagName === "A") return;
+      var tr = ev.target.closest ? ev.target.closest("tr") : null;
+      if (tr && tr.getAttribute("data-href")) location.hash = tr.getAttribute("data-href");
+    });
+  }
+  if (!sorted.length) {
+    var e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = opt.emptyText || "Nothing to show.";
+    host.appendChild(e);
+  }
+  return wrap;
+}
+
+function monthTable(host, stats, cols) {
+  var rows = [];
+  var len = 0;
+  cols.forEach(function (c) { len = Math.max(len, arr(stats[c.key]).length); });
+  for (var i = 0; i < len; i++) rows.push(i);
+  var tcols = [{ key: "month", label: "Month", sortable: false, html: function (i) { return esc(monthLabel(i)); } }];
+  cols.forEach(function (c) {
+    tcols.push({
+      key: c.key, label: c.label, num: true, sortable: false,
+      html: function (i) {
+        var v = arr(stats[c.key])[i];
+        if (v === null || v === undefined) return '<span class="faint">-</span>';
+        return c.money ? (c.signed ? signed(v, true) : fmtMoney(v)) : (c.signed ? signed(v) : fmtInt(v));
+      }
+    });
+  });
+  if (!len) {
+    var e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "No monthly statistics in this export.";
+    host.appendChild(e);
+    return;
+  }
+  renderTable(host, tcols, rows, { short: true, onSort: false });
+}
+
+function toolbar(host, parts) {
+  var bar = document.createElement("div");
+  bar.className = "toolbar";
+  parts.forEach(function (p) { bar.appendChild(p); });
+  host.appendChild(bar);
+  return bar;
+}
+var pendingFocus = null;   /* keeps the caret in the filter box across a rerender */
+
+function textFilter(value, placeholder, onChange, key) {
+  var i = document.createElement("input");
+  i.type = "text";
+  i.placeholder = placeholder || "Filter";
+  i.value = value || "";
+  i.setAttribute("data-focus-key", key || "filter");
+  var t = null;
+  i.addEventListener("input", function () {
+    clearTimeout(t);
+    t = setTimeout(function () {
+      pendingFocus = { key: i.getAttribute("data-focus-key"), pos: i.selectionStart };
+      onChange(i.value);
+    }, 120);
+  });
+  return i;
+}
+function restoreFocus() {
+  if (!pendingFocus) return;
+  var el = document.querySelector('[data-focus-key="' + pendingFocus.key + '"]');
+  if (el) {
+    el.focus();
+    try { el.setSelectionRange(pendingFocus.pos, pendingFocus.pos); } catch (e) {}
+  }
+  pendingFocus = null;
+}
+function selectFilter(value, options, onChange) {
+  var s = document.createElement("select");
+  options.forEach(function (o) {
+    var op = document.createElement("option");
+    op.value = o.value; op.textContent = o.label;
+    if (String(o.value) === String(value)) op.selected = true;
+    s.appendChild(op);
+  });
+  s.addEventListener("change", function () { onChange(s.value); });
+  return s;
+}
+function countLabel(shown, total, noun) {
+  var s = document.createElement("span");
+  s.className = "count";
+  s.textContent = shown === total ? fmtInt(total) + " " + noun : fmtInt(shown) + " of " + fmtInt(total) + " " + noun;
+  return s;
+}
+function heading(host, text) {
+  var h = document.createElement("h2");
+  h.textContent = text;
+  host.appendChild(h);
+  return h;
+}
+function html(host, markup) {
+  var d = document.createElement("div");
+  d.innerHTML = markup;
+  host.appendChild(d);
+  return d;
+}
+function matches(hay, needle) {
+  if (!needle) return true;
+  return hay.toLowerCase().indexOf(needle.toLowerCase()) >= 0;
+}
+function ownerOptions() {
+  var o = [{ value: "", label: "All owners" }];
+  arr(D.players).forEach(function (p) { o.push({ value: String(p.id), label: str(p.name, "Player " + p.id) }); });
+  return o;
+}
+
+/* ------------------------------------------------------------------ views */
+
+function viewOverview(host) {
+  var m = obj(D.meta), mp = obj(m.map), d = obj(m.date);
+  html(host, "<h1>Overview</h1>");
+
+  var stats = [
+    ["Lines", arr(D.lines).length], ["Stops", arr(D.stops).length],
+    ["Convoys", arr(D.convoys).length], ["Cities", arr(D.cities).length],
+    ["Factories", arr(D.factories).length], ["Players", arr(D.players).length],
+    ["Goods", arr(D.goods).length], ["Settings", Object.keys(obj(D.settings)).length]
+  ];
+  var sh = '<div class="cards">';
+  stats.forEach(function (s) {
+    sh += '<div class="stat"><div class="n">' + fmtInt(s[1]) + '</div><div class="l">' + s[0] + "</div></div>";
+  });
+  sh += "</div>";
+  html(host, sh);
+
+  heading(host, "Save");
+  var rows = [
+    ["Save file", esc(str(m.save_file, "unknown"))],
+    ["Pakset", esc(str(m.pakset, "unknown"))],
+    ["Game version", esc(str(m.game_version, "unknown"))],
+    ["Export format", esc(String(num(D.format, 1)))],
+    ["Exported at", esc(str(m.exported_at, "unknown"))],
+    ["In-game date", d.year ? MONTH_NAMES[Math.max(0, Math.min(11, num(d.month, 1) - 1))] + " " + d.year +
+      ' <span class="faint">(tick ' + fmtInt(d.ticks) + ")</span>" : "unknown"],
+    ["Map size", mp.width ? mp.width + " x " + mp.height + " tiles" : "unknown"]
+  ];
+  var kv = '<div class="card"><dl class="kv">';
+  rows.forEach(function (r) { kv += "<dt>" + r[0] + "</dt><dd>" + r[1] + "</dd>"; });
+  kv += "</dl></div>";
+  html(host, kv);
+
+  heading(host, "Players");
+  var pcols = [
+    { key: "id", label: "Id", num: true, value: function (p) { return num(p.id); } },
+    { key: "name", label: "Name", value: function (p) { return str(p.name); },
+      html: function (p) { return esc(str(p.name, "Player " + p.id)); } },
+    { key: "kind", label: "Kind", value: function (p) { return p.is_human ? "human" : str(p.ai_type, "ai"); },
+      html: function (p) { return esc(p.is_human ? "human" : str(p.ai_type, "ai")); } },
+    { key: "active", label: "Active", value: function (p) { return p.active ? 1 : 0; },
+      html: function (p) { return p.active ? "yes" : '<span class="faint">no</span>'; } },
+    { key: "cash", label: "Cash", num: true, value: function (p) { return num(p.cash); },
+      html: function (p) { return signed(p.cash, true); } },
+    { key: "wealth", label: "Net wealth", num: true, value: function (p) { return num(p.net_wealth); },
+      html: function (p) { return signed(p.net_wealth, true); } },
+    { key: "rev", label: "Revenue this month", num: true,
+      value: function (p) { return num(obj(p.finance).revenue_this_month); },
+      html: function (p) { return fmtMoney(obj(p.finance).revenue_this_month); } },
+    { key: "prof", label: "Profit this month", num: true,
+      value: function (p) { return num(obj(p.finance).profit_this_month); },
+      html: function (p) { return signed(obj(p.finance).profit_this_month, true); } },
+    { key: "profy", label: "Profit last year", num: true,
+      value: function (p) { return num(obj(p.finance).profit_last_year); },
+      html: function (p) { return signed(obj(p.finance).profit_last_year, true); } },
+    { key: "lines", label: "Lines", num: true, value: function (p) { return num(p.line_count); },
+      html: function (p) { return fmtInt(p.line_count); } },
+    { key: "halts", label: "Stops", num: true, value: function (p) { return num(p.halt_count); },
+      html: function (p) { return fmtInt(p.halt_count); } },
+    { key: "convoys", label: "Convoys", num: true, value: function (p) { return num(p.convoy_count); },
+      html: function (p) { return fmtInt(p.convoy_count); } },
+    { key: "hq", label: "Headquarters", value: function (p) { return posText(p.headquarters); },
+      html: function (p) { return fmtPos(p.headquarters); } }
+  ];
+  renderTable(host, pcols, arr(D.players), { short: true, onSort: false, emptyText: "No players in this export." });
+
+  heading(host, "Lines per type");
+  var per = {};
+  arr(D.lines).forEach(function (l) { var t = str(l.type, "other"); per[t] = (per[t] || 0) + 1; });
+  var keys = Object.keys(per).sort();
+  if (!keys.length) {
+    html(host, '<div class="empty">No lines in this export.</div>');
+  } else {
+    var ph = '<div class="cards">';
+    keys.forEach(function (k) {
+      ph += '<div class="stat"><div class="n">' + fmtInt(per[k]) + "</div><div class='l'>" +
+            typeBadge(k) + "</div></div>";
+    });
+    ph += "</div>";
+    html(host, ph);
+  }
+}
+
+function viewSettings(host) {
+  var f = filters.settings || (filters.settings = { q: "" });
+  html(host, "<h1>Settings</h1>");
+  var s = obj(D.settings);
+  var all = Object.keys(s).sort().map(function (k) { return { k: k, v: s[k] }; });
+  var rows = all.filter(function (r) {
+    return matches(r.k + " " + String(r.v), f.q);
+  });
+  var state = f.state || (f.state = { sort: null, dir: 1 });
+  toolbar(host, [
+    textFilter(f.q, "Filter settings", function (v) { f.q = v; rerender(); }),
+    countLabel(rows.length, all.length, "settings")
+  ]);
+  renderTable(host, [
+    { key: "k", label: "Setting", value: function (r) { return r.k; },
+      html: function (r) { return '<span class="mono">' + esc(r.k) + "</span>"; } },
+    { key: "v", label: "Value", value: function (r) { return typeof r.v === "number" ? r.v : String(r.v); },
+      wide: true,
+      html: function (r) {
+        if (typeof r.v === "boolean") return r.v ? "true" : '<span class="faint">false</span>';
+        if (r.v === null || r.v === undefined) return '<span class="faint">null</span>';
+        if (typeof r.v === "number") return '<span class="mono">' + esc(String(r.v)) + "</span>";
+        if (typeof r.v === "object") return '<span class="mono">' + esc(JSON.stringify(r.v)) + "</span>";
+        return esc(String(r.v));
+      } }
+  ], rows, { state: state, rerender: rerender, emptyText: "No settings match this filter." });
+}
+
+/* ---- lines ---- */
+
+function lineStopCount(l) {
+  var n = 0;
+  arr(obj(l.schedule).entries).forEach(function (e) { if (e && e.halt_id !== null && e.halt_id !== undefined) n++; });
+  return n;
+}
+function statAt(o, key, i) {
+  var a = arr(obj(o.stats)[key]);
+  return num(a[i], 0);
+}
+
+function viewLines(host) {
+  var f = filters.lines || (filters.lines = { q: "", owner: "", type: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Lines</h1>");
+  var all = arr(D.lines);
+  var rows = all.filter(function (l) {
+    if (f.owner !== "" && String(num(l.owner_id, -1)) !== f.owner) return false;
+    if (f.type !== "" && str(l.type, "other") !== f.type) return false;
+    return matches(str(l.name) + " " + str(l.type) + " " + str(l.state) + " " + playerName(l.owner_id), f.q);
+  });
+  var typeOpts = [{ value: "", label: "All types" }];
+  Object.keys(IDX.lineTypes).sort().forEach(function (t) { typeOpts.push({ value: t, label: titleOf(t) }); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name, type, state", function (v) { f.q = v; rerender(); }),
+    selectFilter(f.owner, ownerOptions(), function (v) { f.owner = v; rerender(); }),
+    selectFilter(f.type, typeOpts, function (v) { f.type = v; rerender(); }),
+    countLabel(rows.length, all.length, "lines")
+  ]);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (l) { return str(l.name); },
+      html: function (l) { return '<a href="#line/' + l.id + '">' + esc(str(l.name, "Line " + l.id)) + "</a>"; } },
+    { key: "owner", label: "Owner", value: function (l) { return playerName(l.owner_id); },
+      html: function (l) { return esc(playerName(l.owner_id)); } },
+    { key: "type", label: "Type", value: function (l) { return str(l.type, "other"); },
+      html: function (l) { return typeBadge(l.type); } },
+    { key: "state", label: "State", value: function (l) { return str(l.state, "unknown"); },
+      html: function (l) { return stateBadge(l.state); } },
+    { key: "cv", label: "Convoys", num: true, value: function (l) { return arr(l.convoy_ids).length; },
+      html: function (l) { return fmtInt(arr(l.convoy_ids).length); } },
+    { key: "st", label: "Stops", num: true, value: lineStopCount,
+      html: function (l) { return fmtInt(lineStopCount(l)); } },
+    { key: "tr", label: "Transported", num: true, title: "Transported this month",
+      value: function (l) { return statAt(l, "transported", 0); },
+      html: function (l) { return fmtInt(statAt(l, "transported", 0)); } },
+    { key: "rev", label: "Revenue", num: true, title: "Revenue this month",
+      value: function (l) { return statAt(l, "revenue", 0); },
+      html: function (l) { return fmtMoney(statAt(l, "revenue", 0)); } },
+    { key: "pr", label: "Profit", num: true, title: "Profit this month",
+      value: function (l) { return statAt(l, "profit", 0); },
+      html: function (l) { return signed(statAt(l, "profit", 0), true); } }
+  ], rows, { state: f.state, rerender: rerender, href: function (l) { return "#line/" + l.id; },
+             emptyText: "No lines match this filter." });
+}
+
+function scheduleList(host, sched) {
+  sched = obj(sched);
+  var entries = arr(sched.entries);
+  if (!entries.length) {
+    html(host, '<div class="empty">This schedule has no entries.</div>');
+    return;
+  }
+  var h = '<div class="card"><ol class="sched">';
+  entries.forEach(function (e, i) {
+    e = obj(e);
+    var here = num(sched.current_stop, -1) === i;
+    h += '<li class="' + (here ? "here" : "") + '">';
+    if (e.halt_id === null || e.halt_id === undefined) {
+      h += '<span class="wp">Waypoint</span> ' + fmtPos(e.pos);
+    } else {
+      h += stopLink(e.halt_id) + " " + fmtPos(e.pos);
+    }
+    var opts = [];
+    if (num(e.minimum_loading) > 0) opts.push("load at least " + num(e.minimum_loading) + "%");
+    if (num(e.waiting_time) > 0) opts.push("wait " + num(e.waiting_time));
+    if (opts.length) h += ' <span class="opts">(' + esc(opts.join(", ")) + ")</span>";
+    h += "</li>";
+  });
+  h += "</ol></div>";
+  var flags = [];
+  if (sched.bidirectional) flags.push("bidirectional");
+  if (sched.mirrored) flags.push("mirrored");
+  if (flags.length) h += '<div class="dim" style="margin-top:4px">Schedule flags: ' + esc(flags.join(", ")) + "</div>";
+  html(host, h);
+}
+
+function convoyMiniTable(host, ids) {
+  var list = arr(ids).map(function (id) { return IDX.convoy[id]; }).filter(Boolean);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+      html: function (c) { return convoyLink(c.id); } },
+    { key: "state", label: "State", value: function (c) { return str(c.state); },
+      html: function (c) { return stateBadge(c.state); } },
+    { key: "load", label: "Loading", num: true, value: function (c) { return num(c.loading_level); },
+      html: function (c) { return loadBar(c.loading_level); } },
+    { key: "cap", label: "Loaded / capacity", num: true,
+      value: function (c) { return num(c.total_loaded); },
+      html: function (c) { return fmtInt(c.total_loaded) + " / " + fmtInt(c.total_capacity); } },
+    { key: "profit", label: "Profit this month", num: true, value: function (c) { return num(c.profit_this_month); },
+      html: function (c) { return signed(c.profit_this_month, true); } }
+  ], list, { short: true, onSort: false, href: function (c) { return "#convoy/" + c.id; },
+             emptyText: "No convoys here." });
+}
+
+function viewLineDetail(host, id) {
+  var l = IDX.line[id];
+  if (!l) { html(host, '<div class="empty">No line with id ' + esc(id) + " in this export.</div>"); return; }
+  html(host, '<a class="backlink" href="#lines">Back to lines</a>');
+  html(host, '<div class="detail-head"><h1>' + esc(str(l.name, "Line " + l.id)) + "</h1>" +
+             typeBadge(l.type) + stateBadge(l.state) + "</div>");
+
+  var catgs = arr(l.goods_categories).map(function (c) { return esc(catgName(c)); }).join(", ");
+  html(host, '<div class="card"><dl class="kv">' +
+    "<dt>Line id</dt><dd>" + esc(String(l.id)) + "</dd>" +
+    "<dt>Owner</dt><dd>" + esc(playerName(l.owner_id)) + "</dd>" +
+    "<dt>Goods carried</dt><dd>" + (catgs || '<span class="faint">none listed</span>') + "</dd>" +
+    "<dt>Convoys</dt><dd>" + fmtInt(arr(l.convoy_ids).length) + "</dd>" +
+    "<dt>Stops in schedule</dt><dd>" + fmtInt(lineStopCount(l)) +
+      ' <span class="faint">(' + fmtInt(arr(obj(l.schedule).entries).length) + " entries)</span></dd>" +
+    "<dt>This month</dt><dd>" + fmtInt(statAt(l, "transported", 0)) + " transported, " +
+      fmtMoney(statAt(l, "revenue", 0)) + " revenue, " + signed(statAt(l, "profit", 0), true) + " profit</dd>" +
+    "</dl></div>");
+
+  var cols = document.createElement("div");
+  cols.className = "cols";
+  host.appendChild(cols);
+  var left = document.createElement("div"), right = document.createElement("div");
+  cols.appendChild(left); cols.appendChild(right);
+
+  heading(left, "Schedule");
+  scheduleList(left, l.schedule);
+  heading(right, "Convoys on this line");
+  convoyMiniTable(right, l.convoy_ids);
+
+  heading(host, "Last 12 months");
+  monthTable(host, obj(l.stats), [
+    { key: "capacity", label: "Capacity" },
+    { key: "transported", label: "Transported" },
+    { key: "revenue", label: "Revenue", money: true },
+    { key: "operations", label: "Operating cost", money: true },
+    { key: "profit", label: "Profit", money: true, signed: true },
+    { key: "convoys", label: "Convoys" },
+    { key: "distance", label: "Distance" },
+    { key: "maxspeed", label: "Max speed" }
+  ]);
+}
+
+/* ---- stops ---- */
+
+function capText(o) {
+  var c = obj(o);
+  return fmtInt(c.passengers) + " / " + fmtInt(c.mail) + " / " + fmtInt(c.goods);
+}
+function capSum(o) {
+  var c = obj(o);
+  return num(c.passengers) + num(c.mail) + num(c.goods);
+}
+
+function viewStops(host) {
+  var f = filters.stops || (filters.stops = { q: "", owner: "", type: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Stops</h1>");
+  var all = arr(D.stops);
+  var rows = all.filter(function (s) {
+    if (f.owner !== "" && String(num(s.owner_id, -1)) !== f.owner) return false;
+    if (f.type !== "" && arr(s.station_types).indexOf(f.type) < 0) return false;
+    return matches(str(s.name) + " " + arr(s.station_types).join(" ") + " " + playerName(s.owner_id), f.q);
+  });
+  var typeOpts = [{ value: "", label: "All types" }];
+  Object.keys(IDX.stopTypes).sort().forEach(function (t) { typeOpts.push({ value: t, label: titleOf(t) }); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name or type", function (v) { f.q = v; rerender(); }),
+    selectFilter(f.owner, ownerOptions(), function (v) { f.owner = v; rerender(); }),
+    selectFilter(f.type, typeOpts, function (v) { f.type = v; rerender(); }),
+    countLabel(rows.length, all.length, "stops")
+  ]);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (s) { return str(s.name); },
+      html: function (s) { return '<a href="#stop/' + s.id + '">' + esc(str(s.name, "Stop " + s.id)) + "</a>"; } },
+    { key: "owner", label: "Owner", value: function (s) { return playerName(s.owner_id); },
+      html: function (s) { return esc(playerName(s.owner_id)); } },
+    { key: "types", label: "Types", sortable: false,
+      html: function (s) {
+        var t = arr(s.station_types);
+        return t.length ? t.map(typeBadge).join("") : '<span class="faint">-</span>';
+      } },
+    { key: "cap", label: "Capacity", num: true, title: "Capacity for passengers / mail / goods",
+      value: function (s) { return capSum(s.capacity); },
+      html: function (s) { return '<span class="mono">' + capText(s.capacity) + "</span>"; } },
+    { key: "wait", label: "Waiting", num: true, title: "Waiting passengers / mail / goods",
+      value: function (s) { return capSum(s.waiting_total); },
+      html: function (s) { return '<span class="mono">' + capText(s.waiting_total) + "</span>"; } },
+    { key: "happy", label: "Happy", num: true, value: function (s) { return num(obj(s.pax).happy); },
+      html: function (s) { return fmtInt(obj(s.pax).happy); } },
+    { key: "unhappy", label: "Unhappy", num: true, value: function (s) { return num(obj(s.pax).unhappy); },
+      html: function (s) { return fmtInt(obj(s.pax).unhappy); } },
+    { key: "noroute", label: "No route", num: true, value: function (s) { return num(obj(s.pax).no_route); },
+      html: function (s) { return fmtInt(obj(s.pax).no_route); } },
+    { key: "lines", label: "Lines", num: true, value: function (s) { return arr(s.line_ids).length; },
+      html: function (s) { return fmtInt(arr(s.line_ids).length); } },
+    { key: "convoys", label: "Convoys", num: true, value: function (s) { return arr(s.convoy_ids).length; },
+      html: function (s) { return fmtInt(arr(s.convoy_ids).length); } },
+    { key: "pos", label: "Position", value: function (s) { return posText(s.pos); },
+      html: function (s) { return fmtPos(s.pos); } }
+  ], rows, { state: f.state, rerender: rerender, href: function (s) { return "#stop/" + s.id; },
+             emptyText: "No stops match this filter." });
+}
+
+function viewStopDetail(host, id) {
+  var s = IDX.stop[id];
+  if (!s) { html(host, '<div class="empty">No stop with id ' + esc(id) + " in this export.</div>"); return; }
+  html(host, '<a class="backlink" href="#stops">Back to stops</a>');
+  var types = arr(s.station_types).map(typeBadge).join("");
+  html(host, '<div class="detail-head"><h1>' + esc(str(s.name, "Stop " + s.id)) + "</h1>" + types + "</div>");
+
+  var en = obj(s.enabled);
+  var enabled = [];
+  if (en.passengers) enabled.push("passengers");
+  if (en.mail) enabled.push("mail");
+  if (en.goods) enabled.push("goods");
+  var pax = obj(s.pax);
+  html(host, '<div class="card"><dl class="kv">' +
+    "<dt>Stop id</dt><dd>" + esc(String(s.id)) + "</dd>" +
+    "<dt>Owner</dt><dd>" + esc(playerName(s.owner_id)) + "</dd>" +
+    "<dt>Position</dt><dd>" + fmtPos(s.pos) + "</dd>" +
+    "<dt>Tiles</dt><dd>" + fmtInt(arr(s.tiles).length) + "</dd>" +
+    "<dt>Handles</dt><dd>" + (enabled.length ? esc(enabled.join(", ")) : '<span class="faint">nothing</span>') + "</dd>" +
+    "<dt>Capacity</dt><dd><span class='mono'>" + capText(s.capacity) + '</span> <span class="faint">(passengers / mail / goods)</span></dd>' +
+    "<dt>Waiting now</dt><dd><span class='mono'>" + capText(s.waiting_total) + '</span> <span class="faint">(passengers / mail / goods)</span></dd>' +
+    "<dt>Passengers this month</dt><dd>" + fmtInt(pax.happy) + " happy, " + fmtInt(pax.unhappy) +
+      " unhappy, " + fmtInt(pax.no_route) + " without a route</dd>" +
+    "</dl></div>");
+
+  var cols = document.createElement("div");
+  cols.className = "cols";
+  host.appendChild(cols);
+  var left = document.createElement("div"), right = document.createElement("div");
+  cols.appendChild(left); cols.appendChild(right);
+
+  heading(left, "Waiting goods");
+  renderTable(left, [
+    { key: "g", label: "Goods", value: function (w) { return str(w.goods_name, goodsName(w.goods_index)); },
+      html: function (w) { return esc(str(w.goods_name, goodsName(w.goods_index))); } },
+    { key: "a", label: "Amount", num: true, value: function (w) { return num(w.amount); },
+      html: function (w) { return fmtInt(w.amount); } }
+  ], arr(s.waiting), { short: true, onSort: false, emptyText: "Nothing is waiting here." });
+
+  heading(left, "Lines serving this stop");
+  var lines = arr(s.line_ids).map(function (id) { return IDX.line[id]; }).filter(Boolean);
+  renderTable(left, [
+    { key: "name", label: "Name", value: function (l) { return str(l.name); },
+      html: function (l) { return lineLink(l.id); } },
+    { key: "type", label: "Type", html: function (l) { return typeBadge(l.type); } },
+    { key: "state", label: "State", html: function (l) { return stateBadge(l.state); } },
+    { key: "owner", label: "Owner", html: function (l) { return esc(playerName(l.owner_id)); } }
+  ], lines, { short: true, onSort: false, href: function (l) { return "#line/" + l.id; },
+              emptyText: "No line stops here." });
+
+  heading(right, "Convoys");
+  convoyMiniTable(right, s.convoy_ids);
+
+  heading(right, "Connections");
+  var conns = arr(s.connections);
+  if (!conns.length) {
+    html(right, '<div class="empty">No direct connections in this export.</div>');
+  } else {
+    var byHalt = {};
+    conns.forEach(function (c) {
+      var k = String(c.halt_id);
+      if (!byHalt[k]) byHalt[k] = { halt_id: c.halt_id, catgs: [] };
+      if (byHalt[k].catgs.indexOf(c.catg_index) < 0) byHalt[k].catgs.push(c.catg_index);
+    });
+    var list = Object.keys(byHalt).map(function (k) { return byHalt[k]; });
+    renderTable(right, [
+      { key: "halt", label: "Stop", value: function (c) { return str((IDX.stop[c.halt_id] || {}).name); },
+        html: function (c) { return stopLink(c.halt_id); } },
+      { key: "catg", label: "Goods categories", sortable: false,
+        html: function (c) {
+          return esc(c.catgs.map(function (x) { return catgName(x); }).join(", "));
+        } }
+    ], list, { short: true, onSort: false });
+  }
+
+  heading(host, "Last 12 months");
+  monthTable(host, obj(s.stats), [
+    { key: "arrived", label: "Arrived" },
+    { key: "departed", label: "Departed" },
+    { key: "waiting", label: "Waiting" },
+    { key: "happy", label: "Happy" },
+    { key: "unhappy", label: "Unhappy" },
+    { key: "no_route", label: "No route" },
+    { key: "convoys_arrived", label: "Convoys arrived" }
+  ]);
+}
+
+/* ---- convoys ---- */
+
+function viewConvoys(host) {
+  var f = filters.convoys || (filters.convoys = { q: "", owner: "", line: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Convoys</h1>");
+  var all = arr(D.convoys);
+  var rows = all.filter(function (c) {
+    if (f.owner !== "" && String(num(c.owner_id, -1)) !== f.owner) return false;
+    if (f.line === "none" && c.line_id !== null && c.line_id !== undefined) return false;
+    if (f.line !== "" && f.line !== "none" && String(c.line_id) !== f.line) return false;
+    var lname = (c.line_id !== null && c.line_id !== undefined && IDX.line[c.line_id])
+              ? str(IDX.line[c.line_id].name) : "";
+    return matches(str(c.name) + " " + str(c.state) + " " + lname + " " + playerName(c.owner_id), f.q);
+  });
+  var lineOpts = [{ value: "", label: "All lines" }, { value: "none", label: "Without a line" }];
+  arr(D.lines).forEach(function (l) { lineOpts.push({ value: String(l.id), label: str(l.name, "Line " + l.id) }); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name, state, line", function (v) { f.q = v; rerender(); }),
+    selectFilter(f.owner, ownerOptions(), function (v) { f.owner = v; rerender(); }),
+    selectFilter(f.line, lineOpts, function (v) { f.line = v; rerender(); }),
+    countLabel(rows.length, all.length, "convoys")
+  ]);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+      html: function (c) { return '<a href="#convoy/' + c.id + '">' + esc(str(c.name, "Convoy " + c.id)) + "</a>"; } },
+    { key: "owner", label: "Owner", value: function (c) { return playerName(c.owner_id); },
+      html: function (c) { return esc(playerName(c.owner_id)); } },
+    { key: "line", label: "Line",
+      value: function (c) { return (IDX.line[c.line_id] ? str(IDX.line[c.line_id].name) : ""); },
+      html: function (c) {
+        return (c.line_id === null || c.line_id === undefined)
+          ? '<span class="faint">no line</span>' : lineLink(c.line_id);
+      } },
+    { key: "state", label: "State", value: function (c) { return str(c.state); },
+      html: function (c) { return stateBadge(c.state); } },
+    { key: "veh", label: "Vehicles", num: true,
+      value: function (c) { return num(c.vehicle_count, arr(c.vehicles).length); },
+      html: function (c) { return fmtInt(num(c.vehicle_count, arr(c.vehicles).length)); } },
+    { key: "load", label: "Loading", num: true, value: function (c) { return num(c.loading_level); },
+      html: function (c) { return loadBar(c.loading_level); } },
+    { key: "cap", label: "Loaded / capacity", num: true, value: function (c) { return num(c.total_loaded); },
+      html: function (c) { return fmtInt(c.total_loaded) + " / " + fmtInt(c.total_capacity); } },
+    { key: "speed", label: "Max speed", num: true, value: function (c) { return num(c.max_speed); },
+      html: function (c) { return fmtInt(c.max_speed); } },
+    { key: "profit", label: "Profit this month", num: true, value: function (c) { return num(c.profit_this_month); },
+      html: function (c) { return signed(c.profit_this_month, true); } }
+  ], rows, { state: f.state, rerender: rerender, href: function (c) { return "#convoy/" + c.id; },
+             emptyText: "No convoys match this filter." });
+}
+
+function viewConvoyDetail(host, id) {
+  var c = IDX.convoy[id];
+  if (!c) { html(host, '<div class="empty">No convoy with id ' + esc(id) + " in this export.</div>"); return; }
+  html(host, '<a class="backlink" href="#convoys">Back to convoys</a>');
+  html(host, '<div class="detail-head"><h1>' + esc(str(c.name, "Convoy " + c.id)) + "</h1>" +
+             stateBadge(c.state) + "</div>");
+  var lineTxt = (c.line_id === null || c.line_id === undefined)
+    ? '<span class="faint">runs without a line</span>' : lineLink(c.line_id);
+  html(host, '<div class="card"><dl class="kv">' +
+    "<dt>Convoy id</dt><dd>" + esc(String(c.id)) + "</dd>" +
+    "<dt>Owner</dt><dd>" + esc(playerName(c.owner_id)) + "</dd>" +
+    "<dt>Line</dt><dd>" + lineTxt + "</dd>" +
+    "<dt>Position</dt><dd>" + fmtPos(c.pos) + "</dd>" +
+    "<dt>Home depot</dt><dd>" + fmtPos(c.home_depot) + "</dd>" +
+    "<dt>Vehicles</dt><dd>" + fmtInt(num(c.vehicle_count, arr(c.vehicles).length)) + "</dd>" +
+    "<dt>Max speed</dt><dd>" + fmtInt(c.max_speed) + "</dd>" +
+    "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +
+      (num(c.loading_limit) > 0 ? ' <span class="dim">(waits for ' + num(c.loading_limit) + "%)</span>" : "") + "</dd>" +
+    "<dt>Loaded</dt><dd>" + fmtInt(c.total_loaded) + " of " + fmtInt(c.total_capacity) + "</dd>" +
+    "<dt>Revenue this month</dt><dd>" + fmtMoney(c.revenue_this_month) + "</dd>" +
+    "<dt>Profit this month</dt><dd>" + signed(c.profit_this_month, true) + "</dd>" +
+    "<dt>Profit last year</dt><dd>" + signed(c.profit_last_year, true) + "</dd>" +
+    "</dl></div>");
+
+  heading(host, "Vehicles");
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (v) { return str(v.name); },
+      html: function (v) { return esc(str(v.name, "unnamed")); } },
+    { key: "catg", label: "Carries", value: function (v) { return catgName(num(v.goods_catg)); },
+      html: function (v) { return esc(catgName(num(v.goods_catg))); } },
+    { key: "cap", label: "Capacity", num: true, value: function (v) { return num(v.capacity); },
+      html: function (v) { return fmtInt(v.capacity); } },
+    { key: "loaded", label: "Loaded", num: true, value: function (v) { return num(v.loaded); },
+      html: function (v) { return fmtInt(v.loaded); } },
+    { key: "speed", label: "Max speed", num: true, value: function (v) { return num(v.max_speed); },
+      html: function (v) { return fmtInt(v.max_speed); } },
+    { key: "power", label: "Power", num: true, value: function (v) { return num(v.power); },
+      html: function (v) { return num(v.power) ? fmtInt(v.power) : '<span class="faint">0</span>'; } }
+  ], arr(c.vehicles), { short: true, onSort: false, emptyText: "No vehicle list in this export." });
+
+  heading(host, "Schedule");
+  if (c.schedule) {
+    scheduleList(host, c.schedule);
+  } else if (IDX.line[c.line_id]) {
+    html(host, '<div class="empty">This convoy follows the schedule of ' + lineLink(c.line_id) + ".</div>");
+  } else {
+    html(host, '<div class="empty">This convoy has no schedule in the export.</div>');
+  }
+}
+
+/* ---- cities, factories, goods ---- */
+
+function viewCities(host) {
+  var f = filters.cities || (filters.cities = { q: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Cities</h1>");
+  var all = arr(D.cities);
+  var rows = all.filter(function (c) { return matches(str(c.name), f.q); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name", function (v) { f.q = v; rerender(); }),
+    countLabel(rows.length, all.length, "cities")
+  ]);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (c) { return str(c.name); },
+      html: function (c) { return esc(str(c.name, "unnamed")); } },
+    { key: "pop", label: "Population", num: true, value: function (c) { return num(c.population); },
+      html: function (c) { return fmtInt(c.population); } },
+    { key: "bld", label: "Buildings", num: true, value: function (c) { return num(c.buildings); },
+      html: function (c) { return fmtInt(c.buildings); } },
+    { key: "growth", label: "Growth", num: true, value: function (c) { return num(c.growth); },
+      html: function (c) { return signed(c.growth); } },
+    { key: "pos", label: "Position", value: function (c) { return posText(c.pos); },
+      html: function (c) { return fmtPos(c.pos); } }
+  ], rows, { state: f.state, rerender: rerender, emptyText: "No cities match this filter." });
+}
+
+function viewFactories(host) {
+  var f = filters.factories || (filters.factories = { q: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Factories</h1>");
+  var all = arr(D.factories);
+  var rows = all.filter(function (x) { return matches(str(x.name) + " " + playerName(x.owner_id), f.q); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name", function (v) { f.q = v; rerender(); }),
+    countLabel(rows.length, all.length, "factories")
+  ]);
+  renderTable(host, [
+    { key: "name", label: "Name", value: function (x) { return str(x.name); },
+      html: function (x) { return esc(str(x.name, "unnamed")); } },
+    { key: "owner", label: "Owner",
+      value: function (x) { return (x.owner_id === null || x.owner_id === undefined) ? "" : playerName(x.owner_id); },
+      html: function (x) {
+        return (x.owner_id === null || x.owner_id === undefined)
+          ? '<span class="faint">none</span>' : esc(playerName(x.owner_id));
+      } },
+    { key: "prod", label: "Production", num: true, value: function (x) { return num(x.production); },
+      html: function (x) { return fmtInt(x.production); } },
+    { key: "pos", label: "Position", value: function (x) { return posText(x.pos); },
+      html: function (x) { return fmtPos(x.pos); } }
+  ], rows, { state: f.state, rerender: rerender, emptyText: "No factories match this filter." });
+}
+
+function viewGoods(host) {
+  var f = filters.goods || (filters.goods = { q: "", state: { sort: null, dir: 1 } });
+  html(host, "<h1>Goods</h1>");
+  var all = arr(D.goods);
+  var rows = all.filter(function (g) { return matches(str(g.name) + " " + str(g.catg_name), f.q); });
+  toolbar(host, [
+    textFilter(f.q, "Filter by name", function (v) { f.q = v; rerender(); }),
+    countLabel(rows.length, all.length, "goods")
+  ]);
+  renderTable(host, [
+    { key: "index", label: "Index", num: true, value: function (g) { return num(g.index); },
+      html: function (g) { return fmtInt(g.index); } },
+    { key: "name", label: "Name", value: function (g) { return str(g.name); },
+      html: function (g) { return esc(str(g.name, "unnamed")); } },
+    { key: "catg", label: "Category", value: function (g) { return str(g.catg_name); },
+      html: function (g) { return esc(str(g.catg_name, String(num(g.catg_index)))); } },
+    { key: "value", label: "Value", num: true, value: function (g) { return num(g.value); },
+      html: function (g) { return fmtInt(g.value); } },
+    { key: "bonus", label: "Speed bonus", num: true, value: function (g) { return num(g.speed_bonus); },
+      html: function (g) { return fmtInt(g.speed_bonus); } },
+    { key: "weight", label: "Weight per unit", num: true, value: function (g) { return num(g.weight_per_unit); },
+      html: function (g) { return fmtInt(g.weight_per_unit); } }
+  ], rows, { state: f.state, rerender: rerender, emptyText: "No goods match this filter." });
+}
+
+/* -------------------------------------------------------------------- map */
+
+var mapState = null;
+
+function typeColor(t) {
+  var v = getComputedStyle(document.documentElement)
+            .getPropertyValue("--t-" + (TYPES.indexOf(t) >= 0 ? t : "other"));
+  return (v || "#888").trim();
+}
+
+function viewMap(host) {
+  host.classList.add("nopad");
+  var f = filters.map || (filters.map = { types: null, showStops: true, showCities: true });
+  var used = {};
+  arr(D.lines).forEach(function (l) { used[str(l.type, "other")] = 1; });
+  var typeList = LINE_TYPES.filter(function (t) { return used[t]; });
+  if (!f.types) {
+    f.types = {};
+    typeList.forEach(function (t) { f.types[t] = true; });
+  }
+
+  var root = document.createElement("div");
+  root.className = "maproot";
+  var bar = document.createElement("div");
+  bar.className = "mapbar";
+  var barHTML = "<span class='dim'>Lines:</span>";
+  typeList.forEach(function (t) {
+    barHTML += '<label><input type="checkbox" data-type="' + t + '"' + (f.types[t] ? " checked" : "") + ">" +
+               '<span class="swatch" style="background:var(--t-' + t + ')"></span>' + esc(titleOf(t)) + "</label>";
+  });
+  barHTML += '<label><input type="checkbox" data-flag="showStops"' + (f.showStops ? " checked" : "") + ">Stops</label>";
+  barHTML += '<label><input type="checkbox" data-flag="showCities"' + (f.showCities ? " checked" : "") + ">Cities</label>";
+  barHTML += '<button class="btn" id="map-zoomin" title="Zoom in">+</button>';
+  barHTML += '<button class="btn" id="map-zoomout" title="Zoom out">-</button>';
+  barHTML += '<button class="btn" id="map-reset">Reset view</button>';
+  barHTML += '<span class="hint">Drag to pan, wheel to zoom, click a stop or a line to open it.</span>';
+  bar.innerHTML = barHTML;
+  root.appendChild(bar);
+
+  var holder = document.createElement("div");
+  holder.className = "mapholder";
+  var canvas = document.createElement("canvas");
+  canvas.id = "mapcanvas";
+  holder.appendChild(canvas);
+  var tip = document.createElement("div");
+  tip.className = "maptip";
+  tip.style.display = "none";
+  holder.appendChild(tip);
+  root.appendChild(holder);
+  host.appendChild(root);
+
+  bar.addEventListener("change", function (ev) {
+    var t = ev.target.getAttribute("data-type");
+    if (t) { f.types[t] = ev.target.checked; draw(); return; }
+    var fl = ev.target.getAttribute("data-flag");
+    if (fl) { f[fl] = ev.target.checked; draw(); }
+  });
+  bar.querySelector("#map-reset").addEventListener("click", function () { fit(); draw(); });
+  bar.querySelector("#map-zoomin").addEventListener("click", function () { zoomBy(1.4); });
+  bar.querySelector("#map-zoomout").addEventListener("click", function () { zoomBy(1 / 1.4); });
+
+  var mp = obj(obj(D.meta).map);
+  var mapW = num(mp.width, 0), mapH = num(mp.height, 0);
+  if (!mapW || !mapH) {
+    var maxx = 1, maxy = 1;
+    arr(D.stops).forEach(function (s) {
+      maxx = Math.max(maxx, num(obj(s.pos).x)); maxy = Math.max(maxy, num(obj(s.pos).y));
+    });
+    mapW = maxx + 8; mapH = maxy + 8;
+  }
+
+  /* screen = (world - o) * scale; kept in the filter state so leaving the map and
+     coming back keeps the same position */
+  var view = f.view || (f.view = { scale: 0, ox: 0, oy: 0 });
+  var ctx = canvas.getContext("2d");
+  var dpr = window.devicePixelRatio || 1;
+  var cw = 0, ch = 0;
+
+  /* precompute polylines once */
+  var polys = [];
+  arr(D.lines).forEach(function (l) {
+    var pts = [];
+    arr(obj(l.schedule).entries).forEach(function (e) {
+      var p = obj(e).pos;
+      if (p && typeof p.x === "number") pts.push([p.x, p.y]);
+    });
+    if (pts.length > 1) polys.push({ line: l, type: str(l.type, "other"), pts: pts });
+  });
+  var stopPts = arr(D.stops).filter(function (s) { return obj(s.pos) && typeof obj(s.pos).x === "number"; });
+  var cityPts = arr(D.cities).filter(function (c) { return obj(c.pos) && typeof obj(c.pos).x === "number"; });
+
+  function resize() {
+    cw = holder.clientWidth; ch = holder.clientHeight;
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(cw * dpr));
+    canvas.height = Math.max(1, Math.round(ch * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function fit() {
+    resize();
+    var s = Math.min(cw / mapW, ch / mapH) * 0.94;
+    view.scale = s || 1;
+    view.ox = mapW / 2 - cw / (2 * view.scale);
+    view.oy = mapH / 2 - ch / (2 * view.scale);
+  }
+  function sx(x) { return (x - view.ox) * view.scale; }
+  function sy(y) { return (y - view.oy) * view.scale; }
+  function wx(px) { return px / view.scale + view.ox; }
+  function wy(py) { return py / view.scale + view.oy; }
+
+  function zoomAt(px, py, k) {
+    var bx = wx(px), by = wy(py);
+    view.scale = Math.max(0.05, Math.min(60, view.scale * k));
+    view.ox = bx - px / view.scale;
+    view.oy = by - py / view.scale;
+    draw();
+  }
+  function zoomBy(k) { zoomAt(cw / 2, ch / 2, k); }
+
+  var raf = null;
+  function draw() {
+    if (raf) return;
+    raf = requestAnimationFrame(function () { raf = null; paint(); });
+  }
+  function paint() {
+    var cs = getComputedStyle(document.documentElement);
+    var panel = (cs.getPropertyValue("--panel") || "#fff").trim();
+    var border = (cs.getPropertyValue("--border") || "#ddd").trim();
+    var text = (cs.getPropertyValue("--text") || "#000").trim();
+    var bg = (cs.getPropertyValue("--bg") || "#eee").trim();
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cw, ch);
+    /* map extent */
+    ctx.fillStyle = panel;
+    ctx.fillRect(sx(0), sy(0), mapW * view.scale, mapH * view.scale);
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx(0), sy(0), mapW * view.scale, mapH * view.scale);
+
+    /* lines */
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    polys.forEach(function (p) {
+      if (!f.types[p.type]) return;
+      ctx.strokeStyle = typeColor(p.type);
+      ctx.lineWidth = Math.max(1, Math.min(3, view.scale * 0.9));
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.moveTo(sx(p.pts[0][0]), sy(p.pts[0][1]));
+      for (var i = 1; i < p.pts.length; i++) ctx.lineTo(sx(p.pts[i][0]), sy(p.pts[i][1]));
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    /* stops */
+    if (f.showStops) {
+      var side = Math.max(3, Math.min(9, view.scale * 2.2));
+      stopPts.forEach(function (s) {
+        var x = sx(obj(s.pos).x), y = sy(obj(s.pos).y);
+        if (x < -20 || y < -20 || x > cw + 20 || y > ch + 20) return;
+        ctx.fillStyle = panel;
+        ctx.fillRect(x - side / 2, y - side / 2, side, side);
+        ctx.strokeStyle = text;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - side / 2, y - side / 2, side, side);
+      });
+    }
+
+    /* cities */
+    if (f.showCities) {
+      ctx.font = "12px -apple-system, Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+      cityPts.forEach(function (c) {
+        var x = sx(obj(c.pos).x), y = sy(obj(c.pos).y);
+        if (x < -60 || y < -30 || x > cw + 60 || y > ch + 30) return;
+        ctx.fillStyle = text;
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = panel;
+        ctx.globalAlpha = 0.75;
+        var w = ctx.measureText(str(c.name)).width;
+        ctx.fillRect(x - w / 2 - 3, y - 19, w + 6, 14);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = text;
+        ctx.fillText(str(c.name, "city"), x, y - 8);
+      });
+      ctx.textAlign = "left";
+    }
+    ctx.restore();
+  }
+
+  function hitStop(px, py) {
+    var best = null, bd = 8;
+    for (var i = 0; i < stopPts.length; i++) {
+      var s = stopPts[i];
+      var d = Math.max(Math.abs(sx(obj(s.pos).x) - px), Math.abs(sy(obj(s.pos).y) - py));
+      if (d < bd) { bd = d; best = s; }
+    }
+    return best;
+  }
+  function segDist(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var len = dx * dx + dy * dy;
+    var t = len ? ((px - ax) * dx + (py - ay) * dy) / len : 0;
+    t = Math.max(0, Math.min(1, t));
+    var qx = ax + t * dx, qy = ay + t * dy;
+    return Math.sqrt((px - qx) * (px - qx) + (py - qy) * (py - qy));
+  }
+  function hitLine(px, py) {
+    var best = null, bd = 5;
+    for (var i = 0; i < polys.length; i++) {
+      var p = polys[i];
+      if (!f.types[p.type]) continue;
+      for (var j = 1; j < p.pts.length; j++) {
+        var d = segDist(px, py, sx(p.pts[j - 1][0]), sy(p.pts[j - 1][1]), sx(p.pts[j][0]), sy(p.pts[j][1]));
+        if (d < bd) { bd = d; best = p.line; }
+      }
+    }
+    return best;
+  }
+
+  var dragging = false, moved = false, lastX = 0, lastY = 0;
+  canvas.addEventListener("mousedown", function (ev) {
+    dragging = true; moved = false; lastX = ev.clientX; lastY = ev.clientY;
+    canvas.classList.add("drag");
+  });
+  window.addEventListener("mouseup", function () { dragging = false; canvas.classList.remove("drag"); });
+  canvas.addEventListener("mousemove", function (ev) {
+    var r = canvas.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    if (dragging) {
+      var dx = ev.clientX - lastX, dy = ev.clientY - lastY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      view.ox -= dx / view.scale; view.oy -= dy / view.scale;
+      lastX = ev.clientX; lastY = ev.clientY;
+      tip.style.display = "none";
+      draw();
+      return;
+    }
+    var s = f.showStops ? hitStop(px, py) : null;
+    var label = null;
+    if (s) label = str(s.name, "Stop " + s.id);
+    else {
+      var l = hitLine(px, py);
+      if (l) label = str(l.name, "Line " + l.id);
+    }
+    if (label) {
+      tip.textContent = label;
+      tip.style.display = "block";
+      tip.style.left = Math.min(cw - tip.offsetWidth - 4, px + 12) + "px";
+      tip.style.top = Math.max(2, py - 26) + "px";
+      canvas.style.cursor = "pointer";
+    } else {
+      tip.style.display = "none";
+      canvas.style.cursor = "grab";
+    }
+  });
+  canvas.addEventListener("mouseleave", function () { tip.style.display = "none"; });
+  canvas.addEventListener("click", function (ev) {
+    if (moved) return;
+    var r = canvas.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    var s = f.showStops ? hitStop(px, py) : null;
+    if (s) { location.hash = "#stop/" + s.id; return; }
+    var l = hitLine(px, py);
+    if (l) location.hash = "#line/" + l.id;
+  });
+  canvas.addEventListener("wheel", function (ev) {
+    ev.preventDefault();
+    var r = canvas.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    zoomAt(px, py, Math.pow(1.0015, -ev.deltaY));
+  }, { passive: false });
+
+  mapState = { resize: function () { resize(); draw(); } };
+  if (view.scale > 0) resize(); else fit();
+  draw();
+  setTimeout(function () { resize(); draw(); }, 0);
+}
+
+window.addEventListener("resize", function () { if (mapState && route.view === "map") mapState.resize(); });
+if (window.matchMedia) {
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", function () {
+    if (mapState && route.view === "map") mapState.resize();
+  });
+}
+
+/* ----------------------------------------------------------------- router */
+
+var VIEWS = {
+  overview: viewOverview,
+  settings: viewSettings,
+  lines: viewLines,
+  stops: viewStops,
+  convoys: viewConvoys,
+  cities: viewCities,
+  factories: viewFactories,
+  goods: viewGoods,
+  map: viewMap
+};
+var DETAILS = { line: viewLineDetail, stop: viewStopDetail, convoy: viewConvoyDetail };
+var NAV_OF = { line: "lines", stop: "stops", convoy: "convoys" };
+
+function parseHash() {
+  var h = location.hash.replace(/^#/, "");
+  if (!h) return { view: "overview", id: null };
+  var parts = h.split("/");
+  if (parts.length > 1 && DETAILS[parts[0]]) return { view: parts[0], id: parts[1] };
+  if (VIEWS[parts[0]]) return { view: parts[0], id: null };
+  return { view: "overview", id: null };
+}
+
+function rerender() { render(); }
+
+function render() {
+  var main = document.getElementById("main");
+  main.classList.remove("nopad");
+  main.innerHTML = "";
+  mapState = null;
+  if (DETAILS[route.view]) {
+    markNav(NAV_OF[route.view]);
+    DETAILS[route.view](main, route.id);
+  } else {
+    markNav(route.view);
+    (VIEWS[route.view] || viewOverview)(main);
+  }
+  restoreFocus();
+}
+
+function onHash() {
+  if (!D) return;
+  var prev = route;
+  route = parseHash();
+  if (!DETAILS[route.view]) {
+    try { localStorage.setItem("simutrans-saveviewer-tab", route.view); } catch (e) {}
+  }
+  render();
+  if (prev.view !== route.view || prev.id !== route.id) {
+    document.getElementById("main").scrollTop = 0;
+  }
+}
+window.addEventListener("hashchange", onHash);
+
+/* --------------------------------------------------------- file plumbing */
+
+var fileInput = document.getElementById("fileinput");
+document.getElementById("btn-pick").addEventListener("click", function () { fileInput.click(); });
+document.getElementById("btn-open").addEventListener("click", function () { fileInput.click(); });
+fileInput.addEventListener("change", function () {
+  if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+  fileInput.value = "";
+});
+
+var dropZone = document.getElementById("drop");
+["dragenter", "dragover"].forEach(function (e) {
+  dropZone.addEventListener(e, function (ev) { ev.preventDefault(); dropZone.classList.add("over"); });
+});
+["dragleave", "drop"].forEach(function (e) {
+  dropZone.addEventListener(e, function () { dropZone.classList.remove("over"); });
+});
+
+var mask = null;
+window.addEventListener("dragover", function (ev) {
+  ev.preventDefault();
+  if (!mask) {
+    mask = document.createElement("div");
+    mask.className = "dropmask";
+    mask.textContent = "Drop the export JSON to load it";
+    document.body.appendChild(mask);
+  }
+});
+window.addEventListener("dragleave", function (ev) {
+  if (ev.clientX === 0 && ev.clientY === 0 && mask) { mask.remove(); mask = null; }
+});
+window.addEventListener("drop", function (ev) {
+  ev.preventDefault();
+  if (mask) { mask.remove(); mask = null; }
+  var dt = ev.dataTransfer;
+  if (dt && dt.files && dt.files[0]) handleFile(dt.files[0]);
+});
+
+/* optional ?file=name.json, works when the folder is served over http */
+(function () {
+  var m = /[?&]file=([^&]+)/.exec(location.search);
+  if (!m) return;
+  var name = decodeURIComponent(m[1]);
+  fetch(name).then(function (r) {
+    if (!r.ok) throw new Error("http " + r.status);
+    return r.text();
+  }).then(function (t) {
+    try { loadJSON(t, name); } catch (e) { showLoadError(e.message); }
+  }).catch(function () { /* no such file, keep the file picker */ });
+})();
+</script>
+</body>
+</html>
