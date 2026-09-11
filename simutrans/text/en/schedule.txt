@@ -38,7 +38,8 @@ The new Stop or waypoint is listed in <strong>Schedule Controls</strong> before 
 </p>
 <p>
 <em>Remove:</em> option deletes a <a href="station.txt">Stop</a> or waypoint from the route.<br>
-Click on option-button to select, then click on item in list to remove.
+Click on option-button to select, then click on item in list to remove.<br>
+A middle click on an item in the list removes it directly, without selecting the Remove option first.
 </p>
 <p>
 <em>replicate backwards:</em> option adds existing <a href="station.txt">Stops</a> and waypoints in reverse order to route. <em>Wait For</em> levels are also replicated. Click on option-button to use: <strong>Schedule Controls</strong> lists new route.

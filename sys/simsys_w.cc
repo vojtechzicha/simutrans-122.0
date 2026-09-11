@@ -546,13 +546,25 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			update_mouse = true;
 			break;
 
-		case WM_MBUTTONDOWN: /* because capture or release may not start with the expected button */
-		case WM_XBUTTONDOWN:
+		case WM_MBUTTONDOWN:
+			SetCapture(this_hwnd);
+			sys_event.type    = SIM_MOUSE_BUTTONS;
+			sys_event.code    = SIM_MOUSE_MIDBUTTON;
+			update_mouse = true;
+			break;
+
+		case WM_MBUTTONUP:
+			ReleaseCapture();
+			sys_event.type    = SIM_MOUSE_BUTTONS;
+			sys_event.code    = SIM_MOUSE_MIDUP;
+			update_mouse = true;
+			break;
+
+		case WM_XBUTTONDOWN: /* because capture or release may not start with the expected button */
 			SetCapture(this_hwnd);
 			break;
 
-		case WM_MBUTTONUP: /* because capture or release may not start with the expected button */
-		case WM_XBUTTONUP:
+		case WM_XBUTTONUP: /* because capture or release may not start with the expected button */
 			ReleaseCapture();
 			break;
 
@@ -883,7 +895,8 @@ LRESULT WINAPI WindowProc(HWND this_hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 
 	if(  update_mouse  ) {
 		sys_event.key_mod = ModifierKeys();
-		sys_event.mb = last_mb = (wParam&3);
+		// MK_LBUTTON=1, MK_RBUTTON=2 map directly; MK_MBUTTON (0x10) becomes bit 4 like the SDL backends
+		sys_event.mb = last_mb = (wParam&3) | ((wParam&MK_MBUTTON) ? 4 : 0);
 		sys_event.mx      = (LOWORD(lParam) * 32)/x_scale;
 		sys_event.my      = (HIWORD(lParam) * 32)/y_scale;
 	}

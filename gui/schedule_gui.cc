@@ -90,10 +90,22 @@ public:
 		stop.set_color(yesno ? SYSCOL_TEXT_HIGHLIGHT : SYSCOL_TEXT);
 	}
 
+	/**
+	 * Listeners receive the entry index on left click (select this entry).
+	 * A middle click requests deletion of this entry; it is signalled as
+	 * the negative value -(index+1), see delete_request_to_index().
+	 */
+	static bool is_delete_request(long v) { return v < 0; }
+	static long delete_request_to_index(long v) { return -v - 1; }
+
 	bool infowin_event(const event_t *ev) OVERRIDE
 	{
 		if( ev->ev_class == EVENT_CLICK ) {
-			if(  IS_RIGHTCLICK(ev)  ||  ev->mx < stop.get_pos().x) {
+			if(  ev->ev_code == MOUSE_MIDBUTTON  ) {
+				// middle click: remove this entry from the schedule
+				call_listeners( value_t( -(long)number - 1 ) );
+			}
+			else if(  IS_RIGHTCLICK(ev)  ||  ev->mx < stop.get_pos().x) {
 				// just center on it
 				welt->get_viewport()->change_world_position( entry.pos );
 			}
@@ -609,17 +621,29 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 		delete tool;
 	}
 	else if (comp == stats) {
-		// click on one of the schedule entries
-		const int line = p.i;
-
-		if(  line >= 0 && line < schedule->get_count()  ) {
-			schedule->set_current_stop( line );
-			if(  mode == removing  ) {
+		if(  gui_schedule_entry_t::is_delete_request(p.i)  ) {
+			// middle click on one of the schedule entries: remove it, keep the current mode
+			const int line = gui_schedule_entry_t::delete_request_to_index(p.i);
+			if(  line >= 0  &&  line < schedule->get_count()  ) {
 				stats->highlight_schedule( false );
+				schedule->set_current_stop( line );
 				schedule->remove();
-				action_triggered( &bt_add, value_t() );
+				update_selection();
 			}
-			update_selection();
+		}
+		else {
+			// click on one of the schedule entries
+			const int line = p.i;
+
+			if(  line >= 0 && line < schedule->get_count()  ) {
+				schedule->set_current_stop( line );
+				if(  mode == removing  ) {
+					stats->highlight_schedule( false );
+					schedule->remove();
+					action_triggered( &bt_add, value_t() );
+				}
+				update_selection();
+			}
 		}
 	}
 	// recheck lines
