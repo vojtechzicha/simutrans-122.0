@@ -1,9 +1,14 @@
 # Simutrans 122.0 — personal feature fork
 
-Fork of Simutrans at the 122.0 release (SVN r9274, branch `release-122.0`, local tag `122.0`).
+Fork of Simutrans at the 122.0 release (SVN r9274). History starts fresh: the root commit (tag
+`122.0`) is the pristine upstream source, everything after it is this fork's work on branch `main`.
 Goal: add and update game features for the owner's own Windows install. Not intended for upstream
-unless explicitly asked. Upstream git history (through 124.x) is present in this clone, so
-`git log origin/master -- <path>` is a good way to see how a file evolved after 122.0.
+unless explicitly asked.
+
+Remotes: `origin` is github.com/vojtechzicha/simutrans-122.0 (push here). `upstream` is the official
+github.com/simutrans/simutrans clone, kept locally for reference only, never pushed to or merged:
+`git log upstream/master -- <path>` shows how a file evolved after 122.0, and
+`git show b4089f540:<path>` is the upstream 122.0 version of a file.
 
 ## Layout (only the parts that matter for feature work)
 
@@ -81,6 +86,7 @@ cd simutrans && ./simutrans -use_workdir -objects pak
 
 ## Git
 
-- Work on `release-122.0` (or feature branches off it). Do not commit `config.default`,
-  `build/`, `simutrans/pak*` or the copied binary; they are ignored already.
+- Work on `main` (or feature branches off it). Do not commit `config.default`, `build/`,
+  `simutrans/pak*`, `simutrans/save/` or the copied binary; they are ignored already.
+- Never push tags or branches from `upstream` to `origin`; the fork's history is meant to stay small.
 - One feature per commit with a `ADD:`/`FIX:`/`CHG:`/`CODE:` prefix, matching upstream style.
