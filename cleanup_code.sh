@@ -6,4 +6,5 @@ find . -type f -name "*.h" | grep -v "squirrel/" | while read f; do guard="$(ech
 #
 # remove trailing spaces
 echo "Removing trailing whitespaces"
-find . -type f -name "*.h" -o -name "*.cc" | grep -v "squirrel" | xargs sed -i -e "s/[ \t]*$//"
+# perl instead of sed: BSD sed (macOS) treats "-i -e" as a backup suffix and does not know \t
+find . -type f \( -name "*.h" -o -name "*.cc" \) | grep -v "squirrel" | xargs perl -pi -e 's/[ \t]+$//'

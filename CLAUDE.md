@@ -29,9 +29,12 @@ github.com/simutrans/simutrans clone, kept locally for reference only, never pus
 ## Build and run on macOS (test only)
 
 ```
-make -j12 && cp build/default/sim simutrans/simutrans
+make -j12 && rm -f simutrans/simutrans && cp build/default/sim simutrans/simutrans
 cd simutrans && ./simutrans -use_workdir -objects pak
 ```
+
+- Remove the old binary before copying: overwriting it in place keeps the stale code-signature cache
+  and macOS kills the new binary with SIGKILL (exit 137) at start.
 
 - `config.default` uses `BACKEND=sdl2`, `OSTYPE=mac`, `AV_FOUNDATION=1`, `USE_FREETYPE=1` and
   `FLAGS = -I/opt/homebrew/include` (the code includes `SDL2/SDL.h`; `sdl2-config` alone is not enough).
@@ -48,6 +51,20 @@ cd simutrans && ./simutrans -use_workdir -objects pak
   (first click after focus is swallowed; a press needs a real cursor move before it).
 - `simutrans/save/testline.sve` (ignored) is a saved game with one road line and a schedule; start
   with `-load testline` to test the schedule editor without building anything in-game.
+- `-load NAME` looks in `<user dir>/save/`, which on macOS is `~/Library/Simutrans/save/` unless you
+  pass `-singleuser` (then it is `simutrans/save/`). A save must match its pakset: the owner's
+  pak128.cs saves need the Windows Steam pakset plus add-ons, so they do not load with the
+  pak128.cs copies in OneDrive (the loader segfaults on missing objects, that is stock behaviour).
+- `./cleanup_code.sh` also rewrites include guards and trailing whitespace in files upstream never
+  cleaned. Run it, then `git checkout --` every file you did not touch, so commits stay focused.
+
+## Save export and web viewer
+
+`simutrans -load NAME -export FILE.json` loads a game with the normal loader, writes a JSON dump
+(`dataobj/savegame_export.cc`, format described in `tools/saveviewer/README.md`) and quits; add
+`SDL_VIDEODRIVER=dummy -nosound -nomidi` to run it headless on macOS. `tools/saveviewer/index.html`
+is a standalone page that opens such a file (lines, stops, convoys, map, settings). Keep the JSON
+keys stable: the exporter and the viewer are the two halves of one format.
 
 ## Windows is the real target
 
