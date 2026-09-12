@@ -142,7 +142,8 @@ cargo from it). The rules live in the helpers on `schedule_entry_t` (`loads`, `u
 `rides_through`, `plans_arrival`, `plans_departure`); `haltestelle_t::rebuild_connections` applies
 them when it walks a schedule (a blocked walk adds no edges until the next entry of the home halt)
 and Terminal edges carry `origin_only` / `dest_only` bits on `connection_t` that both route searches
-test. `convoi_t::hat_gehalten` applies them when stopping. Known limit: a Terminal line still
+test. `convoi_t::hat_gehalten` applies them when stopping. The schedule dialog shows the type as a
+lettered badge in front of each entry row; left click cycles forward, right click back. Known limit: a Terminal line still
 boards waiting cargo whose planned next transfer it also reaches. A bus station with arrival,
 waiting and departure tiles of one halt uses All off on the arrival tile and Regular on the rest.
 
