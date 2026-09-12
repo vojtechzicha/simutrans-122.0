@@ -469,7 +469,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		add_table(3,2);
 		{
 			add_component(&lb_interval);
-			numimp_interval.set_width( 60 );
+			numimp_interval.set_width( 84 );
 			numimp_interval.set_value( schedule->get_current_entry().departure_interval );
 			numimp_interval.set_limits( 0, 24*60 );
 			numimp_interval.set_increment_mode( 1 );
@@ -478,7 +478,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			add_component(&lb_interval_fmt);
 
 			add_component(&lb_offset);
-			numimp_offset.set_width( 60 );
+			numimp_offset.set_width( 84 );
 			numimp_offset.set_value( schedule->get_current_entry().departure_offset );
 			numimp_offset.set_limits( 0, 24*60-1 );
 			numimp_offset.set_increment_mode( 1 );
@@ -589,7 +589,7 @@ void schedule_gui_t::read_extra_offsets()
 	schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
 	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS];
 	uint8 n = 0;
-	const char *p = extra_buf;
+	const char *p = entry.has_timetable()  &&  has_line() ? extra_buf : "";
 	while(  *p  &&  n < schedule_entry_t::MAX_EXTRA_OFFSETS  ) {
 		while(  *p  &&  (*p < '0'  ||  *p > '9')  ) {
 			p++;
@@ -617,16 +617,14 @@ bool schedule_gui_t::has_line() const
 
 void schedule_gui_t::update_selection()
 {
-	const bool extra_was_visible = lb_extra.is_visible();
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
 	numimp_wait.disable();
 	lb_interval.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	lb_offset.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
-	lb_extra.set_visible( false );
+	lb_extra.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	numimp_interval.disable();
 	numimp_offset.disable();
-	input_extra.set_visible( false );
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
@@ -660,8 +658,7 @@ void schedule_gui_t::update_selection()
 				if(  entry.departure_interval > 0  ) {
 					lb_offset.set_color( SYSCOL_TEXT );
 					numimp_offset.enable();
-					lb_extra.set_visible( true );
-					input_extra.set_visible( true );
+					lb_extra.set_color( SYSCOL_TEXT );
 				}
 			}
 
@@ -712,11 +709,6 @@ void schedule_gui_t::update_selection()
 			lb_offset_fmt.update();
 			extra_buf[0] = 0;
 		}
-	}
-	if(  extra_was_visible != lb_extra.is_visible()  &&  get_windowsize().w > 0  ) {
-		// the "also at" row came or went
-		reset_min_windowsize();
-		set_windowsize( get_windowsize() );
 	}
 }
 
@@ -1013,8 +1005,9 @@ void schedule_gui_t::set_windowsize(scr_size size)
 	// manually enlarge size of wait_load combobox
 	wait_load.set_size( scr_size(numimp_load.get_size().w, wait_load.get_size().h) );
 	numimp_wait.set_size( scr_size(numimp_load.get_size().w, numimp_wait.get_size().h) );
-	numimp_interval.set_size( scr_size(numimp_load.get_size().w, numimp_interval.get_size().h) );
-	numimp_offset.set_size( scr_size(numimp_load.get_size().w, numimp_offset.get_size().h) );
+	// four digits plus the arrows need more than the stock 60 pixels
+	numimp_interval.set_size( scr_size(max(numimp_load.get_size().w, 84), numimp_interval.get_size().h) );
+	numimp_offset.set_size( scr_size(max(numimp_load.get_size().w, 84), numimp_offset.get_size().h) );
 	// make scrolly take all of space
 	scrolly.set_size( scr_size(scrolly.get_size().w, get_client_windowsize().h - scrolly.get_pos().y - D_MARGIN_BOTTOM));
 
