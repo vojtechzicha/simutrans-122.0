@@ -475,6 +475,9 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			numimp_interval.set_increment_mode( 1 );
 			numimp_interval.add_listener(this);
 			add_component(&numimp_interval);
+			// room for the widest text, the layout is not recomputed when the value changes
+			lb_interval_fmt.set_min_width( proportional_string_width("= 23h59") );
+			lb_offset_fmt.set_min_width( proportional_string_width("= 23h59") );
 			add_component(&lb_interval_fmt);
 
 			add_component(&lb_offset);

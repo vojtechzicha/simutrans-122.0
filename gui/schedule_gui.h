@@ -32,6 +32,25 @@ class schedule_gui_stats_t;
 
 
 /**
+ * Label whose column keeps a minimum width, so a longer text later on is not clipped
+ * to an ellipsis (the layout is computed once, with the text of that moment).
+ */
+class gui_label_minw_t : public gui_label_buf_t
+{
+	scr_coord_val min_w;
+public:
+	gui_label_minw_t() : min_w(0) {}
+	void set_min_width(scr_coord_val w) { min_w = w; }
+	scr_size get_min_size() const OVERRIDE
+	{
+		scr_size s = gui_label_buf_t::get_min_size();
+		s.w = max( s.w, min_w );
+		return s;
+	}
+};
+
+
+/**
  * GUI for Schedule dialog
  */
 class schedule_gui_t : public gui_frame_t, public action_listener_t
@@ -57,7 +76,7 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	// timetable (fork, world calendar only): departure slots every N minutes plus offset
 	gui_label_t lb_interval, lb_offset;
 	gui_numberinput_t numimp_interval, numimp_offset;
-	gui_label_buf_t lb_interval_fmt, lb_offset_fmt; // the same as hours and minutes
+	gui_label_minw_t lb_interval_fmt, lb_offset_fmt; // the same as hours and minutes
 	gui_label_t lb_extra;            // more departures per cycle, as a comma separated list
 	gui_textinput_t input_extra;
 	char extra_buf[64];
