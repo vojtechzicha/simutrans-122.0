@@ -263,6 +263,22 @@ void schedule_t::rdwr(loadsave_t *file)
 					entries[i].stop_type = schedule_entry_t::regular;
 				}
 			}
+			if(file->is_version_atleast(122, 4)) {
+				// fork: more departure offsets per cycle
+				uint8 count = entries[i].extra_offset_count;
+				file->rdwr_byte(count);
+				uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS];
+				for(  uint8 k=0;  k<count;  k++  ) {
+					uint16 o = k < schedule_entry_t::MAX_EXTRA_OFFSETS ? entries[i].extra_offsets[k] : 0;
+					file->rdwr_short(o);
+					if(  k < schedule_entry_t::MAX_EXTRA_OFFSETS  ) {
+						offsets[k] = o;
+					}
+				}
+				if(  file->is_loading()  ) {
+					entries[i].set_extra_offsets( offsets, min( count, schedule_entry_t::MAX_EXTRA_OFFSETS ) );
+				}
+			}
 		}
 	}
 	if(file->is_loading()) {
@@ -416,7 +432,11 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 {
 	buf.printf("%u|%d|", current_stop, (int)get_type());
 	FOR(minivec_tpl<schedule_entry_t>, const& i, entries) {
-		buf.printf("%s,%i,%i,%i,%i,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time, (int)i.departure_interval, (int)i.departure_offset, (int)i.stop_type);
+		buf.printf("%s,%i,%i,%i,%i,%i,%i,%i", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time, (int)i.departure_interval, (int)i.departure_offset, (int)i.stop_type, (int)i.extra_offset_count);
+		for(  uint8 k=0;  k<i.extra_offset_count;  k++  ) {
+			buf.printf(",%i", (int)i.extra_offsets[k]);
+		}
+		buf.append("|");
 	}
 }
 
@@ -457,28 +477,103 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		return false;
 	}
 	p++;
-	// now scan the entries
+	// now scan the entries: nine fixed values, then the number of extra offsets and those offsets
 	while(  *p>0  ) {
-		sint32 values[9];
-		for(  sint8 i=0;  i<9;  i++  ) {
-			values[i] = atoi( p );
+		const int max_values = 10 + schedule_entry_t::MAX_EXTRA_OFFSETS;
+		sint32 values[max_values];
+		int count = 0;
+		while(  *p  &&  *p != '|'  ) {
+			if(  count < max_values  ) {
+				values[count] = atoi( p );
+			}
+			count ++;
 			while(  *p  &&  (*p!=','  &&  *p!='|')  ) {
 				p++;
 			}
-			if(  i<8  &&  *p!=','  ) {
-				dbg->error( "schedule_t::sscanf_schedule()","incomplete string!" );
-				return false;
+			if(  *p == ','  ) {
+				p++;
 			}
-			if(  i==8  &&  *p!='|'  ) {
-				dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination!" );
-				return false;
-			}
-			p++;
+		}
+		if(  *p != '|'  ) {
+			dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination!" );
+			return false;
+		}
+		p++;
+		if(  count < 9  ) {
+			dbg->error( "schedule_t::sscanf_schedule()","incomplete string!" );
+			return false;
 		}
 		// ok, now we have a complete entry
-		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5], values[6], values[7], values[8]));
+		schedule_entry_t entry(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5], values[6], values[7], values[8]);
+		if(  count > 10  ) {
+			uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS];
+			uint8 n = 0;
+			for(  int k=10;  k<count  &&  k<max_values  &&  n<schedule_entry_t::MAX_EXTRA_OFFSETS;  k++  ) {
+				offsets[n++] = (uint16)values[k];
+			}
+			entry.set_extra_offsets( offsets, n );
+		}
+		entries.append(entry);
 	}
 	return true;
+}
+
+
+uint8 schedule_entry_t::get_departure_offsets(uint16 *out) const
+{
+	if(  departure_interval == 0  ) {
+		return 0;
+	}
+	uint8 n = 0;
+	out[n++] = departure_offset < departure_interval ? departure_offset : departure_interval - 1;
+	for(  uint8 k=0;  k<extra_offset_count  &&  k<MAX_EXTRA_OFFSETS;  k++  ) {
+		const uint16 o = extra_offsets[k];
+		if(  o >= departure_interval  ) {
+			continue;
+		}
+		// insert sorted, skip duplicates
+		uint8 i = 0;
+		while(  i < n  &&  out[i] < o  ) {
+			i ++;
+		}
+		if(  i < n  &&  out[i] == o  ) {
+			continue;
+		}
+		for(  uint8 j=n;  j>i;  j--  ) {
+			out[j] = out[j-1];
+		}
+		out[i] = o;
+		n ++;
+	}
+	return n;
+}
+
+
+void schedule_entry_t::set_extra_offsets(const uint16 *offsets, uint8 count)
+{
+	extra_offset_count = 0;
+	for(  uint8 k=0;  k<count  &&  extra_offset_count<MAX_EXTRA_OFFSETS;  k++  ) {
+		const uint16 o = offsets[k];
+		if(  departure_interval > 0  &&  o >= departure_interval  ) {
+			continue;
+		}
+		if(  o == departure_offset  ) {
+			continue;
+		}
+		// insert sorted, skip duplicates
+		uint8 i = 0;
+		while(  i < extra_offset_count  &&  extra_offsets[i] < o  ) {
+			i ++;
+		}
+		if(  i < extra_offset_count  &&  extra_offsets[i] == o  ) {
+			continue;
+		}
+		for(  uint8 j=extra_offset_count;  j>i;  j--  ) {
+			extra_offsets[j] = extra_offsets[j-1];
+		}
+		extra_offsets[i] = o;
+		extra_offset_count ++;
+	}
 }
 
 
@@ -517,7 +612,15 @@ void schedule_t::append_timetable( cbuffer_t &buf, schedule_entry_t const& entry
 	if(  entry.has_timetable()  ) {
 		buf.append("[");
 		append_minutes( buf, entry.departure_interval );
-		if(  entry.departure_offset > 0  ) {
+		if(  entry.extra_offset_count > 0  ) {
+			// several departures per cycle: plain minutes, e.g. [1h+1,11,31,41]
+			uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+			const uint8 n = entry.get_departure_offsets( offsets );
+			for(  uint8 k=0;  k<n;  k++  ) {
+				buf.printf( "%c%d", k == 0 ? '+' : ',', offsets[k] );
+			}
+		}
+		else if(  entry.departure_offset > 0  ) {
 			buf.append("+");
 			append_minutes( buf, entry.departure_offset );
 		}

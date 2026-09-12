@@ -11,6 +11,7 @@
 
 #include "components/gui_label.h"
 #include "components/gui_numberinput.h"
+#include "components/gui_textinput.h"
 #include "components/gui_combobox.h"
 #include "components/gui_button.h"
 #include "components/action_listener.h"
@@ -57,6 +58,12 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_label_t lb_interval, lb_offset;
 	gui_numberinput_t numimp_interval, numimp_offset;
 	gui_label_buf_t lb_interval_fmt, lb_offset_fmt; // the same as hours and minutes
+	gui_label_t lb_extra;            // more departures per cycle, as a comma separated list
+	gui_textinput_t input_extra;
+	char extra_buf[64];
+
+	void read_extra_offsets();       // parse input_extra into the current entry
+	void show_extra_offsets(const schedule_entry_t &entry);
 
 	/// the schedule belongs to a line (timetable slots only work with lines)
 	bool has_line() const;

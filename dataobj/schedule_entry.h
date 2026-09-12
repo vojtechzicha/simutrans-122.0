@@ -7,6 +7,7 @@
 #define DATAOBJ_SCHEDULE_ENTRY_H
 
 
+#include <string.h>
 #include "koord3d.h"
 
 /**
@@ -28,7 +29,10 @@ public:
 		max_stop_type
 	};
 
-	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), stop_type(regular) {}
+	/// more departure offsets per cycle besides departure_offset (fork)
+	static const uint8 MAX_EXTRA_OFFSETS = 7;
+
+	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), stop_type(regular) {}
 
 	schedule_entry_t(koord3d const& pos, uint const minimum_loading, sint8 const waiting_time_shift, uint16 const waiting_time = 0, uint16 const departure_interval = 0, uint16 const departure_offset = 0, uint8 const stop_type = regular) :
 		pos(pos),
@@ -37,6 +41,7 @@ public:
 		waiting_time(waiting_time),
 		departure_interval(departure_interval),
 		departure_offset(departure_offset),
+		extra_offset_count(0),
 		stop_type(stop_type < max_stop_type ? stop_type : (uint8)regular)
 	{}
 
@@ -78,7 +83,23 @@ public:
 	uint16 departure_interval;
 	uint16 departure_offset;
 
+	/**
+	 * Further departures within one cycle (fork): a line that leaves every 60 minutes at
+	 * :01, :11, :31 and :41 has interval 60, offset 1 and extras 11, 31, 41.
+	 */
+	uint16 extra_offsets[MAX_EXTRA_OFFSETS];
+	uint8 extra_offset_count;
+
 	bool has_timetable() const { return departure_interval > 0; }
+
+	/**
+	 * All departure offsets of one cycle, sorted, unique and below the interval; at least
+	 * departure_offset. Returns their number (out must hold MAX_EXTRA_OFFSETS + 1).
+	 */
+	uint8 get_departure_offsets(uint16 *out) const;
+
+	/// keeps only valid extra offsets: below the interval, not the main offset, unique, sorted
+	void set_extra_offsets(const uint16 *offsets, uint8 count);
 
 	/// one of stop_type_t
 	uint8 stop_type;
@@ -102,7 +123,8 @@ public:
 inline bool operator ==(const schedule_entry_t &a, const schedule_entry_t &b)
 {
 	return a.pos == b.pos  &&  a.minimum_loading == b.minimum_loading  &&  a.waiting_time_shift == b.waiting_time_shift  &&  a.waiting_time == b.waiting_time
-		&&  a.departure_interval == b.departure_interval  &&  a.departure_offset == b.departure_offset  &&  a.stop_type == b.stop_type;
+		&&  a.departure_interval == b.departure_interval  &&  a.departure_offset == b.departure_offset  &&  a.stop_type == b.stop_type
+		&&  a.extra_offset_count == b.extra_offset_count  &&  memcmp( a.extra_offsets, b.extra_offsets, a.extra_offset_count * sizeof(uint16) ) == 0;
 }
 
 

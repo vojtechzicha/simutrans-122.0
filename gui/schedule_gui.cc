@@ -360,6 +360,7 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	lb_load("Full load"),
 	lb_interval("Departure every (min)"),
 	lb_offset("Offset (min)"),
+	lb_extra("Also at (min)"),
 	stats(new schedule_gui_stats_t() ),
 	scrolly(stats)
 {
@@ -484,6 +485,14 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			numimp_offset.add_listener(this);
 			add_component(&numimp_offset);
 			add_component(&lb_offset_fmt);
+
+			// the rare case of several departures per cycle, e.g. "11,31,41" next to offset 1
+			add_component(&lb_extra);
+			extra_buf[0] = 0;
+			input_extra.set_text( extra_buf, sizeof(extra_buf) );
+			input_extra.set_width( 120 );
+			input_extra.add_listener(this);
+			add_component(&input_extra, 2);
 		}
 		end_table();
 	}
@@ -561,6 +570,44 @@ void schedule_gui_t::update_tool(bool set)
 }
 
 
+void schedule_gui_t::show_extra_offsets(const schedule_entry_t &entry)
+{
+	// the text field keeps what the player typed while the entry stays the same
+	cbuffer_t buf;
+	for(  uint8 k=0;  k<entry.extra_offset_count;  k++  ) {
+		buf.printf( "%s%d", k ? "," : "", entry.extra_offsets[k] );
+	}
+	if(  strcmp( buf, extra_buf ) != 0  ) {
+		tstrncpy( extra_buf, buf, sizeof(extra_buf) );
+		input_extra.set_text( extra_buf, sizeof(extra_buf) ); // resets the cursor
+	}
+}
+
+
+void schedule_gui_t::read_extra_offsets()
+{
+	schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS];
+	uint8 n = 0;
+	const char *p = extra_buf;
+	while(  *p  &&  n < schedule_entry_t::MAX_EXTRA_OFFSETS  ) {
+		while(  *p  &&  (*p < '0'  ||  *p > '9')  ) {
+			p++;
+		}
+		if(  *p  ) {
+			offsets[n++] = (uint16)atoi( p );
+			while(  *p >= '0'  &&  *p <= '9'  ) {
+				p++;
+			}
+		}
+	}
+	entry.set_extra_offsets( offsets, n );
+	// echo the cleaned list back
+	extra_buf[0] = 0;
+	show_extra_offsets( entry );
+}
+
+
 bool schedule_gui_t::has_line() const
 {
 	// a line's own schedule (no convoy) or a convoy that serves a line
@@ -570,13 +617,16 @@ bool schedule_gui_t::has_line() const
 
 void schedule_gui_t::update_selection()
 {
+	const bool extra_was_visible = lb_extra.is_visible();
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
 	numimp_wait.disable();
 	lb_interval.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	lb_offset.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	lb_extra.set_visible( false );
 	numimp_interval.disable();
 	numimp_offset.disable();
+	input_extra.set_visible( false );
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
@@ -603,12 +653,15 @@ void schedule_gui_t::update_selection()
 			lb_offset_fmt.update();
 			lb_interval_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
 			lb_offset_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			show_extra_offsets( entry );
 			if(  has_line()  ) {
 				lb_interval.set_color( SYSCOL_TEXT );
 				numimp_interval.enable();
 				if(  entry.departure_interval > 0  ) {
 					lb_offset.set_color( SYSCOL_TEXT );
 					numimp_offset.enable();
+					lb_extra.set_visible( true );
+					input_extra.set_visible( true );
 				}
 			}
 
@@ -657,7 +710,13 @@ void schedule_gui_t::update_selection()
 			lb_interval_fmt.update();
 			lb_offset_fmt.buf().clear();
 			lb_offset_fmt.update();
+			extra_buf[0] = 0;
 		}
+	}
+	if(  extra_was_visible != lb_extra.is_visible()  &&  get_windowsize().w > 0  ) {
+		// the "also at" row came or went
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
 	}
 }
 
@@ -783,7 +842,16 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 	}
 	else if(comp == &numimp_offset) {
 		if(!schedule->empty()) {
-			schedule->entries[schedule->get_current_stop()].departure_offset = (uint16)p.i;
+			schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+			entry.departure_offset = (uint16)p.i;
+			// the main offset must not appear in the list as well
+			entry.set_extra_offsets( entry.extra_offsets, entry.extra_offset_count );
+			update_selection();
+		}
+	}
+	else if(comp == &input_extra) {
+		if(!schedule->empty()) {
+			read_extra_offsets();
 			update_selection();
 		}
 	}

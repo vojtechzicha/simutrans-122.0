@@ -126,43 +126,93 @@ void simline_t::set_schedule(schedule_t* schedule)
 }
 
 
-// the slot after the given one, restarting at the offset after midnight
-static sint64 next_departure_slot(const schedule_entry_t &entry, sint64 slot)
+/*
+ * Timetable slots (fork). A day is divided into cycles of departure_interval minutes starting
+ * at midnight; within every cycle the entry's offsets are departure slots (all below 1440).
+ * A slot stays open for half the gap to the following slot.
+ */
+
+// splits calendar minutes into day and minute of the day
+static void split_day(sint64 minutes, sint64 &day, sint64 &minute_of_day)
 {
-	sint64 day = slot / 1440;
-	sint64 minute_of_day = slot - day * 1440;
+	day = minutes / 1440;
+	minute_of_day = minutes - day * 1440;
 	if(  minute_of_day < 0  ) {
 		minute_of_day += 1440;
 		day --;
 	}
-	minute_of_day += entry.departure_interval;
-	if(  minute_of_day >= 1440  ) {
-		day ++;
-		minute_of_day = entry.departure_offset;
+}
+
+
+// the last slot at or before this minute of the day, if the day has one yet
+static bool slot_at_or_before(const schedule_entry_t &entry, const uint16 *offsets, uint8 n, sint64 minute_of_day, sint64 &slot)
+{
+	const sint64 interval = entry.departure_interval;
+	const sint64 cycle = minute_of_day / interval;
+	const sint64 rem = minute_of_day - cycle * interval;
+	for(  int i = n-1;  i >= 0;  i--  ) {
+		if(  offsets[i] <= rem  ) {
+			slot = cycle * interval + offsets[i];
+			return true;
+		}
 	}
-	return day * 1440 + minute_of_day;
+	if(  cycle == 0  ) {
+		return false;
+	}
+	slot = (cycle - 1) * interval + offsets[n-1];
+	return true;
+}
+
+
+// the first slot after this minute of the day; 1440 and more means the next day
+static sint64 slot_after(const schedule_entry_t &entry, const uint16 *offsets, uint8 n, sint64 minute_of_day)
+{
+	const sint64 interval = entry.departure_interval;
+	const sint64 cycle = minute_of_day / interval;
+	const sint64 rem = minute_of_day - cycle * interval;
+	for(  uint8 i = 0;  i < n;  i++  ) {
+		if(  offsets[i] > rem  ) {
+			const sint64 slot = cycle * interval + offsets[i];
+			if(  slot < 1440  ) {
+				return slot;
+			}
+			break;
+		}
+	}
+	const sint64 slot = (cycle + 1) * interval + offsets[0];
+	if(  slot < 1440  ) {
+		return slot;
+	}
+	return 1440 + offsets[0];
+}
+
+
+// the slot after the given one, restarting at the first offset after midnight
+static sint64 next_departure_slot(const schedule_entry_t &entry, sint64 slot)
+{
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = entry.get_departure_offsets( offsets );
+	sint64 day, minute_of_day;
+	split_day( slot, day, minute_of_day );
+	return day * 1440 + slot_after( entry, offsets, n, minute_of_day );
 }
 
 
 // the first slot a convoy may use from now on: the open one, or else the next to come
 static sint64 first_departure_slot(const schedule_entry_t &entry, sint64 now)
 {
-	const sint64 interval = entry.departure_interval;
-	const sint64 offset = entry.departure_offset;
-	sint64 day = now / 1440;
-	sint64 minute_of_day = now - day * 1440;
-	if(  minute_of_day < 0  ) {
-		minute_of_day += 1440;
-		day --;
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = entry.get_departure_offsets( offsets );
+	sint64 day, minute_of_day;
+	split_day( now, day, minute_of_day );
+	sint64 prev;
+	if(  slot_at_or_before( entry, offsets, n, minute_of_day, prev )  ) {
+		const sint64 gap = slot_after( entry, offsets, n, prev ) - prev;
+		if(  (minute_of_day - prev) * 2 <= gap  ) {
+			return day * 1440 + prev;
+		}
 	}
-	if(  minute_of_day < offset  ) {
-		return day * 1440 + offset;
-	}
-	const sint64 slot_start = offset + ((minute_of_day - offset) / interval) * interval;
-	if(  (minute_of_day - slot_start) * 2 <= interval  ) {
-		return day * 1440 + slot_start;
-	}
-	return next_departure_slot( entry, day * 1440 + slot_start );
+	return day * 1440 + slot_after( entry, offsets, n, minute_of_day );
 }
 
 
@@ -220,26 +270,21 @@ bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &s
 	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {
 		return false;
 	}
-	const sint64 interval = entry.departure_interval;
-	const sint64 offset = entry.departure_offset;
-	const sint64 now = welt->get_calendar_minutes();
-	// minute of the calendar day, slots restart at every midnight
-	sint64 day = now / 1440;
-	sint64 minute_of_day = now - day * 1440;
-	if(  minute_of_day < 0  ) {
-		minute_of_day += 1440;
-		day --;
-	}
-	if(  minute_of_day < offset  ) {
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = entry.get_departure_offsets( offsets );
+	sint64 day, minute_of_day;
+	split_day( welt->get_calendar_minutes(), day, minute_of_day );
+	sint64 prev;
+	if(  !slot_at_or_before( entry, offsets, n, minute_of_day, prev )  ) {
 		// before the first slot of the day
 		return false;
 	}
-	const sint64 slot_start = offset + ((minute_of_day - offset) / interval) * interval;
-	if(  (minute_of_day - slot_start) * 2 > interval  ) {
+	const sint64 gap = slot_after( entry, offsets, n, prev ) - prev;
+	if(  (minute_of_day - prev) * 2 > gap  ) {
 		// the slot is closed again, wait for the next one
 		return false;
 	}
-	slot = day * 1440 + slot_start;
+	slot = day * 1440 + prev;
 	return true;
 }
 

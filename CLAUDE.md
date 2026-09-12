@@ -122,9 +122,12 @@ Schedule stops carry `waiting_time` in calendar minutes (savegame 122.1, `schedu
 wins over the stock `waiting_time_shift` fraction when set. Saves written by the fork do not load in
 the stock 122.0 exe; use `tools/windows/steam-fork.sh downgrade` for that.
 
-Timetable (savegame 122.2): a stop entry may have `departure_interval` and `departure_offset` in
-calendar minutes. Slots start at the offset after every midnight, repeat every interval, and stay
-open for half an interval. A convoy leaves only when its loading rules are met (minimum load or
+Timetable (savegame 122.2, offsets list 122.4): a stop entry may have `departure_interval` and
+`departure_offset` in calendar minutes, plus up to seven `extra_offsets` for lines that leave
+several times per cycle (every 60 at 1, 11, 31, 41). Slots are `cycle * interval + offset` counted
+from midnight, and stay open for half the gap to the next slot (`simline.cc` slot helpers,
+`schedule_entry_t::get_departure_offsets` gives the sorted list). The dialog keeps the single
+offset input and adds an "Also at (min)" text field for the extras. A convoy leaves only when its loading rules are met (minimum load or
 maximum wait, unchanged) and a slot is open that no other convoy of the line used at that entry
 (`simline_t::take_departure_slot`, `last_departure_slot` saved with the line and cleared when the
 schedule changes); among ready convoys the earliest arrival goes first. Convoys without a line and

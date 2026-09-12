@@ -849,7 +849,11 @@ function scheduleList(host, sched) {
     if (num(e.minimum_loading) > 0) opts.push("load at least " + num(e.minimum_loading) + "%");
     if (num(e.waiting_time_minutes) > 0) opts.push("wait " + num(e.waiting_time_minutes) + " min");
     else if (num(e.waiting_time) > 0) opts.push("wait 1/" + Math.pow(2, 16 - num(e.waiting_time)) + " month");
-    if (num(e.departure_interval) > 0) opts.push("every " + num(e.departure_interval) + " min" + (num(e.departure_offset) > 0 ? ", +" + num(e.departure_offset) : ""));
+    if (num(e.departure_interval) > 0) {
+      var offs = Array.isArray(e.departure_offsets) ? e.departure_offsets : [];
+      if (offs.length > 1) opts.push("every " + num(e.departure_interval) + " min at " + offs.join(", "));
+      else opts.push("every " + num(e.departure_interval) + " min" + (num(e.departure_offset) > 0 ? ", +" + num(e.departure_offset) : ""));
+    }
     var stopTypes = ["", "terminal", "all off", "only load", "only unload"];
     if (stopTypes[num(e.stop_type)]) opts.push(stopTypes[num(e.stop_type)]);
     if (opts.length) h += ' <span class="opts">(' + esc(opts.join(", ")) + ")</span>";
