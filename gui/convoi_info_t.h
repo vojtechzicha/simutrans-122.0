@@ -43,6 +43,7 @@ private:
 	gui_textarea_t text;
 	obj_view_t view;
 	gui_label_buf_t speed_label, profit_label, running_cost_label, weight_label, target_label, line_label;
+	gui_label_buf_t departure_label; // timetable (fork): planned departure while waiting at a stop
 	gui_textinput_t input;
 	gui_speedbar_t filled_bar;
 	gui_speedbar_t speed_bar;

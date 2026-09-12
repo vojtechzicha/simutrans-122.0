@@ -2914,6 +2914,13 @@ station_tile_search_ready: ;
 		}
 	}
 
+	// timetable (fork): while a convoy of the line that arrived earlier still waits at this stop,
+	// it leaves first and gets the passengers; we only unload until then
+	bool hold_loading = false;
+	if(  !no_load  &&  line.is_bound()  &&  schedule->get_current_entry().has_timetable()  &&  welt->has_calendar()  ) {
+		hold_loading = line->count_earlier_waiting( self ) > 0;
+	}
+
 	// only load vehicles in station
 	// don't load when vehicle is being withdrawn
 	bool changed_loading_level = false;
@@ -2937,7 +2944,7 @@ station_tile_search_ready: ;
 
 		uint16 amount = v->unload_cargo(halt, next_depot  );
 
-		if(  !no_load  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
+		if(  !no_load  &&  !hold_loading  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
 			// load if: unloaded something (might go back) or previous non-filled car requested different cargo type
 			if (amount>0  ||  cargo_type_prev==NULL  ||  !cargo_type_prev->is_interchangeable(v->get_cargo_type())) {
 				// load

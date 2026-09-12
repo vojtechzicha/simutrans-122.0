@@ -130,7 +130,10 @@ maximum wait, unchanged) and a slot is open that no other convoy of the line use
 schedule changes); among ready convoys the earliest arrival goes first. Convoys without a line and
 convoys with `no_load` ignore the timetable. The schedule dialog shows the two inputs only with the
 calendar on and greys them out for line-less convoys; the entry list appends "(every N min, +M)".
-Not done yet: departure boards still estimate from arrival plus wait, they ignore the slots.
+A convoy that arrived after another convoy of its line at the same entry only unloads until
+that one has left (`count_earlier_waiting`), so passengers board the train that leaves first;
+the convoy window shows "Departure: HH:MM (in N min), K ahead" from `get_planned_departure`.
+Not done yet: the stop departure boards still estimate from arrival plus wait.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

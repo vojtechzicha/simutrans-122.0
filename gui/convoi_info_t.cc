@@ -119,6 +119,9 @@ void convoi_info_t::init(convoihandle_t cnv)
 			add_component(&route_bar);
 			end_table();
 
+			departure_label.set_visible(false);
+			add_component(&departure_label);
+
 			add_component(&container_line);
 			container_line.set_table_layout(3,1);
 			container_line.add_component(&line_button);
@@ -296,6 +299,38 @@ void convoi_info_t::update_labels()
 		line_label.set_color(cnv->get_line()->get_state_color());
 	}
 	line_label.update();
+
+	// timetable (fork): the slot this convoy is going to leave in
+	bool show_departure = false;
+	sint64 slot = 0;
+	if(  cnv->get_state() == convoi_t::LOADING  &&  cnv->get_line().is_bound()  &&  welt->has_calendar()  ) {
+		show_departure = cnv->get_line()->get_planned_departure( cnv, slot );
+	}
+	if(  show_departure  ) {
+		const sint64 now = welt->get_calendar_minutes();
+		const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
+		const karte_t::calendar_date_t today = welt->get_calendar_date( now );
+		departure_label.buf().printf( translator::translate("Departure: %02d:%02d"), date.hour, date.minute );
+		if(  date.day_number != today.day_number  ) {
+			departure_label.buf().printf( " +%dd", (int)(date.day_number - today.day_number) );
+		}
+		if(  slot > now  ) {
+			departure_label.buf().printf( translator::translate(" (in %d min)"), (int)(slot - now) );
+		}
+		else {
+			departure_label.buf().append( translator::translate(" (now)") );
+		}
+		const uint32 ahead = cnv->get_line()->count_earlier_waiting( cnv );
+		if(  ahead > 0  ) {
+			departure_label.buf().printf( translator::translate(", %d ahead"), (int)ahead );
+		}
+	}
+	departure_label.update();
+	if(  departure_label.is_visible() != show_departure  ) {
+		departure_label.set_visible( show_departure );
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
 
 	// buffer update now only when needed by convoi itself => dedicated buffer for this
 	const int old_len=freight_info.len();

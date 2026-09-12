@@ -126,6 +126,95 @@ void simline_t::set_schedule(schedule_t* schedule)
 }
 
 
+// the slot after the given one, restarting at the offset after midnight
+static sint64 next_departure_slot(const schedule_entry_t &entry, sint64 slot)
+{
+	sint64 day = slot / 1440;
+	sint64 minute_of_day = slot - day * 1440;
+	if(  minute_of_day < 0  ) {
+		minute_of_day += 1440;
+		day --;
+	}
+	minute_of_day += entry.departure_interval;
+	if(  minute_of_day >= 1440  ) {
+		day ++;
+		minute_of_day = entry.departure_offset;
+	}
+	return day * 1440 + minute_of_day;
+}
+
+
+// the first slot a convoy may use from now on: the open one, or else the next to come
+static sint64 first_departure_slot(const schedule_entry_t &entry, sint64 now)
+{
+	const sint64 interval = entry.departure_interval;
+	const sint64 offset = entry.departure_offset;
+	sint64 day = now / 1440;
+	sint64 minute_of_day = now - day * 1440;
+	if(  minute_of_day < 0  ) {
+		minute_of_day += 1440;
+		day --;
+	}
+	if(  minute_of_day < offset  ) {
+		return day * 1440 + offset;
+	}
+	const sint64 slot_start = offset + ((minute_of_day - offset) / interval) * interval;
+	if(  (minute_of_day - slot_start) * 2 <= interval  ) {
+		return day * 1440 + slot_start;
+	}
+	return next_departure_slot( entry, day * 1440 + slot_start );
+}
+
+
+uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
+		return 0;
+	}
+	const uint8 idx = cnv_schedule->get_current_stop();
+	uint32 count = 0;
+	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
+		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
+			continue;
+		}
+		const schedule_t *other_schedule = other->get_schedule();
+		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
+			continue;
+		}
+		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  ) {
+			count ++;
+		}
+	}
+	return count;
+}
+
+
+bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 &slot) const
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
+		return false;
+	}
+	const uint8 idx = cnv_schedule->get_current_stop();
+	const schedule_entry_t &entry = cnv_schedule->entries[idx];
+	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {
+		return false;
+	}
+	sint64 s = first_departure_slot( entry, welt->get_calendar_minutes() );
+	if(  idx < last_departure_slot.get_count()  &&  last_departure_slot[idx] == s  ) {
+		// this slot is gone already
+		s = next_departure_slot( entry, s );
+	}
+	// every convoy that arrived earlier takes one slot before us
+	for(  uint32 n = count_earlier_waiting( cnv );  n > 0;  n --  ) {
+		s = next_departure_slot( entry, s );
+	}
+	slot = s;
+	return true;
+}
+
+
 bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot)
 {
 	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {

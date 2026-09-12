@@ -137,6 +137,15 @@ public:
 	 */
 	bool take_departure_slot(convoihandle_t cnv);
 
+	/// Timetable (fork): convoys of the line loading at the same schedule entry that arrived before cnv
+	uint32 count_earlier_waiting(convoihandle_t cnv) const;
+
+	/**
+	 * Timetable (fork): the calendar minute of the slot cnv is expected to leave in, after the
+	 * convoys that arrived before it. False without a timetable at the current entry.
+	 */
+	bool get_planned_departure(convoihandle_t cnv, sint64 &slot) const;
+
 	/**
 	 * returns the state of the line
 	 */

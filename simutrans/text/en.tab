@@ -1551,3 +1551,11 @@ Departure every (min)
 Departure every (min)
 Offset (min)
 Offset (min)
+Departure: %02d:%02d
+Departure: %02d:%02d
+ (in %d min)
+ (in %d min)
+ (now)
+ (now)
+, %d ahead
+, %d ahead
