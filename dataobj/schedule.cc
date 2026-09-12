@@ -247,6 +247,10 @@ void schedule_t::rdwr(loadsave_t *file)
 			if(file->is_version_atleast(99, 18)) {
 				file->rdwr_byte(entries[i].waiting_time_shift);
 			}
+			if(file->is_version_atleast(122, 1)) {
+				// fork: waiting time in calendar minutes
+				file->rdwr_short(entries[i].waiting_time);
+			}
 		}
 	}
 	if(file->is_loading()) {
@@ -400,7 +404,7 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 {
 	buf.printf("%u|%d|", current_stop, (int)get_type());
 	FOR(minivec_tpl<schedule_entry_t>, const& i, entries) {
-		buf.printf("%s,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift);
+		buf.printf("%s,%i,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time);
 	}
 }
 
@@ -443,26 +447,40 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 	p++;
 	// now scan the entries
 	while(  *p>0  ) {
-		sint16 values[5];
-		for(  sint8 i=0;  i<5;  i++  ) {
+		sint32 values[6];
+		for(  sint8 i=0;  i<6;  i++  ) {
 			values[i] = atoi( p );
 			while(  *p  &&  (*p!=','  &&  *p!='|')  ) {
 				p++;
 			}
-			if(  i<4  &&  *p!=','  ) {
+			if(  i<5  &&  *p!=','  ) {
 				dbg->error( "schedule_t::sscanf_schedule()","incomplete string!" );
 				return false;
 			}
-			if(  i==4  &&  *p!='|'  ) {
+			if(  i==5  &&  *p!='|'  ) {
 				dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination!" );
 				return false;
 			}
 			p++;
 		}
 		// ok, now we have a complete entry
-		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4]));
+		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5]));
 	}
 	return true;
+}
+
+
+uint32 schedule_entry_t::get_waiting_ticks() const
+{
+	const karte_t *welt = world();
+	const sint32 minutes_per_month = welt->get_settings().get_minutes_per_month();
+	if(  waiting_time > 0  &&  minutes_per_month > 0  ) {
+		return (uint32)( ((sint64)welt->ticks_per_world_month * waiting_time) / minutes_per_month );
+	}
+	if(  waiting_time_shift > 0  ) {
+		return welt->ticks_per_world_month >> (16 - waiting_time_shift);
+	}
+	return 0;
 }
 
 

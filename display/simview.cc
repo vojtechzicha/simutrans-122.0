@@ -135,7 +135,12 @@ void main_view_t::display(bool force_dirty)
 		uint32 month = welt->get_last_month();
 		const uint32 ticks_this_month = welt->get_ticks() % welt->ticks_per_world_month;
 		uint32 hours2;
-		if (env_t::show_month > env_t::DATE_FMT_MONTH) {
+		if(  welt->has_calendar()  ) {
+			// world calendar: half hours of the calendar day
+			const sint64 minutes = welt->get_calendar_minutes();
+			hours2 = (uint32)( ((minutes / 30) % 48 + 48) % 48 );
+		}
+		else if (env_t::show_month > env_t::DATE_FMT_MONTH) {
 			static sint32 days_per_month[12]={31,28,31,30,31,30,31,31,30,31,30,31};
 			hours2 = (((sint64)ticks_this_month*days_per_month[month]) >> (welt->ticks_per_world_month_shift-17));
 			hours2 = ((hours2*3) / 8192) % 48;

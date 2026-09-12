@@ -285,22 +285,106 @@ int checklist_t::print(char *buffer, const char *entity) const
 }
 
 
+// days since 1970-01-01 for a proleptic Gregorian date (Howard Hinnant's algorithm)
+sint64 karte_t::days_from_civil( sint32 y, uint32 m, uint32 d )
+{
+	y -= m <= 2;
+	const sint64 era = (y >= 0 ? y : y - 399) / 400;
+	const uint32 yoe = (uint32)(y - era * 400);                          // [0, 399]
+	const uint32 doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;   // [0, 365]
+	const uint32 doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;            // [0, 146096]
+	return era * 146097 + (sint64)doe - 719468;
+}
+
+
+void karte_t::civil_from_days( sint64 z, sint32 &y, uint32 &m, uint32 &d )
+{
+	z += 719468;
+	const sint64 era = (z >= 0 ? z : z - 146096) / 146097;
+	const uint32 doe = (uint32)(z - era * 146097);                                 // [0, 146096]
+	const uint32 yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;      // [0, 399]
+	const uint32 doy = doe - (365 * yoe + yoe / 4 - yoe / 100);                    // [0, 365]
+	const uint32 mp = (5 * doy + 2) / 153;                                         // [0, 11]
+	d = doy - (153 * mp + 2) / 5 + 1;                                              // [1, 31]
+	m = mp < 10 ? mp + 3 : mp - 9;                                                 // [1, 12]
+	y = (sint32)(yoe + era * 400) + (m <= 2);
+}
+
+
+sint64 karte_t::get_calendar_minutes_at( uint32 at_ticks ) const
+{
+	const sint64 minutes_per_month = settings.get_minutes_per_month();
+	if(  minutes_per_month <= 0  ) {
+		return 0;
+	}
+	// months elapsed since the start date, then the fraction of the current month;
+	// computed from the month counter so the 32 bit tick counter may wrap
+	const sint64 start_month = (sint64)settings.get_starting_year() * 12 + settings.get_starting_month();
+	const sint64 ticks_this_month = ticks % ticks_per_world_month;
+	sint64 minutes = ((sint64)current_month - start_month) * minutes_per_month + ((ticks_this_month * minutes_per_month) >> ticks_per_world_month_shift);
+	if(  at_ticks != ticks  ) {
+		// offset relative to now (signed, so times in the near past work too)
+		const sint64 delta = (sint32)(at_ticks - ticks);
+		minutes += (delta * minutes_per_month) >> ticks_per_world_month_shift;
+	}
+	return minutes;
+}
+
+
+karte_t::calendar_date_t karte_t::get_calendar_date( sint64 calendar_minutes ) const
+{
+	calendar_date_t date;
+	const sint64 epoch = days_from_civil( settings.get_starting_year(), settings.get_starting_month() + 1, 1 );
+	// floor division, calendar_minutes may be negative for times before the start
+	sint64 days = calendar_minutes / 1440;
+	sint64 minute_of_day = calendar_minutes - days * 1440;
+	if(  minute_of_day < 0  ) {
+		minute_of_day += 1440;
+		days --;
+	}
+	date.day_number = epoch + days;
+	sint32 y;
+	uint32 m, d;
+	civil_from_days( date.day_number, y, m, d );
+	date.year = y;
+	date.month = (uint8)(m - 1);
+	date.day = (uint8)d;
+	// 1970-01-01 was a Thursday (3 with Monday = 0)
+	date.weekday = (uint8)( ((date.day_number % 7) + 7 + 3) % 7 );
+	date.hour = (uint8)(minute_of_day / 60);
+	date.minute = (uint8)(minute_of_day % 60);
+	return date;
+}
+
+
 void karte_t::recalc_season_snowline(bool set_pending)
 {
 	static const sint8 mfactor[12] = { 99, 95, 80, 50, 25, 10, 0, 5, 20, 35, 65, 85 };
 	static const uint8 month_to_season[12] = { 2, 2, 2, 3, 3, 0, 0, 0, 0, 1, 1, 2 };
+	static const uint8 days_per_month[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-	// calculate snowline with day precision
-	// use linear interpolation
-	const sint32 ticks_this_month = get_ticks() & (karte_t::ticks_per_world_month - 1);
-	const sint32 factor = mfactor[last_month] + (  ( (mfactor[(last_month + 1) % 12] - mfactor[last_month]) * (ticks_this_month >> 12) ) >> (karte_t::ticks_per_world_month_shift - 12) );
+	sint32 factor;
+	uint8 season_month;
+	if(  has_calendar()  &&  settings.get_calendar_seasons()  ) {
+		// seasons follow the world calendar: interpolate the snowline by calendar day
+		const calendar_date_t date = get_calendar_date( get_calendar_minutes() );
+		season_month = date.month;
+		factor = mfactor[season_month] + ( (mfactor[(season_month + 1) % 12] - mfactor[season_month]) * (date.day - 1) ) / days_per_month[season_month];
+	}
+	else {
+		// calculate snowline with day precision
+		// use linear interpolation
+		const sint32 ticks_this_month = get_ticks() & (karte_t::ticks_per_world_month - 1);
+		season_month = last_month;
+		factor = mfactor[last_month] + (  ( (mfactor[(last_month + 1) % 12] - mfactor[last_month]) * (ticks_this_month >> 12) ) >> (karte_t::ticks_per_world_month_shift - 12) );
+	}
 
 	// just remember them
 	const uint8 old_season = season;
 	const sint16 old_snowline = snowline;
 
 	// and calculate new values
-	season = month_to_season[last_month];   //  (2+last_month/3)&3; // summer always zero
+	season = month_to_season[season_month];   //  (2+last_month/3)&3; // summer always zero
 	if(  old_season != season  && set_pending  ) {
 		pending_season_change++;
 	}

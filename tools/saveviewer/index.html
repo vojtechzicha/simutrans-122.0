@@ -840,7 +840,8 @@ function scheduleList(host, sched) {
     }
     var opts = [];
     if (num(e.minimum_loading) > 0) opts.push("load at least " + num(e.minimum_loading) + "%");
-    if (num(e.waiting_time) > 0) opts.push("wait " + num(e.waiting_time));
+    if (num(e.waiting_time_minutes) > 0) opts.push("wait " + num(e.waiting_time_minutes) + " min");
+    else if (num(e.waiting_time) > 0) opts.push("wait 1/" + Math.pow(2, 16 - num(e.waiting_time)) + " month");
     if (opts.length) h += ' <span class="opts">(' + esc(opts.join(", ")) + ")</span>";
     h += "</li>";
   });

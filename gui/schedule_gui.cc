@@ -280,7 +280,7 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	gui_frame_t( translator::translate("Fahrplan"), NULL),
 	line_selector(line_scrollitem_t::compare),
 	lb_waitlevel(SYSCOL_TEXT_HIGHLIGHT, gui_label_t::right),
-	lb_wait("month wait time"),
+	lb_wait(world()->has_calendar() ? "Wait time (min)" : "month wait time"),
 	lb_load("Full load"),
 	stats(new schedule_gui_stats_t() ),
 	scrolly(stats)
@@ -363,14 +363,25 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 
 		add_component(&lb_wait);
 
-		add_component(&wait_load);
-		wait_load.add_listener(this);
-
-		wait_load.new_component<gui_waiting_time_item_t>(0);
-		for(sint8 w = 7; w<=16; w++) {
-			wait_load.new_component<gui_waiting_time_item_t>(w);
+		if(  welt->has_calendar()  ) {
+			// world calendar: waiting time in minutes, 0 = off
+			numimp_wait.set_width( 60 );
+			numimp_wait.set_value( schedule->get_current_entry().waiting_time );
+			numimp_wait.set_limits( 0, welt->get_settings().get_minutes_per_month() );
+			numimp_wait.set_increment_mode( 1 );
+			numimp_wait.add_listener(this);
+			add_component(&numimp_wait);
 		}
-		wait_load.set_rigid(true);
+		else {
+			add_component(&wait_load);
+			wait_load.add_listener(this);
+
+			wait_load.new_component<gui_waiting_time_item_t>(0);
+			for(sint8 w = 7; w<=16; w++) {
+				wait_load.new_component<gui_waiting_time_item_t>(w);
+			}
+			wait_load.set_rigid(true);
+		}
 	}
 	end_table();
 
@@ -451,6 +462,7 @@ void schedule_gui_t::update_selection()
 {
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
+	numimp_wait.disable();
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
@@ -461,12 +473,21 @@ void schedule_gui_t::update_selection()
 			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
 
 			sint8 wait = 0;
+			uint16 wait_minutes = 0;
 			if(  schedule->entries[current_stop].minimum_loading>0  ) {
 				lb_wait.set_color( SYSCOL_TEXT );
 				wait_load.enable();
+				numimp_wait.enable();
 
 				wait = schedule->entries[current_stop].waiting_time_shift;
+				wait_minutes = schedule->entries[current_stop].waiting_time;
+				if(  wait_minutes == 0  &&  wait > 0  &&  welt->has_calendar()  ) {
+					// stock fraction of a month from an older schedule: show its minute equivalent
+					const sint32 minutes_per_month = welt->get_settings().get_minutes_per_month();
+					wait_minutes = (uint16)max( 1, (minutes_per_month + (1 << (15 - wait))) >> (16 - wait) );
+				}
 			}
+			numimp_wait.set_value( wait_minutes );
 
 			for(int i=0; i<wait_load.count_elements(); i++) {
 				if (gui_waiting_time_item_t *item = dynamic_cast<gui_waiting_time_item_t*>( wait_load.get_element(i) ) ) {
@@ -590,6 +611,14 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 
 				update_selection();
 			}
+		}
+	}
+	else if(comp == &numimp_wait) {
+		if(!schedule->empty()) {
+			// minutes replace any stock fraction of a month
+			schedule->entries[schedule->get_current_stop()].waiting_time = (uint16)p.i;
+			schedule->entries[schedule->get_current_stop()].waiting_time_shift = 0;
+			update_selection();
 		}
 	}
 	else if(comp == &bt_return) {
@@ -738,6 +767,7 @@ void schedule_gui_t::set_windowsize(scr_size size)
 	gui_frame_t::set_windowsize(size);
 	// manually enlarge size of wait_load combobox
 	wait_load.set_size( scr_size(numimp_load.get_size().w, wait_load.get_size().h) );
+	numimp_wait.set_size( scr_size(numimp_load.get_size().w, numimp_wait.get_size().h) );
 	// make scrolly take all of space
 	scrolly.set_size( scr_size(scrolly.get_size().w, get_client_windowsize().h - scrolly.get_pos().y - D_MARGIN_BOTTOM));
 

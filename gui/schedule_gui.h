@@ -50,7 +50,8 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 
 	gui_label_t lb_wait, lb_load;
 	gui_numberinput_t numimp_load;
-	gui_combobox_t wait_load;
+	gui_combobox_t wait_load;      // stock: fraction of a month
+	gui_numberinput_t numimp_wait; // world calendar: minutes
 
 	schedule_gui_stats_t* stats;
 	gui_scrollpane_t scrolly;

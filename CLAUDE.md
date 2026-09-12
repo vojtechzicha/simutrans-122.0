@@ -49,8 +49,10 @@ cd simutrans && ./simutrans -use_workdir -objects pak
   is the CGEvent tool behind it (build once with `swiftc`, binary is git-ignored). Read the
   screenshot with the image reader to navigate. See `tools/mac-test/README.md` for the SDL quirks
   (first click after focus is swallowed; a press needs a real cursor move before it).
-- `simutrans/save/testline.sve` (ignored) is a saved game with one road line and a schedule; start
-  with `-load testline` to test the schedule editor without building anything in-game.
+- `simutrans/save/schedtest.sve` (ignored) is a saved game with one road line and a two-stop
+  schedule (`testline.sve` has only an empty line); start with `-load schedtest` to test the
+  schedule editor without building anything in-game. Saves also restore their open dialogs, so a
+  schedule window that comes back with the save may hold an unsaved edited copy of the schedule.
 - `-load NAME` looks in `<user dir>/save/`, which on macOS is `~/Library/Simutrans/save/` unless you
   pass `-singleuser` (then it is `simutrans/save/`). A save must match its pakset: the owner's
   pak128.cs saves need the Windows Steam pakset plus add-ons, so they do not load with the
@@ -107,6 +109,21 @@ keys stable: the exporter and the viewer are the two halves of one format.
   `simutrans/pak*`, `simutrans/save/` or the copied binary; they are ignored already.
 - Never push tags or branches from `upstream` to `origin`; the fork's history is meant to stay small.
 - One feature per commit with a `ADD:`/`FIX:`/`CHG:`/`CODE:` prefix, matching upstream style.
+
+## World calendar (fork feature)
+
+`minutes_per_month` in simuconf.tab (saved with the game, 0 = stock) puts a realistic clock on top
+of the game months: `karte_t::get_calendar_minutes()` / `get_calendar_date()` in `simworld.cc` are
+the single source for the status bar clock (`simintr.cc`), the day/night cycle (`display/simview.cc`),
+the seasons (`recalc_season_snowline`, switchable with `calendar_seasons`) and the JSON export. The
+economy still runs on game months; the status bar shows the game year next to the calendar date.
+Schedule stops carry `waiting_time` in calendar minutes (savegame 122.1, `schedule_entry_t`), which
+wins over the stock `waiting_time_shift` fraction when set. Saves written by the fork do not load in
+the stock 122.0 exe.
+
+Status 2026-09-12: built and checked on macOS (clock, old saves load, export). Not yet exercised by
+hand: editing the minute input in the schedule dialog and a save/reload with a minute value set.
+Next step: fixed-grid departures (leave at :00, :12, :24 ... instead of N minutes after arrival).
 
 ## Open task: run the export on the real save (Windows)
 

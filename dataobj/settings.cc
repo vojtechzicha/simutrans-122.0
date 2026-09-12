@@ -95,6 +95,8 @@ settings_t::settings_t() :
 	starting_year = 1930;
 	starting_month = 0;
 	bits_per_month = 20;
+	minutes_per_month = 0;
+	calendar_seasons = true;
 
 	beginner_mode = false;
 	beginner_price_factor = 1500;
@@ -890,6 +892,11 @@ void settings_t::rdwr(loadsave_t *file)
 		if(  file->is_version_atleast(120, 9)  ) {
 			file->rdwr_long(allow_merge_distant_halt);
 		}
+		if(  file->is_version_atleast(122, 1)  ) {
+			// fork: world calendar
+			file->rdwr_long(minutes_per_month);
+			file->rdwr_bool(calendar_seasons);
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1355,6 +1362,8 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 
 	// time stuff
 	bits_per_month = contents.get_int( "bits_per_month", bits_per_month );
+	minutes_per_month = contents.get_int( "minutes_per_month", minutes_per_month );
+	calendar_seasons = contents.get_int( "calendar_seasons", calendar_seasons ) != 0;
 	use_timeline = contents.get_int( "use_timeline", use_timeline );
 	starting_year = contents.get_int( "starting_year", starting_year );
 	starting_month = contents.get_int( "starting_month", starting_month + 1 ) - 1;

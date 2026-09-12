@@ -84,6 +84,8 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	INIT_NUM( "show_names", env_t::show_names, 0, 3, gui_numberinput_t::AUTOLINEAR, true );
 	SEPERATOR
 	INIT_NUM( "bits_per_month", sets->get_bits_per_month(), 16, 24, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_NUM( "minutes_per_month", sets->get_minutes_per_month(), 0, 43200, gui_numberinput_t::AUTOLINEAR, false );
+	INIT_BOOL( "calendar_seasons", sets->get_calendar_seasons() );
 	INIT_NUM( "use_timeline", sets->get_use_timeline(), 0, 3, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "starting_year", sets->get_starting_year(), 0, 2999, gui_numberinput_t::AUTOLINEAR, false );
 	INIT_NUM_NEW( "starting_month", sets->get_starting_month(), 0, 11, gui_numberinput_t::AUTOLINEAR, false );
@@ -128,6 +130,8 @@ void settings_general_stats_t::read(settings_t* const sets)
 	READ_NUM_VALUE( env_t::show_names );
 
 	READ_NUM_VALUE( sets->bits_per_month );
+	READ_NUM_VALUE( sets->minutes_per_month );
+	READ_BOOL_VALUE( sets->calendar_seasons );
 	READ_NUM_VALUE( sets->use_timeline );
 	READ_NUM_VALUE_NEW( sets->starting_year );
 	READ_NUM_VALUE_NEW( sets->starting_month );

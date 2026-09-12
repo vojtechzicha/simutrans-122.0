@@ -1687,6 +1687,13 @@ void win_display_flush(double konto)
 	}
 
 	char const *time = tick_to_string( wl->get_ticks(), true );
+	static cbuffer_t time_buf;
+	if(  wl->has_calendar()  ) {
+		// the calendar year runs much slower than the game year, so show the timeline year too
+		time_buf.clear();
+		time_buf.printf( "%s  (%s %d)", time, translator::translate("Game year"), wl->get_last_year() );
+		time = time_buf;
+	}
 
 	// statusbar background
 	KOORD_VAL const status_bar_height = win_get_statusbar_height();

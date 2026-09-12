@@ -1539,3 +1539,11 @@ Oak
 %s bypass %s
 9suburb
 %s mezzo %s
+Wait time (min)
+Wait time (min)
+minutes_per_month
+Calendar minutes per month (0 = off)
+calendar_seasons
+Seasons follow the calendar
+Game year
+game year

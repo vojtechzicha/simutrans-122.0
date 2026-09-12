@@ -743,6 +743,40 @@ public:
 	inline sint32 get_last_year() const { return last_year; }
 
 	/**
+	 * World calendar (fork): a realistic clock and calendar shown on top of the game months.
+	 * Active when settings_t::minutes_per_month is non-zero; one game month then lasts that
+	 * many shown minutes. Days have 24 hours, months and years follow the Gregorian calendar
+	 * starting at the game's start date. Only the display, the day/night cycle and (optionally)
+	 * the seasons use it; all economy keeps running on game months.
+	 */
+	struct calendar_date_t {
+		sint32 year;
+		uint8 month;      ///< 0..11
+		uint8 day;        ///< 1..31
+		uint8 weekday;    ///< 0 = Monday
+		uint8 hour;       ///< 0..23
+		uint8 minute;     ///< 0..59
+		sint64 day_number; ///< days since 1970-01-01 (for comparing dates)
+	};
+
+	bool has_calendar() const { return settings.get_minutes_per_month() > 0; }
+
+	/// calendar minutes since the game's start date for the current time
+	sint64 get_calendar_minutes() const { return get_calendar_minutes_at( ticks ); }
+
+	/// calendar minutes for an absolute tick value (may lie in the future or past of now)
+	sint64 get_calendar_minutes_at( uint32 at_ticks ) const;
+
+	/// convert calendar minutes since the start date to a date and time of day
+	calendar_date_t get_calendar_date( sint64 calendar_minutes ) const;
+
+	/// days since 1970-01-01 of a Gregorian date (month 1..12)
+	static sint64 days_from_civil( sint32 y, uint32 m, uint32 d );
+
+	/// Gregorian date (month 1..12) from days since 1970-01-01
+	static void civil_from_days( sint64 z, sint32 &y, uint32 &m, uint32 &d );
+
+	/**
 	 * dirty: redraw whole screen.
 	 */
 	void set_dirty() {dirty=true;}

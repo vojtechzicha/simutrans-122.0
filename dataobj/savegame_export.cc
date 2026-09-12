@@ -280,6 +280,7 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 		}
 		w.kv_int( "minimum_loading", entry.minimum_loading );
 		w.kv_int( "waiting_time", entry.waiting_time_shift );
+		w.kv_int( "waiting_time_minutes", entry.waiting_time );
 		w.end_object();
 	}
 	w.end_array();
@@ -324,6 +325,18 @@ static void export_meta( json_writer_t &w, karte_t *welt, const char *save_name 
 	w.kv_int( "month", welt->get_last_month() + 1 );
 	w.kv_int( "ticks", welt->get_ticks() );
 	w.kv_int( "absolute_month", welt->get_current_month() );
+	if(  welt->has_calendar()  ) {
+		// world calendar date (fork): what the status bar clock shows
+		const karte_t::calendar_date_t date = welt->get_calendar_date( welt->get_calendar_minutes() );
+		w.object_key( "calendar" );
+		w.kv_int( "year", date.year );
+		w.kv_int( "month", date.month + 1 );
+		w.kv_int( "day", date.day );
+		w.kv_int( "weekday", date.weekday + 1 );
+		w.kv_int( "hour", date.hour );
+		w.kv_int( "minute", date.minute );
+		w.end_object();
+	}
 	w.end_object();
 
 	int player_count = 0;
@@ -345,6 +358,8 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_int( "starting_year", s.get_starting_year() );
 	w.kv_int( "starting_month", s.get_starting_month() );
 	w.kv_int( "bits_per_month", s.get_bits_per_month() );
+	w.kv_int( "minutes_per_month", s.get_minutes_per_month() );
+	w.kv_bool( "calendar_seasons", s.get_calendar_seasons() );
 	w.kv_int( "use_timeline", s.get_use_timeline() );
 	w.kv_bool( "freeplay", s.is_freeplay() );
 	w.kv_money( "starting_money", s.get_starting_money( s.get_starting_year() ) );

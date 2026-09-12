@@ -160,6 +160,16 @@ private:
 	sint16 starting_month;
 	sint16 bits_per_month;
 
+	/**
+	 * World calendar: shown minutes per game month (0 = stock clock, one month = one day).
+	 * Only the displayed time, day/night cycle and seasons follow it; the economy keeps
+	 * running on game months. Also the unit of schedule_entry_t::waiting_time.
+	 */
+	sint32 minutes_per_month;
+
+	/// with the world calendar active: seasons follow calendar months instead of game months
+	bool calendar_seasons;
+
 	std::string filename;
 
 	bool beginner_mode;
@@ -427,6 +437,9 @@ public:
 	sint16 get_starting_month() const {return starting_month;}
 
 	sint16 get_bits_per_month() const {return bits_per_month;}
+
+	sint32 get_minutes_per_month() const { return minutes_per_month; }
+	bool get_calendar_seasons() const { return calendar_seasons; }
 
 	void set_filename(const char *n) {filename=n;}
 	const char* get_filename() const { return filename.c_str(); }

@@ -146,6 +146,72 @@ void intr_enable()
 }
 
 
+/**
+ * World calendar variant of tick_to_string(): weekday, date and time of day.
+ * With show_full false the time is relative to today (used by the departure boards).
+ */
+static char const *calendar_tick_to_string( sint32 ticks, bool show_full )
+{
+	static char const* const weekdays[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+	static char time[128];
+
+	const karte_t::calendar_date_t date = welt_modell->get_calendar_date( welt_modell->get_calendar_minutes_at( ticks ) );
+	char const* const weekday = translator::translate( weekdays[date.weekday] );
+
+	// time of day in the chosen convention
+	char clock[16];
+	switch(  env_t::show_month  ) {
+		case env_t::DATE_FMT_US:
+		case env_t::DATE_FMT_US_NO_SEASON: {
+			uint32 hours_ = date.hour % 12;
+			if(  hours_ == 0  ) {
+				hours_ = 12;
+			}
+			sprintf( clock, "%2d:%02d%s", hours_, date.minute, date.hour < 12 ? "am" : "pm" );
+			break;
+		}
+		default:
+			sprintf( clock, "%2d:%02dh", date.hour, date.minute );
+			break;
+	}
+
+	if(  show_full  ) {
+		char const* const month_ = translator::get_month_name( date.month );
+		char const* const year_sym = strcmp( "YEAR_SYMBOL", translator::translate("YEAR_SYMBOL") ) ? translator::translate("YEAR_SYMBOL") : "";
+		char const* const day_sym = strcmp( "DAY_SYMBOL", translator::translate("DAY_SYMBOL") ) ? translator::translate("DAY_SYMBOL") : "";
+		switch(  env_t::show_month  ) {
+			case env_t::DATE_FMT_JAPANESE:
+			case env_t::DATE_FMT_JAPANESE_NO_SEASON:
+				sprintf( time, "%d%s %s %d%s (%s) %s", date.year, year_sym, month_, date.day, day_sym, weekday, clock );
+				break;
+			case env_t::DATE_FMT_US:
+			case env_t::DATE_FMT_US_NO_SEASON:
+				sprintf( time, "%s, %s %d, %d%s %s", weekday, month_, date.day, date.year, year_sym, clock );
+				break;
+			default:
+				sprintf( time, "%s %d. %s %d%s %s", weekday, date.day, month_, date.year, year_sym, clock );
+				break;
+		}
+		return time;
+	}
+
+	if(  ticks == 0  ) {
+		return translator::translate("now");
+	}
+
+	// relative: prefix the day difference to today, if any
+	const karte_t::calendar_date_t today = welt_modell->get_calendar_date( welt_modell->get_calendar_minutes() );
+	const sint64 num_days = date.day_number - today.day_number;
+	if(  num_days != 0  ) {
+		sprintf( time, "%+i %s", (int)num_days, clock );
+	}
+	else {
+		strcpy( time, clock );
+	}
+	return time;
+}
+
+
 char const *tick_to_string( sint32 ticks, bool show_full )
 {
 	static sint32 tage_per_month[12]={31,28,31,30,31,30,31,31,30,31,30,31};
@@ -172,6 +238,10 @@ char const *tick_to_string( sint32 ticks, bool show_full )
 	while(  month<0  ) {
 		month += 12;
 		year --;
+	}
+
+	if(  welt_modell->has_calendar()  ) {
+		return calendar_tick_to_string( ticks, show_full );
 	}
 
 	uint32 tage, hours, minuten;

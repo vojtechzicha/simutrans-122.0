@@ -593,6 +593,14 @@ starting_month = 1
 #
 bits_per_month = 20
 
+# World calendar (fork feature): shown minutes per game month, 0 = off (stock clock).
+# With e.g. 480 a game month is 8 shown hours, days have 24 hours and the date follows a
+# real calendar starting at the game's start date. Only the clock, the day/night cycle and
+# (with calendar_seasons = 1) the seasons follow it; the economy still runs on game months.
+# Schedule waiting times are then entered in these minutes. Saved with the game.
+#minutes_per_month = 0
+#calendar_seasons = 1
+
 #################################system stuff#################################
 
 # compress savegames?
