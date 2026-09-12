@@ -164,6 +164,9 @@ public:
 	/// for schedules with rails hide the back ticket button
 	static bool hide_rail_return_ticket;
 
+	/// fork: show the modal list of doubled pak objects at start (simuconf warn_doubled_objects)
+	static bool warn_doubled_objects;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 

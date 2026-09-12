@@ -601,6 +601,9 @@ bits_per_month = 20
 #minutes_per_month = 0
 #calendar_seasons = 1
 
+# Fork: show the list of doubled pak objects at start (1, stock) or only log it (0)
+#warn_doubled_objects = 1
+
 #################################system stuff#################################
 
 # compress savegames?

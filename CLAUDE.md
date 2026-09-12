@@ -166,7 +166,11 @@ required or `display/font.cc` fails on `ft2build.h`. From Git Bash the build is
 the caller's cwd). Visual Studio (`Simutrans.sln`, GDI Release) also works but needs the .lib files.
 
 The user dir is the redirected Documents folder `D:\OneDrive\Documents\Simutrans` (saves in
-`save/`, add-ons, `settings.xml`, autosave). The owner's main game is `save/FORK-CZR.sve` (fork
+`save/`, add-ons, `settings.xml`, autosave). Its `simuconf.tab` holds the owner's fork settings:
+`minutes_per_month = 480`, `calendar_seasons = 1`, `pak_file_path = pak128.cs/` (no pakset dialog)
+and `warn_doubled_objects = 0` (a fork key: the doubled-objects list is only logged). The
+`addons/pak128.cs` folder there is empty, so "reading addon object data failed" at start is
+expected; the add-ons live inside the pakset folder. The owner's main game is `save/FORK-CZR.sve` (fork
 save format 0.122.1); `save/CZR.sve` is the last stock-format save of the same game.
 
 Batch mode: `-load NAME -export FILE.json` dumps a game, `-load NAME -saveas FILE.sve

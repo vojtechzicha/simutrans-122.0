@@ -1124,9 +1124,9 @@ int simu_main(int argc, char** argv)
 	pakset_info_t::debug();
 
 	if(  !overlaid_warning.empty()  ) {
-		if(  batch_mode  ) {
-			// nobody can press a key in batch mode
-			dbg->warning( "simmain()", "pakset contains doubled objects, continuing anyway (batch mode)" );
+		if(  batch_mode  ||  !env_t::warn_doubled_objects  ) {
+			// nobody can press a key in batch mode, or the player switched the dialog off (warn_doubled_objects = 0)
+			dbg->warning( "simmain()", "pakset contains doubled objects, continuing anyway" );
 		}
 		else {
 			overlaid_warning.append( "<p>Continue by ESC, SPACE, or BACKSPACE.<br>" );

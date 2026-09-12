@@ -78,6 +78,7 @@ sint16 env_t::window_snap_distance = 8;
 scr_size env_t::iconsize( 32, 32 );
 uint8 env_t::chat_window_transparency = 75;
 bool env_t::hide_rail_return_ticket = true;
+bool env_t::warn_doubled_objects = true;
 bool env_t::show_delete_buttons = false;
 
 // only used internally => do not touch further
