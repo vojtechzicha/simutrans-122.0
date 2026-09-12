@@ -138,17 +138,18 @@ that one has left (`count_earlier_waiting`), so passengers board the train that 
 the convoy window shows "Departure: HH:MM (in N min), K ahead" from `get_planned_departure`.
 Not done yet: the stop departure boards still estimate from arrival plus wait.
 
-Stop types (savegame 122.3, `schedule_entry_t::stop_type`): Regular, Terminal (everything off, load,
-no transfers, nothing rides through), All off (everything off, no loading), Only load (no
-unloading, the planner never routes cargo to it), Only unload (no loading, the planner never routes
-cargo from it). The rules live in the helpers on `schedule_entry_t` (`loads`, `unloads`,
-`rides_through`, `plans_arrival`, `plans_departure`); `haltestelle_t::rebuild_connections` applies
-them when it walks a schedule (a blocked walk adds no edges until the next entry of the home halt)
-and Terminal edges carry `origin_only` / `dest_only` bits on `connection_t` that both route searches
-test. `convoi_t::hat_gehalten` applies them when stopping. The schedule dialog shows the type as a
-lettered badge in front of each entry row; left click cycles forward, right click back. Known limit: a Terminal line still
-boards waiting cargo whose planned next transfer it also reaches. A bus station with arrival,
-waiting and departure tiles of one halt uses All off on the arrival tile and Regular on the rest.
+Stop types (savegame 122.3, `schedule_entry_t::stop_type`): Regular, Terminal (everything off,
+then load; transfers allowed, nothing rides through), All off (everything off, no loading), Only
+load (no unloading, the planner never routes cargo to it), Only unload (no loading, the planner
+never routes cargo from it). The rules live in the helpers on `schedule_entry_t` (`loads`,
+`unloads`, `rides_through`, `plans_arrival`, `plans_departure`); `haltestelle_t::rebuild_connections`
+applies them when it walks a schedule: a Terminal or All off entry blocks the walk, so no edges are
+added until the next entry of the home halt, which is what stops the planner from routing anyone
+through a terminus (A-B-C-E, then E-D-B-A: nobody boards at B for D, they change instead).
+`convoi_t::hat_gehalten` applies them when stopping. The schedule dialog shows the type as a
+lettered badge in front of each entry row; left click cycles forward, right click back. A single
+terminus entry with a timetable is Terminal; a bus station with arrival, waiting and departure
+tiles of one halt uses All off on the arrival tile and Regular on the rest.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

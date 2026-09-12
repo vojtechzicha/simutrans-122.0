@@ -22,7 +22,7 @@ public:
 	 */
 	enum stop_type_t {
 		regular     = 0, ///< load, unload, transfer, ride through
-		terminal    = 1, ///< everything off, load; no transfers, nothing rides through
+		terminal    = 1, ///< everything off, then load; transfers allowed, nothing rides through
 		all_off     = 2, ///< everything off, no loading; nothing rides through
 		only_load   = 3, ///< no unloading; planner never routes cargo to here on this line
 		only_unload = 4, ///< no loading; planner never routes cargo from here on this line
