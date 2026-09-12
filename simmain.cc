@@ -455,6 +455,8 @@ int simu_main(int argc, char** argv)
 			" -debug NUM          enables debugging (1..5)\n"
 			" -easyserver         set up every for server (query own IP, port forwarding)\n"
 			" -export FILE        dumps the loaded game as JSON to FILE and quits (needs -load)\n"
+			" -saveas FILE        writes the loaded game to FILE and quits (needs -load)\n"
+			" -saveversion VER    save version for -saveas, e.g. 0.122.0 for the stock game\n"
 			" -freeplay           play with endless money\n"
 			" -fullscreen         starts simutrans in fullscreen mode\n"
 			" -fps COUNT          framerate (from 5 to 100)\n"
@@ -503,8 +505,11 @@ int simu_main(int argc, char** argv)
 		return 0;
 	}
 
-	// batch mode: dump the loaded game as JSON and quit, no user is there to answer dialogues
+	// batch mode: dump the loaded game as JSON (-export) or write it as a save (-saveas) and quit,
+	// no user is there to answer dialogues
 	const char *export_filename = gimme_arg(argc, argv, "-export", 1);
+	const char *saveas_filename = gimme_arg(argc, argv, "-saveas", 1);
+	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL;
 
 #ifdef __BEOS__
 	if (1) // since BeOS only supports relative paths ...
@@ -1114,9 +1119,9 @@ int simu_main(int argc, char** argv)
 	pakset_info_t::debug();
 
 	if(  !overlaid_warning.empty()  ) {
-		if(  export_filename  ) {
+		if(  batch_mode  ) {
 			// nobody can press a key in batch mode
-			dbg->warning( "simmain()", "pakset contains doubled objects, continuing anyway (-export)" );
+			dbg->warning( "simmain()", "pakset contains doubled objects, continuing anyway (batch mode)" );
 		}
 		else {
 			overlaid_warning.append( "<p>Continue by ESC, SPACE, or BACKSPACE.<br>" );
@@ -1388,14 +1393,25 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 		tool_t::toolbar_tool[0]->init(welt->get_active_player());
 	}
 
-	// dump the loaded game as JSON and quit right away
-	if(  export_filename  ) {
+	// batch mode: dump the loaded game as JSON and/or write it as a save file, then quit right away
+	if(  batch_mode  ) {
 		if(  new_world  ) {
-			dbg->error( "simmain()", "-export needs a loadable game, use -load NAME" );
+			dbg->error( "simmain()", "-export and -saveas need a loadable game, use -load NAME" );
 		}
 		else {
-			const char *save_name = gimme_arg(argc, argv, "-load", 1);
-			savegame_export_t::write_json( welt, save_name ? save_name : loadgame.c_str(), export_filename );
+			if(  export_filename  ) {
+				const char *save_name = gimme_arg(argc, argv, "-load", 1);
+				savegame_export_t::write_json( welt, save_name ? save_name : loadgame.c_str(), export_filename );
+			}
+			if(  saveas_filename  ) {
+				// an older version (e.g. 0.122.0) leaves out the fork's fields, so the stock game can load the file
+				const char *version = gimme_arg(argc, argv, "-saveversion", 1);
+				if(  version == NULL  ) {
+					version = env_t::savegame_version_str;
+				}
+				dbg->message( "simmain()", "saving game as '%s' with version %s", saveas_filename, version );
+				welt->save( saveas_filename, false, version, true );
+			}
 		}
 		env_t::quit_simutrans = true;
 	}

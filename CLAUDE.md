@@ -70,8 +70,9 @@ keys stable: the exporter and the viewer are the two halves of one format.
 
 ## Windows is the real target
 
-- The owner plays on Windows. Anything touching input, windowing, sound or fonts must be reasoned
-  about for `sys/simsys_w.cc` (GDI) too, not only the SDL2 path, and should be re-verified on Windows.
+- The owner plays on Windows, through Steam, and Steam runs this fork (see the Windows section
+  below). Anything touching input, windowing, sound or fonts must be reasoned about for
+  `sys/simsys_w.cc` (GDI) too, not only the SDL2 path, and should be re-verified on Windows.
 - Keep Windows build files in sync: a new `.cc` file must be added to the `Makefile` SOURCES list
   and to `Simutrans-Main.vcxitems`, or the Windows build silently lacks it.
 
@@ -125,40 +126,60 @@ Status 2026-09-12: built and checked on macOS (clock, old saves load, export). N
 hand: editing the minute input in the schedule dialog and a save/reload with a minute value set.
 Next step: fixed-grid departures (leave at :00, :12, :24 ... instead of N minutes after arrival).
 
-## Windows build and export (verified 2026-09-11)
+## Windows: the fork is the Steam game (since 2026-09-12)
 
-The export was run on the owner's real save (`CZR.sve`, 175 MB, pak128.cs plus add-ons) with the
-MinGW build below; loading plus export takes about a minute and writes a 65 MB `czr.json`.
+The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds
+with MSYS2 MinGW64 and installs the result as `simutrans.exe` in the Steam game folder
+(`D:\SteamLibrary\steamapps\common\Simutrans`); the exe Steam shipped is kept next to it as
+`simutrans-stock.exe`, and a Steam update that replaces `simutrans.exe` is detected and backed up
+again on the next install. Commands: `build`, `install`, `update` (both), `restore` (stock exe
+back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`. After every feature, run
+`tools/windows/steam-fork.sh update`.
 
-MSYS2 is installed at `C:\msys64` (via `winget install MSYS2.MSYS2`). Build from the repo root in
-the MINGW64 shell (from Git Bash: `MSYSTEM=MINGW64 /c/msys64/usr/bin/bash.exe -lc 'cd <repo> && make -j20'`;
-the login shell ignores the caller's cwd, so always `cd` inside the command):
-
-```
-pacman -S --needed make mingw-w64-x86_64-gcc mingw-w64-x86_64-freetype mingw-w64-x86_64-zstd \
-  mingw-w64-x86_64-libpng mingw-w64-x86_64-brotli mingw-w64-x86_64-bzip2 mingw-w64-x86_64-zlib \
-  mingw-w64-x86_64-pkg-config
-printf 'BACKEND = gdi\nOSTYPE = mingw\nDEBUG = 0\nOPTIMISE = 1\nMULTI_THREAD = 1\nUSE_FREETYPE = 1\nUSE_ZSTD = 1\nWITH_REVISION = 0\nFREETYPE_CONFIG = pkg-config freetype2\n' > config.default
-make -j20
-```
-
-`FREETYPE_CONFIG` is required: without it the Makefile never adds the freetype include path and
-`display/font.cc` fails on `ft2build.h`. Without `STATIC = 1` the exe needs the MinGW DLLs, so run
-it from the MSYS2 shell (or with `/mingw64/bin` on PATH). Visual Studio (`Simutrans.sln`, GDI
-Release) also works but you must supply the .lib files it links against.
-
-Run the export from the Steam game folder so the pakset and the add-ons are found. The user dir is
-the redirected Documents folder (`D:\OneDrive\Documents\Simutrans`, saves and add-ons) and is
-picked up automatically; `-log` writes `simu.log` there:
+The build is `STATIC = 1`, so the exe needs no MinGW DLLs and runs from Steam. `config.default`
+for it (the script writes this if the file is missing):
 
 ```
-cd /d/SteamLibrary/steamapps/common/Simutrans
-/c/Users/vojte/Developer/simutrans-122.0/build/default/sim.exe -use_workdir -objects pak128.cs \
-  -load CZR -export /d/OneDrive/Documents/Simutrans/czr.json -nosound -nomidi -log
+BACKEND = gdi
+OSTYPE = mingw
+DEBUG = 0
+OPTIMISE = 1
+MULTI_THREAD = 1
+USE_FREETYPE = 1
+USE_ZSTD = 1
+WITH_REVISION = 0
+STATIC = 1
+FREETYPE_CONFIG = pkg-config freetype2
 ```
 
-Do not overwrite the Steam `simutrans.exe`. The pakset reports "doubled objects" and missing
-producers for some goods; both are tolerated in export mode. To test the viewer with the real file,
-serve `tools/saveviewer/` and the JSON over http (see `tools/saveviewer/README.md`); Playwright for
-Python is installed and drives the installed Chrome (`channel="chrome"`), which is how the views
-were checked.
+MSYS2 is at `C:\msys64` (`winget install MSYS2.MSYS2`), packages: `make mingw-w64-x86_64-gcc
+mingw-w64-x86_64-freetype mingw-w64-x86_64-zstd mingw-w64-x86_64-libpng mingw-w64-x86_64-brotli
+mingw-w64-x86_64-bzip2 mingw-w64-x86_64-zlib mingw-w64-x86_64-pkg-config`. `FREETYPE_CONFIG` is
+required or `display/font.cc` fails on `ft2build.h`. From Git Bash the build is
+`MSYSTEM=MINGW64 /c/msys64/usr/bin/bash.exe -lc 'cd <repo> && make -j20'` (the login shell ignores
+the caller's cwd). Visual Studio (`Simutrans.sln`, GDI Release) also works but needs the .lib files.
+
+The user dir is the redirected Documents folder `D:\OneDrive\Documents\Simutrans` (saves in
+`save/`, add-ons, `settings.xml`, autosave). The owner's main game is `save/FORK-CZR.sve` (fork
+save format 0.122.1); `save/CZR.sve` is the last stock-format save of the same game.
+
+Batch mode: `-load NAME -export FILE.json` dumps a game, `-load NAME -saveas FILE.sve
+[-saveversion 0.122.0]` rewrites it and quits. Version 0.122.0 leaves out the fork's fields, so
+the stock game (or the stock exe, `steam-fork.sh restore`) can open the file; that is what
+`steam-fork.sh downgrade NAME` does (writes `save/NAME-122.0.sve`). Both must run from the Steam
+folder with `-use_workdir -objects pak128.cs` so pakset and add-ons are found; the script does
+that. Loading the 175 MB save takes about a minute. The pakset reports "doubled objects" and
+missing producers for some goods; both are tolerated in batch mode.
+
+Verified on the real save: export (65 MB JSON), the calendar clock, and the fork loading and
+saving the game. To test the viewer with the real file, serve `tools/saveviewer/` and the JSON
+over http (see `tools/saveviewer/README.md`); Playwright for Python is installed and drives the
+installed Chrome (`channel="chrome"`).
+
+GUI checks on Windows: `tools/win-test/win.ps1` screenshots the GDI window and sends clicks and
+keys (`pwsh tools/win-test/win.ps1 shot out.png`, `click X Y [left|right|middle]`, `keys "{ESC}"`).
+Coordinates are client-relative like the macOS helpers.
+
+The fork writes `settings.xml` and autosaves with save version 0.122.1. A stock exe deletes a
+newer `settings.xml` at start and refuses newer saves, so do not switch back to the stock exe
+without `downgrade` for the saves you need there.
