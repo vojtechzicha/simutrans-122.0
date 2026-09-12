@@ -2985,8 +2985,12 @@ station_tile_search_ready: ;
 	}
 
 	// loading is finished => maybe drive on
-	if(  loading_level >= loading_limit  ||  no_load
-		||  (schedule->get_current_entry().has_waiting_time()  &&  welt->get_ticks() - arrived_time > schedule->get_current_entry().get_waiting_ticks() ) ) {
+	bool depart = is_ready_to_depart();
+	if(  depart  &&  !no_load  &&  line.is_bound()  &&  schedule->get_current_entry().has_timetable()  &&  welt->has_calendar()  ) {
+		// timetable (fork): only in an open slot, one convoy per slot, first come first served
+		depart = line->take_departure_slot( self );
+	}
+	if(  depart  ) {
 
 		if(  withdraw  &&  (loading_level == 0  ||  goods_catg_index.empty())  ) {
 			// destroy when empty
@@ -3011,6 +3015,16 @@ station_tile_search_ready: ;
 
 	// at least wait the minimum time for loading
 	wait_lock = time;
+}
+
+
+bool convoi_t::is_ready_to_depart() const
+{
+	if(  loading_level >= loading_limit  ||  no_load  ) {
+		return true;
+	}
+	const schedule_entry_t &entry = schedule->get_current_entry();
+	return entry.has_waiting_time()  &&  welt->get_ticks() - arrived_time > entry.get_waiting_ticks();
 }
 
 

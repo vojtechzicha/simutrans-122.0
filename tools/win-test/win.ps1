@@ -26,15 +26,9 @@ public static class W {
 }
 "@
 function Find-Game {
-  $found = [IntPtr]::Zero
-  $sb = New-Object System.Text.StringBuilder 256
-  [W]::EnumWindows({ param($h, $l)
-    if (-not [W]::IsWindowVisible($h)) { return $true }
-    $sb.Clear() | Out-Null; [W]::GetWindowTextW($h, $sb, 256) | Out-Null
-    if ($sb.ToString() -like 'Simutrans*') { $script:found = $h; return $false }
-    return $true }, [IntPtr]::Zero) | Out-Null
-  if ($script:found -eq [IntPtr]::Zero) { throw "no Simutrans window" }
-  return $script:found
+  $p = Get-Process | Where-Object { $_.MainWindowTitle -like 'Simutrans*' } | Select-Object -First 1
+  if (-not $p) { throw "no Simutrans window" }
+  return [IntPtr]$p.MainWindowHandle
 }
 function Client-Origin($h) { $p = New-Object POINT; [W]::ClientToScreen($h, [ref]$p) | Out-Null; return $p }
 $h = Find-Game

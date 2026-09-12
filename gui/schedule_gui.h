@@ -53,6 +53,14 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_combobox_t wait_load;      // stock: fraction of a month
 	gui_numberinput_t numimp_wait; // world calendar: minutes
 
+	// timetable (fork, world calendar only): departure slots every N minutes plus offset
+	gui_label_t lb_interval, lb_offset;
+	gui_numberinput_t numimp_interval, numimp_offset;
+	gui_label_buf_t lb_interval_fmt, lb_offset_fmt; // the same as hours and minutes
+
+	/// the schedule belongs to a line (timetable slots only work with lines)
+	bool has_line() const;
+
 	schedule_gui_stats_t* stats;
 	gui_scrollpane_t scrolly;
 

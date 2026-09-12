@@ -389,6 +389,15 @@ public:
 	*/
 	linehandle_t get_line() const {return line;}
 
+	/// tick of the arrival at the current stop (valid while loading)
+	uint32 get_arrived_time() const { return arrived_time; }
+
+	/**
+	 * loading rules satisfied: the minimum load is reached, the maximum waiting time is over,
+	 * or the convoy must not load at all. Without a timetable this is the departure condition.
+	 */
+	bool is_ready_to_depart() const;
+
 	/* true, if electrification needed for this convoi */
 	bool needs_electrification() const { return is_electric; }
 

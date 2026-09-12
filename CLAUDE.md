@@ -120,11 +120,17 @@ the seasons (`recalc_season_snowline`, switchable with `calendar_seasons`) and t
 economy still runs on game months; the status bar shows the game year next to the calendar date.
 Schedule stops carry `waiting_time` in calendar minutes (savegame 122.1, `schedule_entry_t`), which
 wins over the stock `waiting_time_shift` fraction when set. Saves written by the fork do not load in
-the stock 122.0 exe.
+the stock 122.0 exe; use `tools/windows/steam-fork.sh downgrade` for that.
 
-Status 2026-09-12: built and checked on macOS (clock, old saves load, export). Not yet exercised by
-hand: editing the minute input in the schedule dialog and a save/reload with a minute value set.
-Next step: fixed-grid departures (leave at :00, :12, :24 ... instead of N minutes after arrival).
+Timetable (savegame 122.2): a stop entry may have `departure_interval` and `departure_offset` in
+calendar minutes. Slots start at the offset after every midnight, repeat every interval, and stay
+open for half an interval. A convoy leaves only when its loading rules are met (minimum load or
+maximum wait, unchanged) and a slot is open that no other convoy of the line used at that entry
+(`simline_t::take_departure_slot`, `last_departure_slot` saved with the line and cleared when the
+schedule changes); among ready convoys the earliest arrival goes first. Convoys without a line and
+convoys with `no_load` ignore the timetable. The schedule dialog shows the two inputs only with the
+calendar on and greys them out for line-less convoys; the entry list appends "(every N min, +M)".
+Not done yet: departure boards still estimate from arrival plus wait, they ignore the slots.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
@@ -180,6 +186,7 @@ GUI checks on Windows: `tools/win-test/win.ps1` screenshots the GDI window and s
 keys (`pwsh tools/win-test/win.ps1 shot out.png`, `click X Y [left|right|middle]`, `keys "{ESC}"`).
 Coordinates are client-relative like the macOS helpers.
 
-The fork writes `settings.xml` and autosaves with save version 0.122.1. A stock exe deletes a
-newer `settings.xml` at start and refuses newer saves, so do not switch back to the stock exe
-without `downgrade` for the saves you need there.
+Saves and autosaves from the fork carry the fork's save version, which a stock exe refuses, so
+`downgrade` the saves you need before `restore`. `settings.xml` is written with the stock version
+string (`SETTINGS_SAVE_VER_NR`) on purpose: an exe that finds a newer `settings.xml` deletes it,
+and the next start then asks for the language (the fork now picks English silently anyway).

@@ -42,6 +42,25 @@ static karte_ptr_t welt;
 /**
  * One entry in the list of schedule entries.
  */
+/**
+ * Calendar minutes as a short text: 8', 1h, 1h30, 4h (fork, timetable display)
+ */
+static void append_minutes( cbuffer_t &buf, uint16 minutes )
+{
+	if(  minutes >= 60  ) {
+		if(  minutes % 60 == 0  ) {
+			buf.printf( "%dh", minutes / 60 );
+		}
+		else {
+			buf.printf( "%dh%02d", minutes / 60, minutes % 60 );
+		}
+	}
+	else {
+		buf.printf( "%d'", minutes );
+	}
+}
+
+
 class gui_schedule_entry_t : public gui_aligned_container_t, public gui_action_creator_t
 {
 	schedule_entry_t entry;
@@ -70,6 +89,16 @@ public:
 	void update_label()
 	{
 		stop.buf().printf("%i) ", number+1);
+		if(  entry.has_timetable()  &&  welt->has_calendar()  ) {
+			// timetable marker in front of the name, which may be longer than the window: [8'] or [2h+30']
+			stop.buf().append("[");
+			append_minutes( stop.buf(), entry.departure_interval );
+			if(  entry.departure_offset > 0  ) {
+				stop.buf().append("+");
+				append_minutes( stop.buf(), entry.departure_offset );
+			}
+			stop.buf().append("] ");
+		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
 		stop.update();
 	}
@@ -282,6 +311,8 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	lb_waitlevel(SYSCOL_TEXT_HIGHLIGHT, gui_label_t::right),
 	lb_wait(world()->has_calendar() ? "Wait time (min)" : "month wait time"),
 	lb_load("Full load"),
+	lb_interval("Departure every (min)"),
+	lb_offset("Offset (min)"),
 	stats(new schedule_gui_stats_t() ),
 	scrolly(stats)
 {
@@ -385,6 +416,31 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	}
 	end_table();
 
+	if(  welt->has_calendar()  ) {
+		// timetable: departure slots, 0 = none
+		add_table(3,2);
+		{
+			add_component(&lb_interval);
+			numimp_interval.set_width( 60 );
+			numimp_interval.set_value( schedule->get_current_entry().departure_interval );
+			numimp_interval.set_limits( 0, 24*60 );
+			numimp_interval.set_increment_mode( 1 );
+			numimp_interval.add_listener(this);
+			add_component(&numimp_interval);
+			add_component(&lb_interval_fmt);
+
+			add_component(&lb_offset);
+			numimp_offset.set_width( 60 );
+			numimp_offset.set_value( schedule->get_current_entry().departure_offset );
+			numimp_offset.set_limits( 0, 24*60-1 );
+			numimp_offset.set_increment_mode( 1 );
+			numimp_offset.add_listener(this);
+			add_component(&numimp_offset);
+			add_component(&lb_offset_fmt);
+		}
+		end_table();
+	}
+
 	// return tickets
 	if(  !env_t::hide_rail_return_ticket  ||  schedule->get_waytype()==road_wt  ||  schedule->get_waytype()==air_wt  ||  schedule->get_waytype()==water_wt  ) {
 		//  hide the return ticket on rail stuff, where it causes much trouble
@@ -458,11 +514,22 @@ void schedule_gui_t::update_tool(bool set)
 }
 
 
+bool schedule_gui_t::has_line() const
+{
+	// a line's own schedule (no convoy) or a convoy that serves a line
+	return !cnv.is_bound()  ||  new_line.is_bound();
+}
+
+
 void schedule_gui_t::update_selection()
 {
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
 	numimp_wait.disable();
+	lb_interval.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	lb_offset.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	numimp_interval.disable();
+	numimp_offset.disable();
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
@@ -471,6 +538,32 @@ void schedule_gui_t::update_selection()
 			lb_load.set_color( SYSCOL_TEXT );
 			numimp_load.enable();
 			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
+
+			// timetable slots: only lines have them
+			schedule_entry_t &entry = schedule->entries[current_stop];
+			if(  entry.departure_interval > 0  &&  entry.departure_offset >= entry.departure_interval  ) {
+				entry.departure_offset = entry.departure_interval - 1;
+			}
+			numimp_interval.set_value( entry.departure_interval );
+			numimp_offset.set_limits( 0, entry.departure_interval > 0 ? entry.departure_interval - 1 : 0 );
+			numimp_offset.set_value( entry.departure_offset );
+			// long intervals read better as hours
+			lb_interval_fmt.buf().append("= ");
+			append_minutes( lb_interval_fmt.buf(), entry.departure_interval );
+			lb_interval_fmt.update();
+			lb_offset_fmt.buf().append("= ");
+			append_minutes( lb_offset_fmt.buf(), entry.departure_offset );
+			lb_offset_fmt.update();
+			lb_interval_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			lb_offset_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			if(  has_line()  ) {
+				lb_interval.set_color( SYSCOL_TEXT );
+				numimp_interval.enable();
+				if(  entry.departure_interval > 0  ) {
+					lb_offset.set_color( SYSCOL_TEXT );
+					numimp_offset.enable();
+				}
+			}
 
 			sint8 wait = 0;
 			uint16 wait_minutes = 0;
@@ -503,6 +596,12 @@ void schedule_gui_t::update_selection()
 			lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 			numimp_load.disable();
 			numimp_load.set_value( 0 );
+			numimp_interval.set_value( 0 );
+			numimp_offset.set_value( 0 );
+			lb_interval_fmt.buf().clear();
+			lb_interval_fmt.update();
+			lb_offset_fmt.buf().clear();
+			lb_offset_fmt.update();
 		}
 	}
 }
@@ -618,6 +717,18 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 			// minutes replace any stock fraction of a month
 			schedule->entries[schedule->get_current_stop()].waiting_time = (uint16)p.i;
 			schedule->entries[schedule->get_current_stop()].waiting_time_shift = 0;
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_interval) {
+		if(!schedule->empty()) {
+			schedule->entries[schedule->get_current_stop()].departure_interval = (uint16)p.i;
+			update_selection(); // clamps the offset
+		}
+	}
+	else if(comp == &numimp_offset) {
+		if(!schedule->empty()) {
+			schedule->entries[schedule->get_current_stop()].departure_offset = (uint16)p.i;
 			update_selection();
 		}
 	}
@@ -768,6 +879,8 @@ void schedule_gui_t::set_windowsize(scr_size size)
 	// manually enlarge size of wait_load combobox
 	wait_load.set_size( scr_size(numimp_load.get_size().w, wait_load.get_size().h) );
 	numimp_wait.set_size( scr_size(numimp_load.get_size().w, numimp_wait.get_size().h) );
+	numimp_interval.set_size( scr_size(numimp_load.get_size().w, numimp_interval.get_size().h) );
+	numimp_offset.set_size( scr_size(numimp_load.get_size().w, numimp_offset.get_size().h) );
 	// make scrolly take all of space
 	scrolly.set_size( scr_size(scrolly.get_size().w, get_client_windowsize().h - scrolly.get_pos().y - D_MARGIN_BOTTOM));
 

@@ -251,6 +251,11 @@ void schedule_t::rdwr(loadsave_t *file)
 				// fork: waiting time in calendar minutes
 				file->rdwr_short(entries[i].waiting_time);
 			}
+			if(file->is_version_atleast(122, 2)) {
+				// fork: timetable slots
+				file->rdwr_short(entries[i].departure_interval);
+				file->rdwr_short(entries[i].departure_offset);
+			}
 		}
 	}
 	if(file->is_loading()) {
@@ -404,7 +409,7 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 {
 	buf.printf("%u|%d|", current_stop, (int)get_type());
 	FOR(minivec_tpl<schedule_entry_t>, const& i, entries) {
-		buf.printf("%s,%i,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time);
+		buf.printf("%s,%i,%i,%i,%i,%i|", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time, (int)i.departure_interval, (int)i.departure_offset);
 	}
 }
 
@@ -447,24 +452,24 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 	p++;
 	// now scan the entries
 	while(  *p>0  ) {
-		sint32 values[6];
-		for(  sint8 i=0;  i<6;  i++  ) {
+		sint32 values[8];
+		for(  sint8 i=0;  i<8;  i++  ) {
 			values[i] = atoi( p );
 			while(  *p  &&  (*p!=','  &&  *p!='|')  ) {
 				p++;
 			}
-			if(  i<5  &&  *p!=','  ) {
+			if(  i<7  &&  *p!=','  ) {
 				dbg->error( "schedule_t::sscanf_schedule()","incomplete string!" );
 				return false;
 			}
-			if(  i==5  &&  *p!='|'  ) {
+			if(  i==7  &&  *p!='|'  ) {
 				dbg->error( "schedule_t::sscanf_schedule()","incomplete entry termination!" );
 				return false;
 			}
 			p++;
 		}
 		// ok, now we have a complete entry
-		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5]));
+		entries.append(schedule_entry_t(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5], values[6], values[7]));
 	}
 	return true;
 }

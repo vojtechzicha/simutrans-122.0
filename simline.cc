@@ -121,6 +121,74 @@ void simline_t::set_schedule(schedule_t* schedule)
 		delete this->schedule;
 	}
 	this->schedule = schedule;
+	// the entries may have moved, so the booked slots are meaningless now
+	last_departure_slot.clear();
+}
+
+
+bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot)
+{
+	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {
+		return false;
+	}
+	const sint64 interval = entry.departure_interval;
+	const sint64 offset = entry.departure_offset;
+	const sint64 now = welt->get_calendar_minutes();
+	// minute of the calendar day, slots restart at every midnight
+	sint64 day = now / 1440;
+	sint64 minute_of_day = now - day * 1440;
+	if(  minute_of_day < 0  ) {
+		minute_of_day += 1440;
+		day --;
+	}
+	if(  minute_of_day < offset  ) {
+		// before the first slot of the day
+		return false;
+	}
+	const sint64 slot_start = offset + ((minute_of_day - offset) / interval) * interval;
+	if(  (minute_of_day - slot_start) * 2 > interval  ) {
+		// the slot is closed again, wait for the next one
+		return false;
+	}
+	slot = day * 1440 + slot_start;
+	return true;
+}
+
+
+bool simline_t::take_departure_slot(convoihandle_t cnv)
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
+		return true;
+	}
+	const uint8 idx = cnv_schedule->get_current_stop();
+	const schedule_entry_t &entry = cnv_schedule->entries[idx];
+	sint64 slot;
+	if(  !get_open_departure_slot( entry, slot )  ) {
+		return false;
+	}
+	while(  last_departure_slot.get_count() <= idx  ) {
+		last_departure_slot.append( -1 );
+	}
+	if(  last_departure_slot[idx] == slot  ) {
+		// somebody left in this slot already
+		return false;
+	}
+	// first come, first served: a ready convoy that arrived earlier at this stop goes first
+	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
+		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
+			continue;
+		}
+		const schedule_t *other_schedule = other->get_schedule();
+		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
+			continue;
+		}
+		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  &&  other->is_ready_to_depart()  ) {
+			return false;
+		}
+	}
+	last_departure_slot[idx] = slot;
+	return true;
 }
 
 
@@ -292,6 +360,25 @@ void simline_t::rdwr(loadsave_t *file)
 
 	if(file->is_version_atleast(102, 2)) {
 		file->rdwr_bool(withdraw);
+	}
+
+	if(file->is_version_atleast(122, 2)) {
+		// fork: timetable slots already used
+		uint8 count = (uint8)min( last_departure_slot.get_count(), 255 );
+		file->rdwr_byte(count);
+		if(  file->is_loading()  ) {
+			last_departure_slot.clear();
+			for(  uint8 i=0;  i<count;  i++  ) {
+				sint64 slot = -1;
+				file->rdwr_longlong(slot);
+				last_departure_slot.append(slot);
+			}
+		}
+		else {
+			for(  uint8 i=0;  i<count;  i++  ) {
+				file->rdwr_longlong(last_departure_slot[i]);
+			}
+		}
 	}
 
 	// otherwise initialized to zero if loading ...

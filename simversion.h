@@ -23,7 +23,7 @@
 
 // Beware: SAVEGAME minor is often ahead of version minor when there were patches.
 // ==> These have no direct connection at all!
-#define SIM_SAVE_MINOR      1
+#define SIM_SAVE_MINOR      2
 #define SIM_SERVER_MINOR    0
 // NOTE: increment before next release to enable save/load of new features
 
@@ -59,6 +59,8 @@
 
 #define SAVEGAME_VER_NR        "0." QUOTEME(SIM_VERSION_MAJOR) "." QUOTEME(SIM_SAVE_MINOR)
 #define SERVER_SAVEGAME_VER_NR "0." QUOTEME(SIM_VERSION_MAJOR) "." QUOTEME(SIM_SERVER_MINOR)
+// fork: settings.xml is written with the stock version so older exes keep it
+#define SETTINGS_SAVE_VER_NR   "0." QUOTEME(SIM_VERSION_MAJOR) ".0"
 
 #define RES_VERSION_NUMBER  0, SIM_VERSION_MAJOR, SIM_VERSION_MINOR, SIM_VERSION_PATCH
 

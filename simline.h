@@ -33,6 +33,7 @@ class karte_ptr_t;
 class loadsave_t;
 class player_t;
 class schedule_t;
+struct schedule_entry_t;
 
 class simline_t {
 
@@ -66,6 +67,12 @@ private:
 	 * a list of all convoys assigned to this line
 	 */
 	vector_tpl<convoihandle_t> line_managed_convoys;
+
+	/**
+	 * Timetable (fork): per schedule entry the calendar minute of the slot a convoy last
+	 * left in, so every slot is used by one convoy only. Cleared with the schedule.
+	 */
+	vector_tpl<sint64> last_departure_slot;
 
 	/**
 	 * a list of all catg_index, which can be transported by this line.
@@ -115,6 +122,20 @@ public:
 	uint32 count_convoys() const { return line_managed_convoys.get_count(); }
 
 	vector_tpl<convoihandle_t> const& get_convoys() const { return line_managed_convoys; }
+
+	/**
+	 * Timetable (fork): the slot that is open right now for this entry, if any.
+	 * Slots start at departure_offset minutes after midnight, every departure_interval
+	 * minutes, and stay open for half an interval. Returns false outside a slot.
+	 */
+	static bool get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot);
+
+	/**
+	 * Timetable (fork): may the convoy leave its current stop now? True when a slot is open
+	 * that no other convoy of the line used at this entry, and no other ready convoy of the
+	 * line arrived there earlier. Books the slot for the convoy when it returns true.
+	 */
+	bool take_departure_slot(convoihandle_t cnv);
 
 	/**
 	 * returns the state of the line

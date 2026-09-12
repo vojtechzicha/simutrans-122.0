@@ -373,6 +373,11 @@ static void ask_objfilename()
  */
 static void ask_language()
 {
+	if(  translator::get_language("en") != -1  ) {
+		// fork: English only, do not bother the player with the dialog
+		translator::set_language( "en" );
+		return;
+	}
 	if(  display_get_width()==0  ) {
 		// only console available ... => choose english for the moment
 		dbg->warning( "ask_language", "No language selected, will use english!" );
@@ -1523,7 +1528,9 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 
 	// save setting ...
 	dr_chdir( env_t::user_dir );
-	if(  file.wr_open("settings.xml",loadsave_t::xml,0,"settings only/",SAVEGAME_VER_NR)  ) {
+	// fork: written with the stock version, so an older exe (stock or an earlier fork build)
+	// keeps the file instead of deleting it as "too new"; the fork's settings live in simuconf.tab
+	if(  file.wr_open("settings.xml",loadsave_t::xml,0,"settings only/",SETTINGS_SAVE_VER_NR)  ) {
 		env_t::rdwr(&file);
 		env_t::default_settings.rdwr(&file);
 		file.close();
