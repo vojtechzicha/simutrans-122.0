@@ -649,10 +649,10 @@ void vehicle_t::set_convoi(convoi_t *c)
  * Unload freight to halt
  * @return sum of unloaded goods
  */
-uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all )
+uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all, bool unload_any )
 {
 	uint16 sum_menge = 0, sum_delivered = 0, index = 0;
-	if(  !halt.is_bound()  ) {
+	if(  !halt.is_bound()  ||  !unload_any  ) {
 		return 0;
 	}
 

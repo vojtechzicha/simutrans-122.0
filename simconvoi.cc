@@ -2887,20 +2887,25 @@ station_tile_search_ready: ;
 	// next stop in schedule will be a depot
 	bool next_depot = false;
 
+	// stop type (fork): what this entry lets us do
+	const schedule_entry_t &current_entry = schedule->get_current_entry();
+	const bool entry_loads = current_entry.loads();
+
 	// prepare a list of all destination halts in the schedule
 	vector_tpl<halthandle_t> destination_halts(schedule->get_count());
-	if (!no_load) {
+	if (!no_load  &&  entry_loads) {
 		const uint8 count = schedule->get_count();
 		for(  uint8 i=1;  i<count;  i++  ) {
 			const uint8 wrap_i = (i + schedule->get_current_stop()) % count;
+			const schedule_entry_t &next_entry = schedule->entries[wrap_i];
 
-			const halthandle_t plan_halt = haltestelle_t::get_halt(schedule->entries[wrap_i].pos, owner);
+			const halthandle_t plan_halt = haltestelle_t::get_halt(next_entry.pos, owner);
 			if(plan_halt == halt) {
 				// we will come later here again ...
 				break;
 			}
 			else if(  !plan_halt.is_bound()  ) {
-				if(  grund_t *gr = welt->lookup( schedule->entries[wrap_i].pos )  ) {
+				if(  grund_t *gr = welt->lookup( next_entry.pos )  ) {
 					if(  gr->get_depot()  ) {
 
 						next_depot = i==1;
@@ -2910,7 +2915,13 @@ station_tile_search_ready: ;
 				}
 				continue;
 			}
-			destination_halts.append(plan_halt);
+			if(  next_entry.unloads()  ) {
+				destination_halts.append(plan_halt);
+			}
+			if(  !next_entry.rides_through()  ) {
+				// terminal or all-off: nothing aboard continues past it
+				break;
+			}
 		}
 	}
 
@@ -2942,9 +2953,9 @@ station_tile_search_ready: ;
 			v->last_stop_pos = v->get_pos();
 		}
 
-		uint16 amount = v->unload_cargo(halt, next_depot  );
+		uint16 amount = v->unload_cargo(halt, next_depot  ||  current_entry.unloads_all(), current_entry.unloads()  );
 
-		if(  !no_load  &&  !hold_loading  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
+		if(  !no_load  &&  entry_loads  &&  !hold_loading  &&  !next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
 			// load if: unloaded something (might go back) or previous non-filled car requested different cargo type
 			if (amount>0  ||  cargo_type_prev==NULL  ||  !cargo_type_prev->is_interchangeable(v->get_cargo_type())) {
 				// load
@@ -3027,10 +3038,10 @@ station_tile_search_ready: ;
 
 bool convoi_t::is_ready_to_depart() const
 {
-	if(  loading_level >= loading_limit  ||  no_load  ) {
+	const schedule_entry_t &entry = schedule->get_current_entry();
+	if(  loading_level >= loading_limit  ||  no_load  ||  !entry.loads()  ) {
 		return true;
 	}
-	const schedule_entry_t &entry = schedule->get_current_entry();
 	return entry.has_waiting_time()  &&  welt->get_ticks() - arrived_time > entry.get_waiting_ticks();
 }
 

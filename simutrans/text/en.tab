@@ -1561,3 +1561,19 @@ Departure: %02d:%02d
 , %d ahead
 Departure: by %02d:%02d
 Departure: by %02d:%02d
+Stop type
+Stop type
+Regular stop
+Regular stop
+Terminal
+Terminal
+All off
+All off
+Only load
+Only load
+Only unload
+Only unload
+no boarding
+no boarding
+Stop type tooltip
+Regular: load, unload, transfer. Terminal: everything off, load, no transfers, nothing rides through. All off: everything off, no loading. Only load: no unloading. Only unload: no loading.

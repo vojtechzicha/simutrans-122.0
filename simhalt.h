@@ -210,12 +210,16 @@ public:
 		/// directly reachable halt
 		halthandle_t halt;
 		/// best connection weight to reach this destination
-		uint16 weight:15;
+		uint16 weight:13;
 		/// is halt a transfer halt
 		bool is_transfer:1;
+		/// fork, stop types: only cargo starting at this halt may use the edge (terminal at the home entry)
+		bool origin_only:1;
+		/// fork, stop types: only cargo ending at the target may use the edge (terminal at the target entry)
+		bool dest_only:1;
 
-		connection_t() : weight(0), is_transfer(false) { }
-		connection_t(halthandle_t _halt, uint16 _weight=0) : halt(_halt), weight(_weight), is_transfer(false) { }
+		connection_t() : weight(0), is_transfer(false), origin_only(false), dest_only(false) { }
+		connection_t(halthandle_t _halt, uint16 _weight=0, bool _origin_only=false, bool _dest_only=false) : halt(_halt), weight(_weight), is_transfer(false), origin_only(_origin_only), dest_only(_dest_only) { }
 
 		bool operator == (const connection_t &other) const { return halt == other.halt; }
 		bool operator != (const connection_t &other) const { return halt != other.halt; }

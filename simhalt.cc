@@ -1248,9 +1248,15 @@ sint32 haltestelle_t::rebuild_connections()
 
 		// now we add the schedule to the connection array
 		uint16 aggregate_weight = WEIGHT_WAIT;
+		// fork, stop types: the last entry of self we passed decides whether cargo may leave with this
+		// schedule; a terminal or all-off entry on the way blocks the walk until the next entry of self
+		const schedule_entry_t &home_entry = schedule->entries[ (start_index-1) % schedule->get_count() ];
+		bool blocked = !home_entry.plans_departure();
+		bool origin_only = home_entry.stop_type == schedule_entry_t::terminal;
 		for(  uint8 j=0;  j<schedule->get_count();  ++j  ) {
 
-			halthandle_t current_halt = get_halt(schedule->entries[(start_index+j)%schedule->get_count()].pos, owner );
+			const schedule_entry_t &entry = schedule->entries[(start_index+j)%schedule->get_count()];
+			halthandle_t current_halt = get_halt(entry.pos, owner );
 			if(  !current_halt.is_bound()  ) {
 				// ignore way points
 				continue;
@@ -1266,10 +1272,14 @@ sint32 haltestelle_t::rebuild_connections()
 				}
 				// reset aggregate weight
 				aggregate_weight = WEIGHT_WAIT;
+				blocked = !entry.plans_departure();
+				origin_only = entry.stop_type == schedule_entry_t::terminal;
 				continue;
 			}
 
 			aggregate_weight += WEIGHT_HALT;
+			const bool add_edge = !blocked  &&  entry.plans_arrival();
+			const bool dest_only = entry.stop_type == schedule_entry_t::terminal;
 
 			FOR(minivec_tpl<uint8>, const catg_index, supported_catg_index) {
 				if(  current_halt->is_enabled(catg_index)  ) {
@@ -1280,12 +1290,24 @@ sint32 haltestelle_t::rebuild_connections()
 					}
 					previous_halt[catg_index] = current_halt;
 
+					if(  !add_edge  ) {
+						continue;
+					}
 					// either add a new connection or update the weight of an existing connection where necessary
-					connection_t *const existing_connection = all_links[catg_index].connections.insert_unique_ordered( connection_t( current_halt, aggregate_weight ), connection_t::compare );
-					if(  existing_connection  &&  aggregate_weight<existing_connection->weight  ) {
-						existing_connection->weight = aggregate_weight;
+					connection_t *const existing_connection = all_links[catg_index].connections.insert_unique_ordered( connection_t( current_halt, aggregate_weight, origin_only, dest_only ), connection_t::compare );
+					if(  existing_connection  ) {
+						if(  aggregate_weight<existing_connection->weight  ) {
+							existing_connection->weight = aggregate_weight;
+						}
+						// the least restrictive schedule decides what the edge allows
+						existing_connection->origin_only &= origin_only;
+						existing_connection->dest_only &= dest_only;
 					}
 				}
+			}
+			if(  !entry.rides_through()  ) {
+				// nothing aboard continues past this entry
+				blocked = true;
 			}
 		}
 
@@ -1680,6 +1702,14 @@ int haltestelle_t::search_route( const halthandle_t *const start_halts, const ui
 			// (if not, we were just under construction, and will be fine after 16 steps)
 			const uint16 reachable_halt_id = current_conn.halt.get_id();
 
+			// fork, stop types: a terminal edge only carries cargo that starts here resp. ends there
+			if(  current_conn.origin_only  &&  current_halt_data.depth > 0  ) {
+				continue;
+			}
+			if(  current_conn.dest_only  &&  !(  markers[ reachable_halt_id ]==current_marker  &&  halt_data[ reachable_halt_id ].destination  )  ) {
+				continue;
+			}
+
 			if(  markers[ reachable_halt_id ]!=current_marker  ) {
 				// Case : not processed before
 
@@ -1933,6 +1963,13 @@ void haltestelle_t::search_route_resumable(  ware_t &ware   )
 				// Case: halt removed -> make sure we never visit it again
 				markers[ reachable_halt_id ] = current_marker;
 				halt_data[ reachable_halt_id ].best_weight = 0;
+			}
+			// fork, stop types: a terminal edge only carries cargo that starts here resp. ends there
+			else if(  current_conn.origin_only  &&  current_halt_data.depth > 0  ) {
+				continue;
+			}
+			else if(  current_conn.dest_only  &&  !(  markers[ reachable_halt_id ]==current_marker  &&  halt_data[ reachable_halt_id ].destination  )  ) {
+				continue;
 			}
 			else if(  markers[ reachable_halt_id ]!=current_marker  ) {
 				// Case : not processed before and not destination

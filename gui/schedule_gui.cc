@@ -75,6 +75,10 @@ public:
 			schedule_t::append_timetable( stop.buf(), entry );
 			stop.buf().append(" ");
 		}
+		if(  entry.stop_type != schedule_entry_t::regular  ) {
+			schedule_t::append_stop_type( stop.buf(), entry );
+			stop.buf().append(" ");
+		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
 		stop.update();
 	}
@@ -285,6 +289,7 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	gui_frame_t( translator::translate("Fahrplan"), NULL),
 	line_selector(line_scrollitem_t::compare),
 	lb_waitlevel(SYSCOL_TEXT_HIGHLIGHT, gui_label_t::right),
+	lb_stop_type("Stop type"),
 	lb_wait(world()->has_calendar() ? "Wait time (min)" : "month wait time"),
 	lb_load("Full load"),
 	lb_interval("Departure every (min)"),
@@ -355,6 +360,20 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		line_selector.add_listener(this);
 		add_component(&line_selector);
 	}
+
+	// stop type (fork)
+	add_table(2,1);
+	{
+		add_component(&lb_stop_type);
+		for(  uint8 i=0;  i<schedule_entry_t::max_stop_type;  i++  ) {
+			stop_type_selector.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate( schedule_entry_t::get_stop_type_name(i) ), SYSCOL_TEXT );
+		}
+		stop_type_selector.set_selection( schedule->get_current_entry().stop_type );
+		lb_stop_type.set_tooltip( translator::translate("Stop type tooltip") );
+		stop_type_selector.add_listener(this);
+		add_component(&stop_type_selector);
+	}
+	end_table();
 
 	// loading level and waiting time
 	add_table(2,2);
@@ -499,6 +518,8 @@ bool schedule_gui_t::has_line() const
 
 void schedule_gui_t::update_selection()
 {
+	lb_stop_type.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	stop_type_selector.disable();
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
 	numimp_wait.disable();
@@ -511,6 +532,10 @@ void schedule_gui_t::update_selection()
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
 		const uint8 current_stop = schedule->get_current_stop();
 		if(  haltestelle_t::get_halt(schedule->entries[current_stop].pos, player).is_bound()  ) {
+			lb_stop_type.set_color( SYSCOL_TEXT );
+			stop_type_selector.enable();
+			stop_type_selector.set_selection( schedule->entries[current_stop].stop_type );
+
 			lb_load.set_color( SYSCOL_TEXT );
 			numimp_load.enable();
 			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
@@ -567,8 +592,17 @@ void schedule_gui_t::update_selection()
 				}
 			}
 
+			if(  !entry.loads()  ) {
+				// nothing boards here, so loading rules do not apply
+				lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+				numimp_load.disable();
+				lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+				wait_load.disable();
+				numimp_wait.disable();
+			}
 		}
 		else {
+			stop_type_selector.set_selection( schedule_entry_t::regular );
 			lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 			numimp_load.disable();
 			numimp_load.set_value( 0 );
@@ -676,6 +710,12 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 	else if(comp == &numimp_load) {
 		if (!schedule->empty()) {
 			schedule->entries[schedule->get_current_stop()].minimum_loading = (uint8)p.i;
+			update_selection();
+		}
+	}
+	else if(comp == &stop_type_selector) {
+		if(  !schedule->empty()  &&  p.i >= 0  &&  p.i < schedule_entry_t::max_stop_type  ) {
+			schedule->entries[schedule->get_current_stop()].stop_type = (uint8)p.i;
 			update_selection();
 		}
 	}

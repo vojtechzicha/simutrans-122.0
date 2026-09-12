@@ -404,10 +404,11 @@ public:
 	virtual void set_convoi(convoi_t *c);
 
 	/**
-	 * Unload freight to halt
+	 * Unload freight to halt: everything if all is set (depot ahead, terminal or all-off stop),
+	 * nothing if any is false (only-load stop), otherwise what ends or changes here.
 	 * @return sum of unloaded goods
 	 */
-	uint16 unload_cargo(halthandle_t halt, bool all );
+	uint16 unload_cargo(halthandle_t halt, bool all, bool any = true );
 
 	/**
 	 * Load freight from halt

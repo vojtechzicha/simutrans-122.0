@@ -853,11 +853,20 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 				insert_image(hi.cnv);
 
 				// timetable (fork): mark departures that run on a timetable from here
+				// stop types (fork): mark departures nobody may board
 				const schedule_entry_t &entry = hi.cnv->get_schedule()->get_current_entry();
-				if(  entry.has_timetable()  &&  welt->has_calendar()  &&  hi.cnv->get_line().is_bound()  &&  haltestelle_t::get_halt( entry.pos, hi.cnv->get_owner() ) == halt  ) {
+				const bool entry_here = haltestelle_t::get_halt( entry.pos, hi.cnv->get_owner() ) == halt;
+				const bool timetable_here = entry_here  &&  entry.has_timetable()  &&  welt->has_calendar()  &&  hi.cnv->get_line().is_bound();
+				const bool no_boarding = entry_here  &&  !entry.loads();
+				if(  timetable_here  ||  no_boarding  ) {
 					gui_label_buf_t *name = new_component<gui_label_buf_t>();
 					name->buf().printf( "%s  ", hi.halt->get_name() );
-					schedule_t::append_timetable( name->buf(), entry );
+					if(  timetable_here  ) {
+						schedule_t::append_timetable( name->buf(), entry );
+					}
+					if(  no_boarding  ) {
+						name->buf().printf( "(%s)", translator::translate("no boarding") );
+					}
 					name->update();
 				}
 				else {

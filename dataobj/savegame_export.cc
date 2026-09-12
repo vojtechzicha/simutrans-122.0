@@ -330,6 +330,7 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 		w.kv_int( "waiting_time_minutes", entry.waiting_time );
 		w.kv_int( "departure_interval", entry.departure_interval );
 		w.kv_int( "departure_offset", entry.departure_offset );
+		w.kv_int( "stop_type", entry.stop_type );
 		w.end_object();
 	}
 	w.end_array();

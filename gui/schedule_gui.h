@@ -48,6 +48,10 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	button_t bt_add, bt_insert, bt_remove; // stop management
 	button_t bt_return;
 
+	// stop type (fork): regular, terminal, all off, only load, only unload
+	gui_label_t lb_stop_type;
+	gui_combobox_t stop_type_selector;
+
 	gui_label_t lb_wait, lb_load;
 	gui_numberinput_t numimp_load;
 	gui_combobox_t wait_load;      // stock: fraction of a month

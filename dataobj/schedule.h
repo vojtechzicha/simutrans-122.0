@@ -174,6 +174,9 @@ public:
 
 	/// timetable marker of an entry: [8'] or [2h+30'] (fork); nothing without a timetable
 	static void append_timetable( cbuffer_t &buf, schedule_entry_t const& entry );
+
+	/// appends "[Terminal]" etc. for non-regular stop types (fork)
+	static void append_stop_type( cbuffer_t &buf, schedule_entry_t const& entry );
 };
 
 
