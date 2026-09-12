@@ -42,25 +42,6 @@ static karte_ptr_t welt;
 /**
  * One entry in the list of schedule entries.
  */
-/**
- * Calendar minutes as a short text: 8', 1h, 1h30, 4h (fork, timetable display)
- */
-static void append_minutes( cbuffer_t &buf, uint16 minutes )
-{
-	if(  minutes >= 60  ) {
-		if(  minutes % 60 == 0  ) {
-			buf.printf( "%dh", minutes / 60 );
-		}
-		else {
-			buf.printf( "%dh%02d", minutes / 60, minutes % 60 );
-		}
-	}
-	else {
-		buf.printf( "%d'", minutes );
-	}
-}
-
-
 class gui_schedule_entry_t : public gui_aligned_container_t, public gui_action_creator_t
 {
 	schedule_entry_t entry;
@@ -91,13 +72,8 @@ public:
 		stop.buf().printf("%i) ", number+1);
 		if(  entry.has_timetable()  &&  welt->has_calendar()  ) {
 			// timetable marker in front of the name, which may be longer than the window: [8'] or [2h+30']
-			stop.buf().append("[");
-			append_minutes( stop.buf(), entry.departure_interval );
-			if(  entry.departure_offset > 0  ) {
-				stop.buf().append("+");
-				append_minutes( stop.buf(), entry.departure_offset );
-			}
-			stop.buf().append("] ");
+			schedule_t::append_timetable( stop.buf(), entry );
+			stop.buf().append(" ");
 		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
 		stop.update();
@@ -549,10 +525,10 @@ void schedule_gui_t::update_selection()
 			numimp_offset.set_value( entry.departure_offset );
 			// long intervals read better as hours
 			lb_interval_fmt.buf().append("= ");
-			append_minutes( lb_interval_fmt.buf(), entry.departure_interval );
+			schedule_t::append_minutes( lb_interval_fmt.buf(), entry.departure_interval );
 			lb_interval_fmt.update();
 			lb_offset_fmt.buf().append("= ");
-			append_minutes( lb_offset_fmt.buf(), entry.departure_offset );
+			schedule_t::append_minutes( lb_offset_fmt.buf(), entry.departure_offset );
 			lb_offset_fmt.update();
 			lb_interval_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
 			lb_offset_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );

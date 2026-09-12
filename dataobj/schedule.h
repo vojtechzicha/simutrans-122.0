@@ -168,6 +168,12 @@ public:
 	 * If @p max_chars > 0 then append short version, without loading level and position.
 	 */
 	static void gimme_stop_name(cbuffer_t& buf, karte_t* welt, player_t const* player_, schedule_entry_t const& entry, int max_chars);
+
+	/// calendar minutes as a short text: 8', 1h, 1h30, 4h (fork, timetable display)
+	static void append_minutes( cbuffer_t &buf, uint16 minutes );
+
+	/// timetable marker of an entry: [8'] or [2h+30'] (fork); nothing without a timetable
+	static void append_timetable( cbuffer_t &buf, schedule_entry_t const& entry );
 };
 
 

@@ -331,6 +331,27 @@ sint64 karte_t::get_calendar_minutes_at( uint32 at_ticks ) const
 }
 
 
+sint64 karte_t::get_calendar_minutes_in_month( sint64 ticks_in_month ) const
+{
+	const sint64 minutes_per_month = settings.get_minutes_per_month();
+	if(  minutes_per_month <= 0  ) {
+		return 0;
+	}
+	const sint64 start_month = (sint64)settings.get_starting_year() * 12 + settings.get_starting_month();
+	return ((sint64)current_month - start_month) * minutes_per_month + ((ticks_in_month * minutes_per_month) >> ticks_per_world_month_shift);
+}
+
+
+sint64 karte_t::calendar_minutes_to_ticks( sint64 minutes ) const
+{
+	const sint64 minutes_per_month = settings.get_minutes_per_month();
+	if(  minutes_per_month <= 0  ) {
+		return 0;
+	}
+	return (minutes * ticks_per_world_month) / minutes_per_month;
+}
+
+
 karte_t::calendar_date_t karte_t::get_calendar_date( sint64 calendar_minutes ) const
 {
 	calendar_date_t date;

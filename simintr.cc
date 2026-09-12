@@ -155,7 +155,9 @@ static char const *calendar_tick_to_string( sint32 ticks, bool show_full )
 	static char const* const weekdays[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
 	static char time[128];
 
-	const karte_t::calendar_date_t date = welt_modell->get_calendar_date( welt_modell->get_calendar_minutes_at( ticks ) );
+	// the full form gets absolute ticks (the status bar), the relative form ticks counted from the
+	// start of the current game month (the departure boards), as the stock function does
+	const karte_t::calendar_date_t date = welt_modell->get_calendar_date( show_full ? welt_modell->get_calendar_minutes_at( ticks ) : welt_modell->get_calendar_minutes_in_month( ticks ) );
 	char const* const weekday = translator::translate( weekdays[date.weekday] );
 
 	// time of day in the chosen convention

@@ -767,6 +767,12 @@ public:
 	/// calendar minutes for an absolute tick value (may lie in the future or past of now)
 	sint64 get_calendar_minutes_at( uint32 at_ticks ) const;
 
+	/// calendar minutes for ticks counted from the start of the current game month (may exceed the month)
+	sint64 get_calendar_minutes_in_month( sint64 ticks_in_month ) const;
+
+	/// ticks for a number of calendar minutes (0 without calendar)
+	sint64 calendar_minutes_to_ticks( sint64 minutes ) const;
+
 	/// convert calendar minutes since the start date to a date and time of day
 	calendar_date_t get_calendar_date( sint64 calendar_minutes ) const;
 

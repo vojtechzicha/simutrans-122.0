@@ -489,6 +489,36 @@ uint32 schedule_entry_t::get_waiting_ticks() const
 }
 
 
+void schedule_t::append_minutes( cbuffer_t &buf, uint16 minutes )
+{
+	if(  minutes >= 60  ) {
+		if(  minutes % 60 == 0  ) {
+			buf.printf( "%dh", minutes / 60 );
+		}
+		else {
+			buf.printf( "%dh%02d", minutes / 60, minutes % 60 );
+		}
+	}
+	else {
+		buf.printf( "%d'", minutes );
+	}
+}
+
+
+void schedule_t::append_timetable( cbuffer_t &buf, schedule_entry_t const& entry )
+{
+	if(  entry.has_timetable()  ) {
+		buf.append("[");
+		append_minutes( buf, entry.departure_interval );
+		if(  entry.departure_offset > 0  ) {
+			buf.append("+");
+			append_minutes( buf, entry.departure_offset );
+		}
+		buf.append("]");
+	}
+}
+
+
 void schedule_t::gimme_stop_name(cbuffer_t& buf, karte_t* welt, player_t const* const player_, schedule_entry_t const& entry, int const max_chars)
 {
 	const char *p;

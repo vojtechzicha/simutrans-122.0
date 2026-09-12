@@ -765,8 +765,17 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 		}
 		halthandle_t next_halt = cnv->get_schedule()->get_next_halt(cnv->get_owner(),halt);
 		if(  next_halt.is_bound()  ) {
-			dest_info_t next( next_halt, 0, cnv );
-			destinations.append_unique( next );
+			// timetable (fork): a waiting convoy leaves in its planned slot, not right now
+			sint64 slot;
+			if(  cnv->get_line().is_bound()  &&  welt->has_calendar()  &&  cnv->get_line()->get_planned_departure( cnv, slot )  ) {
+				const sint64 wait_ticks = welt->calendar_minutes_to_ticks( slot - welt->get_calendar_minutes() );
+				dest_info_t next( next_halt, cur_ticks + (sint32)max( wait_ticks, 0 ), cnv );
+				destinations.insert_ordered( next, compare_hi );
+			}
+			else {
+				dest_info_t next( next_halt, 0, cnv );
+				destinations.append_unique( next );
+			}
 			if(  grund_t *gr = welt->lookup( cnv->get_vehikel(0)->last_stop_pos )  ) {
 				if(  gr->get_halt().is_bound()  &&  gr->get_halt() != halt  ) {
 					dest_info_t prev( gr->get_halt(), 0, cnv );
@@ -842,7 +851,17 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 
 				insert_image(hi.cnv);
 
-				new_component<gui_label_t>(hi.halt->get_name() );
+				// timetable (fork): mark departures that run on a timetable from here
+				const schedule_entry_t &entry = hi.cnv->get_schedule()->get_current_entry();
+				if(  entry.has_timetable()  &&  welt->has_calendar()  &&  hi.cnv->get_line().is_bound()  &&  haltestelle_t::get_halt( entry.pos, hi.cnv->get_owner() ) == halt  ) {
+					gui_label_buf_t *name = new_component<gui_label_buf_t>();
+					name->buf().printf( "%s  ", hi.halt->get_name() );
+					schedule_t::append_timetable( name->buf(), entry );
+					name->update();
+				}
+				else {
+					new_component<gui_label_t>(hi.halt->get_name() );
+				}
 				exclude.append( hi.halt );
 			}
 		}
