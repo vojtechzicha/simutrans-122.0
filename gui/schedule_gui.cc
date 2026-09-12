@@ -465,8 +465,8 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	end_table();
 
 	if(  welt->has_calendar()  ) {
-		// timetable: departure slots, 0 = none
-		add_table(3,2);
+		// timetable: departure slots, 0 = none; three rows (interval, offset, more offsets)
+		add_table(3,3);
 		{
 			add_component(&lb_interval);
 			numimp_interval.set_width( 84 );
