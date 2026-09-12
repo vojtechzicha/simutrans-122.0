@@ -40,6 +40,64 @@
 static karte_ptr_t welt;
 
 /**
+ * Stop type badge (fork): a small square in front of each schedule entry that shows the
+ * stop type as a letter. A left click on it cycles to the next type, a right click back.
+ */
+class gui_stop_type_badge_t : public gui_component_t
+{
+	uint8 stop_type;
+	cbuffer_t tooltip;
+
+public:
+	gui_stop_type_badge_t(uint8 t) : stop_type(t)
+	{
+		tooltip.printf( "%s: %s", translator::translate("Stop type"), translator::translate( schedule_entry_t::get_stop_type_name(t) ) );
+		set_size( get_min_size() );
+	}
+
+	scr_size get_min_size() const OVERRIDE { return scr_size( LINESPACE, LINESPACE ); }
+	scr_size get_max_size() const OVERRIDE { return get_min_size(); }
+
+	static const char *get_glyph(uint8 t)
+	{
+		switch(  t  ) {
+			case schedule_entry_t::terminal:    return "T";
+			case schedule_entry_t::all_off:     return "A";
+			case schedule_entry_t::only_load:   return "L";
+			case schedule_entry_t::only_unload: return "U";
+			default:                            return "";
+		}
+	}
+
+	static PIXVAL get_color(uint8 t)
+	{
+		switch(  t  ) {
+			case schedule_entry_t::terminal:    return color_idx_to_rgb( COL_DARK_RED );
+			case schedule_entry_t::all_off:     return color_idx_to_rgb( COL_ORANGE );
+			case schedule_entry_t::only_load:   return color_idx_to_rgb( COL_DARK_GREEN );
+			case schedule_entry_t::only_unload: return color_idx_to_rgb( COL_DARK_BLUE );
+			default:                            return color_idx_to_rgb( COL_GREY3 );
+		}
+	}
+
+	void draw(scr_coord offset) OVERRIDE
+	{
+		const scr_coord p = pos + offset;
+		if(  stop_type == schedule_entry_t::regular  ) {
+			// empty frame: nothing special here, but there is something to click
+			display_ddd_box_clip_rgb( p.x, p.y, size.w, size.h, get_color(stop_type), get_color(stop_type) );
+		}
+		else {
+			display_fillbox_wh_clip_rgb( p.x, p.y, size.w, size.h, get_color(stop_type), true );
+			display_proportional_clip_rgb( p.x + size.w/2, p.y, get_glyph(stop_type), ALIGN_CENTER_H, color_idx_to_rgb( COL_WHITE ), true );
+		}
+		if(  getroffen( get_mouse_x()-offset.x, get_mouse_y()-offset.y )  ) {
+			win_set_tooltip( get_mouse_x() + TOOLTIP_MOUSE_OFFSET_X, p.y + size.h + TOOLTIP_MOUSE_OFFSET_Y, tooltip, this );
+		}
+	}
+};
+
+/**
  * One entry in the list of schedule entries.
  */
 class gui_schedule_entry_t : public gui_aligned_container_t, public gui_action_creator_t
@@ -49,19 +107,22 @@ class gui_schedule_entry_t : public gui_aligned_container_t, public gui_action_c
 	uint number;
 	player_t* player;
 	gui_image_t arrow;
+	gui_stop_type_badge_t badge;
 	gui_label_buf_t stop;
 
 public:
-	gui_schedule_entry_t(player_t* pl, schedule_entry_t e, uint n)
+	gui_schedule_entry_t(player_t* pl, schedule_entry_t e, uint n) : badge(e.stop_type)
 	{
 		player = pl;
 		entry  = e;
 		number = n;
 		is_current = false;
-		set_table_layout(2,1);
+		set_table_layout(3,1);
 
 		add_component(&arrow);
 		arrow.set_image(gui_theme_t::pos_button_img[0], true);
+
+		add_component(&badge);
 
 		add_component(&stop);
 		update_label();
@@ -73,10 +134,6 @@ public:
 		if(  entry.has_timetable()  &&  welt->has_calendar()  ) {
 			// timetable marker in front of the name, which may be longer than the window: [8'] or [2h+30']
 			schedule_t::append_timetable( stop.buf(), entry );
-			stop.buf().append(" ");
-		}
-		if(  entry.stop_type != schedule_entry_t::regular  ) {
-			schedule_t::append_stop_type( stop.buf(), entry );
 			stop.buf().append(" ");
 		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
@@ -103,9 +160,15 @@ public:
 	 * Listeners receive the entry index on left click (select this entry).
 	 * A middle click requests deletion of this entry; it is signalled as
 	 * the negative value -(index+1), see delete_request_to_index().
+	 * A click on the stop type badge requests the next (left) or previous
+	 * (right click) stop type; it is signalled as index plus a flag above 0xffff.
 	 */
 	static bool is_delete_request(long v) { return v < 0; }
 	static long delete_request_to_index(long v) { return -v - 1; }
+	static long toggle_request(uint n, bool backwards) { return (backwards ? 0x20000L : 0x10000L) + (long)n; }
+	static bool is_toggle_request(long v) { return v >= 0x10000L; }
+	static bool is_toggle_backwards(long v) { return v >= 0x20000L; }
+	static long toggle_request_to_index(long v) { return v & 0xffffL; }
 
 	bool infowin_event(const event_t *ev) OVERRIDE
 	{
@@ -113,6 +176,10 @@ public:
 			if(  ev->ev_code == MOUSE_MIDBUTTON  ) {
 				// middle click: remove this entry from the schedule
 				call_listeners( value_t( -(long)number - 1 ) );
+			}
+			else if(  badge.getroffen( ev->mx, ev->my )  ) {
+				// stop type badge: cycle the stop type
+				call_listeners( value_t( toggle_request( number, IS_RIGHTCLICK(ev) ) ) );
 			}
 			else if(  IS_RIGHTCLICK(ev)  ||  ev->mx < stop.get_pos().x) {
 				// just center on it
@@ -289,7 +356,6 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	gui_frame_t( translator::translate("Fahrplan"), NULL),
 	line_selector(line_scrollitem_t::compare),
 	lb_waitlevel(SYSCOL_TEXT_HIGHLIGHT, gui_label_t::right),
-	lb_stop_type("Stop type"),
 	lb_wait(world()->has_calendar() ? "Wait time (min)" : "month wait time"),
 	lb_load("Full load"),
 	lb_interval("Departure every (min)"),
@@ -360,20 +426,6 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		line_selector.add_listener(this);
 		add_component(&line_selector);
 	}
-
-	// stop type (fork)
-	add_table(2,1);
-	{
-		add_component(&lb_stop_type);
-		for(  uint8 i=0;  i<schedule_entry_t::max_stop_type;  i++  ) {
-			stop_type_selector.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate( schedule_entry_t::get_stop_type_name(i) ), SYSCOL_TEXT );
-		}
-		stop_type_selector.set_selection( schedule->get_current_entry().stop_type );
-		lb_stop_type.set_tooltip( translator::translate("Stop type tooltip") );
-		stop_type_selector.add_listener(this);
-		add_component(&stop_type_selector);
-	}
-	end_table();
 
 	// loading level and waiting time
 	add_table(2,2);
@@ -518,8 +570,6 @@ bool schedule_gui_t::has_line() const
 
 void schedule_gui_t::update_selection()
 {
-	lb_stop_type.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
-	stop_type_selector.disable();
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
 	numimp_wait.disable();
@@ -532,10 +582,6 @@ void schedule_gui_t::update_selection()
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
 		const uint8 current_stop = schedule->get_current_stop();
 		if(  haltestelle_t::get_halt(schedule->entries[current_stop].pos, player).is_bound()  ) {
-			lb_stop_type.set_color( SYSCOL_TEXT );
-			stop_type_selector.enable();
-			stop_type_selector.set_selection( schedule->entries[current_stop].stop_type );
-
 			lb_load.set_color( SYSCOL_TEXT );
 			numimp_load.enable();
 			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
@@ -602,7 +648,6 @@ void schedule_gui_t::update_selection()
 			}
 		}
 		else {
-			stop_type_selector.set_selection( schedule_entry_t::regular );
 			lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 			numimp_load.disable();
 			numimp_load.set_value( 0 );
@@ -713,12 +758,6 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 			update_selection();
 		}
 	}
-	else if(comp == &stop_type_selector) {
-		if(  !schedule->empty()  &&  p.i >= 0  &&  p.i < schedule_entry_t::max_stop_type  ) {
-			schedule->entries[schedule->get_current_stop()].stop_type = (uint8)p.i;
-			update_selection();
-		}
-	}
 	else if(comp == &wait_load) {
 		if(!schedule->empty()) {
 			if (gui_waiting_time_item_t *item = dynamic_cast<gui_waiting_time_item_t*>( wait_load.get_selected_item())) {
@@ -784,6 +823,17 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 				stats->highlight_schedule( false );
 				schedule->set_current_stop( line );
 				schedule->remove();
+				update_selection();
+			}
+		}
+		else if(  gui_schedule_entry_t::is_toggle_request(p.i)  ) {
+			// click on the stop type badge: next or previous stop type, and select the entry
+			const int line = gui_schedule_entry_t::toggle_request_to_index(p.i);
+			if(  line >= 0  &&  line < schedule->get_count()  ) {
+				const uint8 count = schedule_entry_t::max_stop_type;
+				schedule_entry_t &entry = schedule->entries[line];
+				entry.stop_type = (uint8)( (entry.stop_type + (gui_schedule_entry_t::is_toggle_backwards(p.i) ? count-1 : 1)) % count );
+				schedule->set_current_stop( line );
 				update_selection();
 			}
 		}
