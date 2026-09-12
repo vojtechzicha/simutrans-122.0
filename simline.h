@@ -142,9 +142,10 @@ public:
 
 	/**
 	 * Timetable (fork): the calendar minute of the slot cnv is expected to leave in, after the
-	 * convoys that arrived before it. False without a timetable at the current entry.
+	 * convoys that arrived before it, searched from ready_at (now, or the latest moment the
+	 * loading rules let it go). False without a timetable at the current entry.
 	 */
-	bool get_planned_departure(convoihandle_t cnv, sint64 &slot) const;
+	bool get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint64 &slot) const;
 
 	/**
 	 * returns the state of the line

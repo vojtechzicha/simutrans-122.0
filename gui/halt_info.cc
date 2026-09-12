@@ -765,9 +765,10 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 		}
 		halthandle_t next_halt = cnv->get_schedule()->get_next_halt(cnv->get_owner(),halt);
 		if(  next_halt.is_bound()  ) {
-			// timetable (fork): a waiting convoy leaves in its planned slot, not right now
+			// fork: a waiting convoy leaves in its timetable slot or at the end of its wait, not right now
 			sint64 slot;
-			if(  cnv->get_line().is_bound()  &&  welt->has_calendar()  &&  cnv->get_line()->get_planned_departure( cnv, slot )  ) {
+			bool latest;
+			if(  cnv->get_planned_departure( slot, latest )  ) {
 				const sint64 wait_ticks = welt->calendar_minutes_to_ticks( slot - welt->get_calendar_minutes() );
 				dest_info_t next( next_halt, cur_ticks + (sint32)max( wait_ticks, 0 ), cnv );
 				destinations.insert_ordered( next, compare_hi );

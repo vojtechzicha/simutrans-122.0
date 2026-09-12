@@ -1559,3 +1559,5 @@ Departure: %02d:%02d
  (now)
 , %d ahead
 , %d ahead
+Departure: by %02d:%02d
+Departure: by %02d:%02d

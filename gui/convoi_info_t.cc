@@ -300,17 +300,15 @@ void convoi_info_t::update_labels()
 	}
 	line_label.update();
 
-	// timetable (fork): the slot this convoy is going to leave in
-	bool show_departure = false;
+	// fork: when this convoy is going to leave (timetable slot, or the end of its maximum wait)
 	sint64 slot = 0;
-	if(  cnv->get_state() == convoi_t::LOADING  &&  cnv->get_line().is_bound()  &&  welt->has_calendar()  ) {
-		show_departure = cnv->get_line()->get_planned_departure( cnv, slot );
-	}
+	bool latest = false;
+	const bool show_departure = cnv->get_planned_departure( slot, latest );
 	if(  show_departure  ) {
 		const sint64 now = welt->get_calendar_minutes();
 		const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
 		const karte_t::calendar_date_t today = welt->get_calendar_date( now );
-		departure_label.buf().printf( translator::translate("Departure: %02d:%02d"), date.hour, date.minute );
+		departure_label.buf().printf( translator::translate(latest ? "Departure: by %02d:%02d" : "Departure: %02d:%02d"), date.hour, date.minute );
 		if(  date.day_number != today.day_number  ) {
 			departure_label.buf().printf( " +%dd", (int)(date.day_number - today.day_number) );
 		}
@@ -320,7 +318,7 @@ void convoi_info_t::update_labels()
 		else {
 			departure_label.buf().append( translator::translate(" (now)") );
 		}
-		const uint32 ahead = cnv->get_line()->count_earlier_waiting( cnv );
+		const uint32 ahead = cnv->get_line().is_bound()  &&  cnv->get_schedule()->get_current_entry().has_timetable() ? cnv->get_line()->count_earlier_waiting( cnv ) : 0;
 		if(  ahead > 0  ) {
 			departure_label.buf().printf( translator::translate(", %d ahead"), (int)ahead );
 		}

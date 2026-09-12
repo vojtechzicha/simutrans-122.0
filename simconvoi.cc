@@ -3035,6 +3035,35 @@ bool convoi_t::is_ready_to_depart() const
 }
 
 
+bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
+{
+	if(  state != LOADING  ||  !welt->has_calendar()  ||  schedule == NULL  ||  schedule->empty()  ) {
+		return false;
+	}
+	const schedule_entry_t &entry = schedule->get_current_entry();
+	const sint64 now = welt->get_calendar_minutes();
+	// when will the loading rules let us go?
+	sint64 ready_at = now;
+	latest = false;
+	if(  !is_ready_to_depart()  ) {
+		if(  !entry.has_waiting_time()  ) {
+			// waits for its load, no telling how long
+			return false;
+		}
+		ready_at = max( now, welt->get_calendar_minutes_at( arrived_time + entry.get_waiting_ticks() ) );
+		latest = true;
+	}
+	if(  line.is_bound()  &&  entry.has_timetable()  &&  !no_load  ) {
+		return line->get_planned_departure( self, ready_at, minutes );
+	}
+	if(  latest  ) {
+		minutes = ready_at;
+		return true;
+	}
+	return false;
+}
+
+
 sint64 convoi_t::calc_restwert() const
 {
 	sint64 result = 0;

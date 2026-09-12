@@ -398,6 +398,14 @@ public:
 	 */
 	bool is_ready_to_depart() const;
 
+	/**
+	 * Fork: the calendar minute this convoy is expected to leave its current stop, while loading.
+	 * With a timetable it is the planned slot; otherwise the end of the maximum waiting time.
+	 * latest is set when the convoy is still waiting for its minimum load, so it may leave earlier.
+	 * False when nothing is known (no calendar, ready without a timetable, no maximum wait).
+	 */
+	bool get_planned_departure(sint64 &minutes, bool &latest) const;
+
 	/* true, if electrification needed for this convoi */
 	bool needs_electrification() const { return is_electric; }
 

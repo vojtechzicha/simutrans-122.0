@@ -190,7 +190,7 @@ uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
 }
 
 
-bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 &slot) const
+bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint64 &slot) const
 {
 	const schedule_t *cnv_schedule = cnv->get_schedule();
 	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
@@ -201,7 +201,7 @@ bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 &slot) const
 	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {
 		return false;
 	}
-	sint64 s = first_departure_slot( entry, welt->get_calendar_minutes() );
+	sint64 s = first_departure_slot( entry, max( ready_at, welt->get_calendar_minutes() ) );
 	if(  idx < last_departure_slot.get_count()  &&  last_departure_slot[idx] == s  ) {
 		// this slot is gone already
 		s = next_departure_slot( entry, s );
