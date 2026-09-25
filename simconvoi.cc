@@ -3635,61 +3635,12 @@ bool convoi_t::can_overtake(overtaker_t *other_overtaker, sint32 other_speed, si
 	}
 
 	if(  other_speed == 0  ) {
-		/* overtaking a loading convoi
-		 * => we can do a lazy check, since halts are always straight
-		 */
-		grund_t *gr = welt->lookup(get_pos());
-		if(  gr==NULL  ) {
-			// should never happen, since there is a vehicle in front of us ...
+		// passing a standing convoi: only alongside it, the tile after it is checked when we get there
+		const sint8 tiles = get_tiles_to_pass_standing( other_overtaker, fahr[0]->get_route_index() );
+		if(  tiles == 0  ) {
 			return false;
 		}
-		weg_t *str = gr->get_weg(road_wt);
-		if(  str==0  ) {
-			// also this is not possible, since a car loads in front of is!?!
-			return false;
-		}
-
-		uint16 idx = fahr[0]->get_route_index();
-		const sint32 tiles = other_speed == 0 ? 2 : (steps_other-1)/(CARUNITS_PER_TILE*VEHICLE_STEPS_PER_CARUNIT) + get_tile_length() + 1;
-		if(  tiles > 0  &&  idx+(uint32)tiles >= route.get_count()  ) {
-			// needs more space than there
-			return false;
-		}
-
-		for(  sint32 i=0;  i<tiles;  i++  ) {
-			grund_t *gr = welt->lookup( route.at( idx+i ) );
-			if(  gr==NULL  ) {
-				return false;
-			}
-			weg_t *str = gr->get_weg(road_wt);
-			if(  str==0  ) {
-				return false;
-			}
-			// not overtaking on railroad crossings or normal crossings ...
-			if(  str->is_crossing() ) {
-				return false;
-			}
-			if(  ribi_t::is_threeway(str->get_ribi())  ) {
-				return false;
-			}
-			// Check for other vehicles on the next tile
-			const uint8 top = gr->get_top();
-			for(  uint8 j=1;  j<top;  j++  ) {
-				if(  vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(j))  ) {
-					// check for other traffic on the road
-					const overtaker_t *ov = v->get_overtaker();
-					if(ov) {
-						if(this!=ov  &&  other_overtaker!=ov) {
-							return false;
-						}
-					}
-					else if(  v->get_waytype()==road_wt  &&  v->get_typ()!=obj_t::pedestrian  ) {
-						return false;
-					}
-				}
-			}
-		}
-		set_tiles_overtaking( tiles );
+		set_tiles_passing_standing( tiles );
 		return true;
 	}
 
@@ -3846,6 +3797,37 @@ bool convoi_t::can_overtake(overtaker_t *other_overtaker, sint32 other_speed, si
 	set_tiles_overtaking( 1+n_tiles );
 	other_overtaker->set_tiles_overtaking( -1-(n_tiles*(akt_speed-diff_speed))/akt_speed );
 	return true;
+}
+
+
+/**
+ * Passing a standing convoi: our route from start_index must run along its tiles (no
+ * crossings or junctions there, since nothing is checked alongside it) and go on for at
+ * least one tile, and all of these must be free of other traffic. Bends, junctions and
+ * crossings before it or after it do not matter, the tile after it is checked like in
+ * normal driving when we get there.
+ */
+sint8 convoi_t::get_tiles_to_pass_standing(const overtaker_t *other, uint32 start_index) const
+{
+	sint8 alongside = 0;
+	for(  uint32 idx = start_index;  idx < route.get_count()  &&  alongside < 16;  idx++  ) {
+		const grund_t *gr = welt->lookup( route.at(idx) );
+		const weg_t *str = gr ? gr->get_weg(road_wt) : NULL;
+		bool other_here;
+		if(  str==NULL  ||  !vehicle_base_t::is_free_for_passing( gr, this, other, other_here )  ) {
+			return 0;
+		}
+		if(  !other_here  ) {
+			// first tile after it
+			return alongside > 0 ? alongside + 1 : 0;
+		}
+		if(  str->is_crossing()  ||  ribi_t::is_threeway( str->get_ribi() )  ) {
+			return 0;
+		}
+		alongside++;
+	}
+	// our route ends alongside it: we stop behind it
+	return 0;
 }
 
 

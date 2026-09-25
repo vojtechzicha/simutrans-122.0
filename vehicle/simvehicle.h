@@ -114,6 +114,11 @@ public:
 
 	static void set_overtaking_offsets( bool driving_on_the_left );
 
+	/* passing a standing vehicle: true, if there is no road traffic on this tile except the
+	 * two overtakers; other_here is set, if the passed one is on this tile
+	 */
+	static bool is_free_for_passing( const grund_t *gr, const overtaker_t *self, const overtaker_t *other, bool &other_here );
+
 	// if true, this convoi needs to restart for correct alignment
 	bool need_realignment() const;
 
@@ -463,6 +468,9 @@ private:
 	// called internally only from ist_weg_frei()
 	// returns true on success
 	bool choose_route(sint32 &restart_speed, ribi_t::ribi start_direction, uint16 index);
+
+	// true during a choose sign search that may pick a stop position beyond a standing convoi
+	bool choose_pass_standing;
 
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;

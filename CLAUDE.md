@@ -151,6 +151,20 @@ lettered badge in front of each entry row; left click cycles forward, right clic
 terminus entry with a timetable is Terminal; a bus station with arrival, waiting and departure
 tiles of one halt uses All off on the arrival tile and Regular on the rest.
 
+## Passing standing buses (fork feature)
+
+Road vehicles (convoys and city cars) pass a convoy standing at a stop (`convoi_t::is_standing()`:
+LOADING, ROUTING_1 right after loading, NO_ROUTE) regardless of bends, junctions or rail crossings
+before or after it. Only the tiles alongside it must be free and not junctions/crossings, and the route
+must go on at least one tile beyond it (`get_tiles_to_pass_standing` in `simconvoi.cc` and
+`simroadtraffic.cc`, `vehicle_base_t::is_free_for_passing`). The overtaking lane is used only alongside
+it (`overtaker_t::set_tiles_passing_standing`); the tile after it is checked like normal driving
+(`is_passing_standing_last_tile`), so junction rules and `request_crossing` still apply there. A vehicle
+may enter a junction when the car blocking its exit is a standing convoy it can pass. Choose signs first
+search for a free stop tile beyond standing convoys (`road_vehicle_t::choose_pass_standing` in
+`is_target`), then fall back to the stock nearest free tile. Moving overtaking is unchanged. Not saved:
+a game loaded mid-pass finishes it like a stock overtake.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

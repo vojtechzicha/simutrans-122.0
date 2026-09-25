@@ -812,6 +812,15 @@ public:
 
 	// Overtaking for convois
 	bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other) OVERRIDE;
+
+	// standing at a stop (loading, or finding its route before leaving): road traffic may pass it
+	bool is_standing() const { return state==LOADING  ||  state==ROUTING_1  ||  state==NO_ROUTE; }
+
+	/**
+	 * Passing a standing convoi (see convoi_t::is_standing()), whose first tile is route tile start_index.
+	 * @return tiles for set_tiles_passing_standing(), or 0 if we cannot pass it
+	 */
+	sint8 get_tiles_to_pass_standing(const overtaker_t *other, uint32 start_index) const;
 };
 
 #endif

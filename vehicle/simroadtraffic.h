@@ -152,6 +152,12 @@ public:
 
 	// Overtaking for city cars
 	bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other) OVERRIDE;
+
+	/**
+	 * Passing a standing convoi (see convoi_t::is_standing()), whose first tile is gr, entered from the tile at from.
+	 * @return tiles for set_tiles_passing_standing(), or 0 if we cannot pass it
+	 */
+	sint8 get_tiles_to_pass_standing(const overtaker_t *other, koord3d from, const grund_t *gr) const;
 };
 
 #endif

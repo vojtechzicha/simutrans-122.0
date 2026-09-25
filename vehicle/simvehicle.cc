@@ -590,6 +590,30 @@ vehicle_base_t *vehicle_base_t::no_cars_blocking( const grund_t *gr, const convo
 }
 
 
+bool vehicle_base_t::is_free_for_passing( const grund_t *gr, const overtaker_t *self, const overtaker_t *other, bool &other_here )
+{
+	other_here = false;
+	for(  uint8 pos=1;  pos<(uint8)gr->get_top();  pos++  ) {
+		if(  vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(pos))  ) {
+			const overtaker_t *ov = v->get_overtaker();
+			if(  ov  ) {
+				if(  ov==other  ) {
+					other_here = true;
+				}
+				else if(  ov!=self  ) {
+					return false;
+				}
+			}
+			else if(  v->get_waytype()==road_wt  &&  v->get_typ()!=obj_t::pedestrian  ) {
+				// sheep etc.
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+
 void vehicle_t::rotate90()
 {
 	vehicle_base_t::rotate90();
@@ -1797,11 +1821,13 @@ road_vehicle_t::road_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	vehicle_t(pos, desc, player)
 {
 	cnv = cn;
+	choose_pass_standing = false;
 }
 
 
 road_vehicle_t::road_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : vehicle_t()
 {
+	choose_pass_standing = false;
 	rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -1942,6 +1968,17 @@ bool road_vehicle_t::is_target(const grund_t *gr, const grund_t *prev_gr) const
 			}
 			grund_t *to;
 			if(  !gr->get_neighbour(to,road_wt,ribi)  ||  !(to->get_halt()==target_halt)  ||  (gr->get_weg(get_waytype())->get_ribi_maske() & ribi_type(dir))!=0  ||  !target_halt->is_reservable(to,cnv->self)  ) {
+				grund_t *next;
+				if(  choose_pass_standing  &&  gr->get_neighbour(next,road_wt,ribi)  &&  next->get_halt()==target_halt  &&  (gr->get_weg(get_waytype())->get_ribi_maske() & ribi)==0  ) {
+					// a convoi standing on the next tile: we can pass it, so look for a position beyond it
+					for(  uint8 i=1;  i<next->get_top();  i++  ) {
+						if(  road_vehicle_t const* const other = obj_cast<road_vehicle_t>(next->obj_bei(i))  ) {
+							if(  other->get_convoi()!=cnv  &&  other->get_convoi()->is_standing()  ) {
+								return false;
+							}
+						}
+					}
+				}
 				// end of stop: Is it long enough?
 				uint16 tiles = cnv->get_tile_length();
 				while(  tiles>1  ) {
@@ -2042,7 +2079,14 @@ bool road_vehicle_t::choose_route(sint32 &restart_speed, ribi_t::ribi start_dire
 			// now it make sense to search a route
 			route_t target_rt;
 			koord3d next3d = rt->at(index);
-			if(  !target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() )  ) {
+			// first look for a position beyond standing convois (we pass them), then take the first free one
+			choose_pass_standing = true;
+			bool found = target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() );
+			choose_pass_standing = false;
+			if(  !found  ) {
+				found = target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() );
+			}
+			if(  !found  ) {
 				// nothing empty or not route with less than 33 tiles
 				target_halt = halthandle_t();
 				restart_speed = 0;
@@ -2128,7 +2172,8 @@ bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 		uint32 test_index = route_index + 1u;
 
 		// way should be clear for overtaking: we checked previously
-		if(  !cnv->is_overtaking()  ) {
+		// (except the tile after a passed standing convoi, which may be a junction or crossing)
+		if(  !cnv->is_overtaking()  ||  cnv->is_passing_standing_last_tile()  ) {
 			// calculate new direction
 			route_t const& r = *cnv->get_route();
 			koord3d next = route_index < r.get_count() - 1u ? r.at(route_index + 1u) : pos_next;
@@ -2224,6 +2269,10 @@ bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 				}
 				if(  road_vehicle_t const* const car = obj_cast<road_vehicle_t>(obj)  ) {
 					const convoi_t* const ocnv = car->get_convoi();
+					// a convoi standing after the intersection: go on, if we can pass it there
+					if(  ocnv->is_standing()  &&  ocnv->can_be_overtaken()  &&  cnv->get_tiles_to_pass_standing( ocnv, test_index - 1u ) > 0  ) {
+						return true;
+					}
 					sint32 dummy;
 					if(  ocnv->front()->get_route_index() < ocnv->get_route()->get_count()  &&  ocnv->front()->can_enter_tile( dummy, second_check_count + 1 )  ) {
 						return true;
@@ -2252,7 +2301,7 @@ bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 						// not overtaking/being overtake: we need to make a more thought test!
 						if(  road_vehicle_t const* const car = obj_cast<road_vehicle_t>(obj)  ) {
 							convoi_t* const ocnv = car->get_convoi();
-							if(  cnv->can_overtake( ocnv, (ocnv->get_state()==convoi_t::LOADING ? 0 : over->get_max_power_speed()), ocnv->get_length_in_steps()+ocnv->get_vehikel(0)->get_steps())  ) {
+							if(  cnv->can_overtake( ocnv, (ocnv->is_standing() ? 0 : over->get_max_power_speed()), ocnv->get_length_in_steps()+ocnv->get_vehikel(0)->get_steps())  ) {
 								return true;
 							}
 						}
