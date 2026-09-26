@@ -1166,6 +1166,14 @@ void vehicle_t::hop(grund_t* gr)
 			cnv->set_schedule_target( cnv->is_waypoint(ziel) ? ziel : koord3d::invalid );
 		}
 	}
+	// fork, coupling: the joined train's schedule passes the waypoints of its own that the pair passes
+	if(  cnv->is_coupled_primary()  &&  cnv->front()==this  ) {
+		convoi_t *const joined = cnv->get_coupled_convoi().get_rep();
+		schedule_t *const js = joined->get_schedule();
+		if(  js  &&  !js->empty()  &&  js->get_current_entry().pos==get_pos()  &&  joined->is_waypoint( get_pos() )  ) {
+			js->advance();
+		}
+	}
 
 	// this is a required hack for aircrafts! Aircrafts can turn on a single square, and this confuses the previous calculation!
 	if(!check_for_finish  &&  pos_prev==pos_next) {
@@ -3060,7 +3068,7 @@ skip_choose:
 				return false;
 			}
 			route_t path;
-			if(  find_station_track( cnv->get_route(), start_block, halthandle_t(), 0, koord3d::invalid, path )  ) {
+			if(  find_station_track( cnv->get_route(), start_block, halthandle_t(), 0, koord3d::invalid, path, cnv->get_last_waypoint_index( *cnv->get_route(), start_block ) )  ) {
 				route_t *route = cnv->access_route();
 				const route_t old_route( *route );
 				if(  route_through( route, start_block, path, false )  &&  block_reserver( route, start_block+1, next_signal, next_crossing, 0, true, false )  ) {
@@ -3273,7 +3281,7 @@ static bool has_platform_for(halthandle_t halt, uint16 length, waytype_t wt)
 }
 
 
-bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path)
+bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path, uint32 keep_to)
 {
 	path.clear();
 	const uint32 count = route->get_count();
@@ -3333,18 +3341,43 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 		return true;
 	}
 
+	// schedule waypoints ahead stay on the way. Passing: a waypoint on the planned track allows only
+	// that track (as at a stock choose signal), those beyond are kept on the way on. Stopping: the way
+	// up to the last waypoint stays, a free track is searched from there
+	uint32 from = start;
+	if(  !halt.is_bound()  ) {
+		for(  uint32 i=start+1;  i<=planned_end;  i++  ) {
+			if(  cnv->is_pending_waypoint( route->at(i) )  ) {
+				return false;
+			}
+		}
+	}
+	else if(  keep_to!=INVALID_INDEX  &&  keep_to>start  ) {
+		if(  keep_to+1>=count  ) {
+			return false;
+		}
+		for(  uint32 i=start+1;  i<=keep_to;  i++  ) {
+			grund_t const* const gr = welt->lookup( route->at(i) );
+			schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+			if(  sch==NULL  ||  !sch->can_reserve( cnv->self )  ) {
+				return false;
+			}
+		}
+		from = keep_to;
+	}
+
 	// search a free track (stopping: a stop position of halt, passing: up to a signal that applies)
 	track_search_halt = halt;
-	track_search_start = route->at(start);
+	track_search_start = route->at(from);
 	track_search_excluded.clear();
-	const ribi_t::ribi start_dir = ribi_type( route->at(start), route->at(start+1) );
+	const ribi_t::ribi start_dir = ribi_type( route->at(from), route->at(from+1) );
 	bool found = false;
 	// every rejected track is excluded, so this ends after at most as many tries as tracks
 	for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
 		route_t candidate;
 		track_search = halt.is_bound() ? 1 : 2;
 		track_search_block = false;
-		const bool ok = candidate.find_route( welt, route->at(start), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
+		const bool ok = candidate.find_route( welt, route->at(from), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
 		// the way on from there may use any track
 		track_search = 3;
 		bool leads_on = false;
@@ -3357,8 +3390,8 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			}
 			else {
 				route_t on;
-				leads_on = on.calc_route( welt, candidate.back(), route->back(), this, speed, 8888 )!=route_t::no_route
-					&&  on.get_count()>=2  &&  on.at(1)!=candidate.at( candidate.get_count()-2 );
+				leads_on = cnv->calc_route_on( candidate.back(), *route, start, candidate.get_route(), on )
+					&&  on.at(1)!=candidate.at( candidate.get_count()-2 );
 				if(  leads_on  ) {
 					// not much longer than the planned way
 					const uint32 planned_len = count-1-start;
@@ -3372,6 +3405,9 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			break;
 		}
 		if(  leads_on  ) {
+			for(  uint32 i=start;  i<from;  i++  ) {
+				path.append( route->at(i) );
+			}
 			path.append( &candidate );
 			found = true;
 		}
@@ -3482,15 +3518,27 @@ bool rail_vehicle_t::route_through(route_t *route, uint32 start, const route_t &
 	}
 	if(  !stops  &&  path.back()!=route->back()  ) {
 		// passing: from the signal at the end of the track on to the end of the route
-		route_t on;
-		track_search = 3;
-		const bool ok = on.calc_route( welt, path.back(), route->back(), this, speed_to_kmh( cnv->get_min_top_speed() ), 8888 )!=route_t::no_route;
-		track_search = 0;
-		if(  !ok  ||  on.get_count()<2  ||  on.at(1)==path.at( path.get_count()-2 )  ) {
-			return false;
+		bool planned = start+path.get_count() < route->get_count();
+		for(  uint32 k=0;  planned  &&  k<path.get_count();  k++  ) {
+			planned = route->at(start+k)==path.at(k);
 		}
-		for(  uint32 k=1;  k<on.get_count();  k++  ) {
-			new_route.append( on.at(k) );
+		if(  planned  ) {
+			// the planned track: the route on from there stays (with its waypoints)
+			for(  uint32 i=start+path.get_count();  i<route->get_count();  i++  ) {
+				new_route.append( route->at(i) );
+			}
+		}
+		else {
+			route_t on;
+			track_search = 3;
+			const bool ok = cnv->calc_route_on( path.back(), *route, start, path.get_route(), on );
+			track_search = 0;
+			if(  !ok  ||  on.at(1)==path.at( path.get_count()-2 )  ) {
+				return false;
+			}
+			for(  uint32 k=1;  k<on.get_count();  k++  ) {
+				new_route.append( on.at(k) );
+			}
 		}
 	}
 	if(  new_route.get_count() >= INVALID_INDEX  ) {
@@ -3558,7 +3606,9 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		ahead.append( route->at(i) );
 	}
 	leg_end.append( ahead.get_count()-1 );
-	uint8 entry_index = schedule->get_current_stop();
+	// the route runs through the schedule waypoints ahead: the first leg ends at the entry after them
+	const uint8 first_entry = cnv->get_route_entry();
+	uint8 entry_index = first_entry;
 	sint32 enter = -1, end_signal = -1;
 	uint32 scan_from = 1;
 	track_search = 3; // the legs over any track, the tiles are checked below
@@ -3587,7 +3637,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		}
 		// on with the next leg of the schedule
 		entry_index = (entry_index+1) % schedule->get_count();
-		if(  entry_index==schedule->get_current_stop()  ) {
+		if(  entry_index==first_entry  ) {
 			break;
 		}
 		route_t leg;
@@ -3639,7 +3689,9 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		for(  uint32 i=at+1;  stops  &&  i+1<leg_route.get_count();  i++  ) {
 			stops = !is_stop_point( &leg_route, i );
 		}
-		const uint8 leg_entry = (schedule->get_current_stop() + leg) % schedule->get_count();
+		const uint8 leg_entry = (first_entry + leg) % schedule->get_count();
+		// a schedule waypoint ahead after the station boundary stays on the way
+		const uint32 keep_to = leg==0 ? cnv->get_last_waypoint_index( leg_route, at ) : INVALID_INDEX;
 		const halthandle_t halt = stops ? haltestelle_t::get_halt( leg_route.back(), get_owner() ) : halthandle_t();
 		if(  !stops  ||  halt.is_bound()  ) {
 			const uint8 needs = stops ? get_platform_needs( schedule->entries[leg_entry], halt ) : 0;
@@ -3647,9 +3699,9 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			route_t path;
 			// fork, coupling: right behind our partner standing there, if we couple at the stop we go to now
 			bool standing = false;
-			const convoihandle_t partner = stops  &&  leg==0 ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
+			const convoihandle_t partner = stops  &&  leg==0  &&  keep_to==INVALID_INDEX ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
 			const bool to_partner = partner.is_bound()  &&  standing  &&  find_partner_track( &leg_route, at, partner, path );
-			if(  !to_partner  &&  !find_station_track( &leg_route, at, halt, needs, next_stop, path )  ) {
+			if(  !to_partner  &&  !find_station_track( &leg_route, at, halt, needs, next_stop, path, keep_to )  ) {
 				grund_t const* const end_gr = welt->lookup( leg_route.back() );
 				const halthandle_t full_halt = halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t());
 				sig->set_state( roadsign_t::rot );
@@ -3722,11 +3774,14 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 	}
 	schedule_t const* const schedule = cnv->get_schedule();
 	const halthandle_t halt = stops ? haltestelle_t::get_halt( route->back(), get_owner() ) : halthandle_t();
+	// the route runs through the schedule waypoints ahead, those after the boundary stay on the way
+	const schedule_entry_t &entry = schedule->entries[ cnv->get_route_entry() ];
+	const uint32 keep_to = cnv->get_last_waypoint_index( *route, next_block );
 
 	// fork, coupling: right behind our partner in this station; it may have come after we chose a track
 	bool to_partner = false;
 	bool standing = false;
-	const convoihandle_t partner = halt.is_bound() ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
+	const convoihandle_t partner = halt.is_bound()  &&  keep_to==INVALID_INDEX ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
 	if(  partner.is_bound()  &&  standing  ) {
 		const koord3d end = cnv->has_claim() ? cnv->get_claim_end() : route->back();
 		to_partner = leads_to_convoi( end, partner, get_waytype() );
@@ -3737,7 +3792,7 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 			}
 			route_t path;
 			if(  find_partner_track( route, next_block, partner, path )  ) {
-				cnv->set_claim( path, get_track_start( path, get_waytype() ), true, schedule->get_current_entry().pos );
+				cnv->set_claim( path, get_track_start( path, get_waytype() ), true, entry.pos );
 				to_partner = true;
 			}
 		}
@@ -3755,17 +3810,17 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 			return false;
 		}
 		if(  !stops  ||  halt.is_bound()  ) {
-			const uint8 needs = stops ? get_platform_needs( schedule->get_current_entry(), halt ) : 0;
-			const koord3d next_stop = stops ? schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos : koord3d::invalid;
+			const uint8 needs = stops ? get_platform_needs( entry, halt ) : 0;
+			const koord3d next_stop = stops ? schedule->entries[ (cnv->get_route_entry()+1) % schedule->get_count() ].pos : koord3d::invalid;
 			route_t path;
-			if(  !find_station_track( route, next_block, halt, needs, next_stop, path )  ) {
+			if(  !find_station_track( route, next_block, halt, needs, next_stop, path, keep_to )  ) {
 				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, halt );
 				restart_speed = 0;
 				return false;
 			}
 			const uint16 track_start = get_track_start( path, get_waytype() );
 			if(  track_start>0  ) {
-				cnv->set_claim( path, track_start, stops, schedule->get_current_entry().pos );
+				cnv->set_claim( path, track_start, stops, entry.pos );
 			}
 			else if(  !route_through( route, next_block, path, stops )  ) {
 				restart_speed = 0;

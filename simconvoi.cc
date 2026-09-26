@@ -413,9 +413,9 @@ sint8 convoi_t::route_via_claim(route_t &r, uint32 from)
 		nr.append( claim_path[k] );
 	}
 	if(  !claim_stops  ) {
-		// passing: from the platform signal on to the end of the route
+		// passing: from the platform signal on to the end of the route (through the waypoints ahead)
 		route_t cont;
-		if(  !cont.calc_route( welt, claim_path.back(), r.back(), fahr[0], speed_to_kmh(min_top_speed), 8888 )  ||  cont.get_count()<2  ) {
+		if(  !calc_route_on( claim_path.back(), r, j, claim_path, cont )  ) {
 			return -1;
 		}
 		if(  cont.at(1)==claim_path[claim_path.get_count()-2]  ) {
@@ -429,6 +429,109 @@ sint8 convoi_t::route_via_claim(route_t &r, uint32 from)
 	r.clear();
 	r.append( &nr );
 	return 1;
+}
+
+
+uint32 convoi_t::get_last_waypoint_index(const route_t &r, uint32 after) const
+{
+	uint32 last = INVALID_INDEX;
+	if(  schedule_target==koord3d::invalid  ||  schedule==NULL  ||  schedule->empty()  ||  anz_vehikel==0  ) {
+		return last;
+	}
+	const uint8 count = schedule->get_count();
+	uint8 idx = schedule->get_current_stop();
+	for(  uint8 n=0;  n<count  &&  is_waypoint( schedule->entries[idx].pos );  n++  ) {
+		for(  uint32 k=after+1;  k<r.get_count();  k++  ) {
+			if(  r.at(k)==schedule->entries[idx].pos  ) {
+				if(  last==INVALID_INDEX  ||  k>last  ) {
+					last = k;
+				}
+				break;
+			}
+		}
+		idx = (idx+1) % count;
+	}
+	return last;
+}
+
+
+bool convoi_t::is_pending_waypoint(koord3d pos) const
+{
+	if(  schedule_target==koord3d::invalid  ||  schedule==NULL  ||  schedule->empty()  ||  anz_vehikel==0  ) {
+		return false;
+	}
+	const uint8 count = schedule->get_count();
+	uint8 idx = schedule->get_current_stop();
+	for(  uint8 n=0;  n<count  &&  is_waypoint( schedule->entries[idx].pos );  n++  ) {
+		if(  schedule->entries[idx].pos==pos  ) {
+			return true;
+		}
+		idx = (idx+1) % count;
+	}
+	return false;
+}
+
+
+uint8 convoi_t::get_route_entry() const
+{
+	uint8 idx = schedule->get_current_stop();
+	if(  schedule_target==koord3d::invalid  ||  route.empty()  ||  anz_vehikel==0  ) {
+		return idx;
+	}
+	const uint8 count = schedule->get_count();
+	for(  uint8 n=0;  n+1<count;  n++  ) {
+		const koord3d pos = schedule->entries[idx].pos;
+		if(  !is_waypoint( pos )  ||  pos==route.back()  ||  !route.is_contained( pos )  ) {
+			break;
+		}
+		idx = (idx+1) % count;
+	}
+	return idx;
+}
+
+
+bool convoi_t::calc_route_on(koord3d from, const route_t &r, uint32 after, const vector_tpl<koord3d> &covered, route_t &on)
+{
+	on.clear();
+	if(  anz_vehikel==0  ||  r.empty()  ) {
+		return false;
+	}
+	// the waypoints still ahead on r that covered does not pass, in route order
+	vector_tpl<uint32> via;
+	if(  schedule_target!=koord3d::invalid  &&  schedule!=NULL  &&  !schedule->empty()  ) {
+		const uint8 count = schedule->get_count();
+		uint8 idx = schedule->get_current_stop();
+		for(  uint8 n=0;  n<count  &&  is_waypoint( schedule->entries[idx].pos );  n++  ) {
+			const koord3d wp = schedule->entries[idx].pos;
+			for(  uint32 k=after+1;  !covered.is_contained( wp )  &&  k+1<r.get_count();  k++  ) {
+				if(  r.at(k)==wp  ) {
+					uint32 i = 0;
+					while(  i<via.get_count()  &&  via[i]<k  ) {
+						i++;
+					}
+					via.insert_at( i, k );
+					break;
+				}
+			}
+			idx = (idx+1) % count;
+		}
+	}
+	via.append( r.get_count()-1 );
+	on.append( from );
+	FOR( vector_tpl<uint32>, const k, via ) {
+		if(  r.at(k)==on.back()  ) {
+			continue;
+		}
+		route_t leg;
+		if(  leg.calc_route( welt, on.back(), r.at(k), fahr[0], speed_to_kmh(min_top_speed), 8888 )==route_t::no_route  ||  leg.get_count()<2  ) {
+			on.clear();
+			return false;
+		}
+		for(  uint32 i=1;  i<leg.get_count();  i++  ) {
+			on.append( leg.at(i) );
+		}
+	}
+	return on.get_count()>=2;
 }
 
 

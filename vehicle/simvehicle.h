@@ -637,8 +637,11 @@ private:
 	// a free track in the station ahead, searched from route index start (a station boundary or a
 	// choose signal): a stop position of halt (with needs, leading on to next_stop if valid), or with
 	// no halt a track up to a signal that applies at its end from which the way leads on to
-	// route->back(); path runs from route->at(start) to the stop end or to that signal
-	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path);
+	// route->back(); path runs from route->at(start) to the stop end or to that signal.
+	// Schedule waypoints ahead stay on the way: stopping, the path follows the route up to keep_to (the
+	// last of them, convoi_t::get_last_waypoint_index) and the search starts there; passing, a waypoint
+	// on the planned track allows only that track, the way on from another one goes through the rest
+	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path, uint32 keep_to);
 
 	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none
 	uint32 get_onward_length(koord3d from, koord3d next_stop);
@@ -649,7 +652,8 @@ private:
 	bool leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length);
 
 	// path (from find_station_track, starting at route index start) in place of the route from there on;
-	// when the train passes (!stops), on from the end of path to the end of the route
+	// when the train passes (!stops), on from the end of path to the end of the route (through the
+	// schedule waypoints ahead)
 	bool route_through(route_t *route, uint32 start, const route_t &path, bool stops);
 
 	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);

@@ -306,7 +306,8 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   arrival) hold the whole train too.
   At most 255 vehicles together (the vehicle count is a uint8). A primary's load
   (`calc_loading`), sale value (`calc_restwert`) and purchase cost count only its own vehicles. The joined train's schedule follows
-  (`follow_to_stop` on arrival, `advance` on departure, its open timetable slot is marked used too, unless a train of that line that came first can take it;
+  (`follow_to_stop` on arrival, `advance` on departure and at each of its waypoints the pair
+  passes (`vehicle_t::hop`), its open timetable slot is marked used too, unless a train of that line that came first can take it;
   the joined line's timetable never holds the coupled train). After a schedule change of either
   train while coupled (a line edit, or the primary's own schedule sending it elsewhere),
   `resync_coupled_schedule` points the joined train at its entry of the stop the primary is at or
@@ -396,6 +397,15 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   other side's platform of a station with a crossover in one throat only and have to go back.
   `P` at both ends of every track is the normal exit signal of double-track stations too (plan 3.7.1).
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
+- Schedule waypoints: the route runs through the waypoints ahead up to the next stop (stock
+  `drive_to`), and every track choice at a `P` or `LT` keeps them (`find_station_track`). A
+  stopping train keeps the way up to the last waypoint (`get_last_waypoint_index`) and searches a
+  free platform only from there. A passing train with a waypoint on its planned track takes only
+  that track; from another track the way on goes through the waypoints beyond it
+  (`convoi_t::calc_route_on`, also in `route_via_claim` and `route_through`). Platform type, next
+  stop and `claim_stop` come from the stop the route ends at (`get_route_entry`), not from the
+  waypoint entry. Before, a busy planned track sent the train the shortest way on and it skipped
+  them (R8/R12 passing Blazovice skipped the three waypoints to Brno hl.n.).
 - A save for an older version (0.122.6 for the previous fork build, 0.122.0 for the stock game)
   writes `P` two-way (older builds treat it as a plain signal, and a one-way one would make the
   track one-way) and leaves out claims. Such a file is for the older exe only: loaded back into

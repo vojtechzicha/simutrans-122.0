@@ -1083,6 +1083,17 @@ public:
 	// true when route_via_claim would not change the route (no route search needed)
 	bool route_follows_claim(const route_t &r, uint32 from) const;
 
+	// fork: the route runs through the schedule waypoints ahead (drive_to). Route index of the last of
+	// them on r after index after, INVALID_INDEX if none
+	uint32 get_last_waypoint_index(const route_t &r, uint32 after) const;
+	// fork: pos is one of the schedule waypoints ahead
+	bool is_pending_waypoint(koord3d pos) const;
+	// fork: the schedule entry the route ends at: the current one, or the one after the waypoints ahead
+	uint8 get_route_entry() const;
+	// fork: the way from pos to the end of r through the schedule waypoints ahead on r after index
+	// after that covered does not pass; false if there is none
+	bool calc_route_on(koord3d from, const route_t &r, uint32 after, const vector_tpl<koord3d> &covered, route_t &on);
+
 	// SECTION_WAIT_LAST_TRACK: the last free track there is kept, taking it could lock the stations up
 	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK };
 	void set_section_wait(uint8 why, halthandle_t halt);
