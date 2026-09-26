@@ -2561,7 +2561,8 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 	if(sch->has_sign()) {
 		const roadsign_t* rs = bd->find<roadsign_t>();
 		if(  rs->get_desc()->get_wtyp()==get_waytype()  ) {
-			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_min_top_speed()  ) {
+			// fork, mixed traction: the engines that pull on this tile decide
+			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_traction_top_speed( sch->is_electrified() )  ) {
 				// below speed limit
 				return false;
 			}

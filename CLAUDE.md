@@ -178,10 +178,12 @@ running cost, no top speed limit, no smoke (`vehicle_t::idle`) and no start soun
 `min_top_speed`, `sum_running_costs`, `is_electric` and (road convoys) the overtaking speed
 `max_power_speed` for the current mode; `vehicle_t::hop` calls
 it when an electric engine of a mixed convoy enters or leaves catenary (`on_wire`). The bonus speed
-assumes the better choice under wires; the per-tile average of speed limits covers the rest.
+assumes the better choice under wires; `add_running_cost` credits each tile with the speed the
+pulling engines reach with the departure load (`traction_power_speed_*`), so slow unwired sections
+lower the average. Minimum speed signs are checked per tile with `get_traction_top_speed(electrified)`.
 Nothing is saved: the mode is rebuilt on load. The depot offers electric vehicles in a depot without
 catenary once the convoy has another engine and shows the off-wire power and speed; the convoy
-details show what pulls now and mark idle engines; the JSON export has `traction` per convoy and
+details show installed and pulling power and the mode and mark idle engines; the JSON export has `traction` per convoy and
 `idle` per vehicle. Convoys with only one kind of engine behave as stock.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)

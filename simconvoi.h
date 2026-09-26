@@ -238,6 +238,10 @@ private:
 	bool traction_mixed;
 	bool traction_off_wire;        ///< at least one electric engine is on a tile without catenary
 	bool traction_both_under_wire; ///< under wires the other engines pull too
+	sint32 traction_top_speed_under_wire; ///< top speed limit of the engines that pull under wires
+	sint32 traction_top_speed_off_wire;   ///< top speed limit of the engines that pull off wires
+	sint32 traction_power_speed_under_wire; ///< speed reachable under wires with the load at departure
+	sint32 traction_power_speed_off_wire;   ///< speed reachable off wires with the load at departure
 
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
@@ -430,6 +434,18 @@ public:
 
 	/// fork, mixed traction: true, if an electric engine is off wires, so only the other engines pull
 	bool is_traction_off_wire() const { return traction_off_wire; }
+
+	/**
+	 * fork: top speed limit of the engines that pull on a tile with (@p electrified) or without
+	 * catenary; for route checks like minimum speed signs. min_top_speed for other convoys.
+	 */
+	sint32 get_traction_top_speed(bool electrified) const
+	{
+		return traction_mixed ? (electrified ? traction_top_speed_under_wire : traction_top_speed_off_wire) : min_top_speed;
+	}
+
+	/// fork: power (kW, without gear) of the engines that pull now
+	uint32 get_active_power() const;
 
 	/**
 	 * Fork: recalculates which engines pull (power, running costs, top speed) from the tiles of the

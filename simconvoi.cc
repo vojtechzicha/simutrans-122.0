@@ -112,6 +112,8 @@ void convoi_t::init(player_t *player)
 
 	is_electric = false;
 	traction_mixed = traction_off_wire = traction_both_under_wire = false;
+	traction_top_speed_under_wire = traction_top_speed_off_wire = SPEED_UNLIMITED;
+	traction_power_speed_under_wire = traction_power_speed_off_wire = SPEED_UNLIMITED;
 	sum_gesamtweight = sum_weight = 0;
 	sum_running_costs = sum_fixed_costs = sum_gear_and_power = previous_delta_v = 0;
 	sum_power = 0;
@@ -675,7 +677,12 @@ void convoi_t::add_running_cost( const weg_t *weg )
 	total_distance_traveled ++;
 	distance_since_last_stop++;
 
-	sum_speed_limit += speed_to_kmh( min( min_top_speed, speed_limit ));
+	sint32 tile_speed = min( min_top_speed, speed_limit );
+	if(  traction_mixed  ) {
+		// fork: the engines that pull here may not reach their top speed with this load (diesel off wires)
+		tile_speed = min( tile_speed, traction_off_wire ? traction_power_speed_off_wire : traction_power_speed_under_wire );
+	}
+	sum_speed_limit += speed_to_kmh( tile_speed );
 	book( 1, CONVOI_DISTANCE );
 }
 
@@ -3158,6 +3165,13 @@ void convoi_t::recalc_traction(bool choose)
 		traction_both_under_wire = false;
 	}
 
+	if(  traction_mixed  ) {
+		// the limits in both modes, for route checks of tiles with and without catenary
+		sint32 power, costs;
+		calc_traction_sums( false, traction_both_under_wire, power, traction_top_speed_under_wire, costs );
+		calc_traction_sums( true, false, power, traction_top_speed_off_wire, costs );
+	}
+
 	const sint32 old_gear_and_power = sum_gear_and_power;
 	const sint32 old_top_speed = min_top_speed;
 	calc_traction_sums( traction_off_wire, traction_both_under_wire, sum_gear_and_power, min_top_speed, sum_running_costs );
@@ -3177,6 +3191,18 @@ void convoi_t::recalc_traction(bool choose)
 			}
 		}
 	}
+}
+
+
+uint32 convoi_t::get_active_power() const
+{
+	uint32 power = 0;
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		if(  !fahr[i]->is_idle()  ) {
+			power += fahr[i]->get_desc()->get_power();
+		}
+	}
+	return power;
 }
 
 
@@ -3247,6 +3273,11 @@ void convoi_t::calc_speedbonus_kmh()
 			// fork: under wires with the better choice of engines; the average of the speed limits
 			// (sum_speed_limit) accounts for the slower sections off wires
 			speedbonus_kmh = speed_to_kmh( calc_traction_max_speed( total_max_weight, false ) );
+			if(  traction_mixed  ) {
+				// credited per tile in add_running_cost(), so a slow section off wires lowers the average
+				traction_power_speed_under_wire = calc_traction_max_speed( total_max_weight, false );
+				traction_power_speed_off_wire = calc_traction_max_speed( total_max_weight, true );
+			}
 
 			// convoi overtakers use current actual weight for achievable speed
 			if(  front()->get_overtaker()  ) {

@@ -164,7 +164,8 @@ void convoi_detail_t::init(convoihandle_t cnv)
 			for(  uint8 i=0;  i<3;  i++  ) {
 				cbuffer_t buf;
 				buf.printf( translator::translate("Leistung: %d kW"), cnv->get_sum_power() );
-				buf.printf( ", %s", translator::translate(traction_texts[i]) );
+				buf.append(" ");
+				buf.printf( translator::translate("(pulling %d kW, %s)"), cnv->get_sum_power(), translator::translate(traction_texts[i]) );
 				w = max( w, proportional_string_width(buf) );
 			}
 			label_power.set_min_width( w );
@@ -215,9 +216,10 @@ void convoi_detail_t::update_labels()
 	label_odometer.update();
 	label_power.buf().printf( translator::translate("Leistung: %d kW"), cnv->get_sum_power() );
 	if(  cnv->has_mixed_traction()  ) {
-		// fork: which engines pull now
-		label_power.buf().append(", ");
-		label_power.buf().append( translator::translate( cnv->is_traction_off_wire() ? "off wires" : (cnv->get_traction_both_under_wire() ? "under wires, all engines" : "under wires, electric only") ) );
+		// fork: installed power first, then the power of the engines that pull now and why
+		label_power.buf().append(" ");
+		label_power.buf().printf( translator::translate("(pulling %d kW, %s)"), cnv->get_active_power(),
+			translator::translate( cnv->is_traction_off_wire() ? "off wires" : (cnv->get_traction_both_under_wire() ? "under wires, all engines" : "under wires, electric only") ) );
 	}
 	label_power.update();
 	label_length.buf().printf("%s %i %s %i", translator::translate("Vehicle count:"), cnv->get_vehicle_count(), translator::translate("Station tiles:"), cnv->get_tile_length());
