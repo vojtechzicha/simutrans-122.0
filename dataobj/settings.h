@@ -170,6 +170,14 @@ private:
 	/// with the world calendar active: seasons follow calendar months instead of game months
 	bool calendar_seasons;
 
+	/**
+	 * Fork, with the world calendar: a train departing a stop inside a choose area waits while
+	 * a passing train arrives within this many calendar minutes (0 = never), at most for
+	 * passing_hold_max_minutes at one stop.
+	 */
+	uint16 passing_hold_minutes;
+	uint16 passing_hold_max_minutes;
+
 	std::string filename;
 
 	bool beginner_mode;
@@ -440,6 +448,8 @@ public:
 
 	sint32 get_minutes_per_month() const { return minutes_per_month; }
 	bool get_calendar_seasons() const { return calendar_seasons; }
+	uint16 get_passing_hold_minutes() const { return passing_hold_minutes; }
+	uint16 get_passing_hold_max_minutes() const { return passing_hold_max_minutes; }
 
 	void set_filename(const char *n) {filename=n;}
 	const char* get_filename() const { return filename.c_str(); }

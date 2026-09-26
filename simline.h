@@ -47,6 +47,9 @@ protected:
 
 	bool withdraw;
 
+	// fork, rail: all convois of the line are marked as Hold (see convoi_t::is_hold_marked)
+	bool hold_marker;
+
 private:
 	static karte_ptr_t welt;
 	plainstring name;
@@ -221,6 +224,9 @@ public:
 	void set_withdraw( bool yes_no );
 
 	bool get_withdraw() const { return withdraw; }
+
+	bool get_hold_marker() const { return hold_marker; }
+	void set_hold_marker(bool on) { hold_marker = on; }
 
 	player_t *get_owner() const {return player;}
 

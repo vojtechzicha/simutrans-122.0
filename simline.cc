@@ -47,6 +47,7 @@ simline_t::simline_t(player_t* player, linetype type)
 	this->schedule = NULL;
 	this->player = player;
 	withdraw = false;
+	hold_marker = false;
 	state_color = SYSCOL_TEXT;
 	create_schedule();
 }
@@ -60,6 +61,7 @@ simline_t::simline_t(player_t* player, linetype type, loadsave_t *file)
 	this->schedule = NULL;
 	this->player = player;
 	withdraw = false;
+	hold_marker = false;
 	create_schedule();
 	rdwr(file);
 	// now self has the right id but the this-pointer is not assigned to the quickstone handle yet
@@ -513,6 +515,11 @@ void simline_t::rdwr(loadsave_t *file)
 				file->rdwr_longlong(last_departure_slot[i]);
 			}
 		}
+	}
+
+	if(  file->is_version_atleast(122, 5)  ) {
+		// fork: Hold marker
+		file->rdwr_bool(hold_marker);
 	}
 
 	// otherwise initialized to zero if loading ...

@@ -65,6 +65,7 @@ public:
 			case schedule_entry_t::all_off:     return "A";
 			case schedule_entry_t::only_load:   return "L";
 			case schedule_entry_t::only_unload: return "U";
+			case schedule_entry_t::hold:        return "H";
 			default:                            return "";
 		}
 	}
@@ -76,6 +77,7 @@ public:
 			case schedule_entry_t::all_off:     return color_idx_to_rgb( COL_ORANGE );
 			case schedule_entry_t::only_load:   return color_idx_to_rgb( COL_DARK_GREEN );
 			case schedule_entry_t::only_unload: return color_idx_to_rgb( COL_DARK_BLUE );
+			case schedule_entry_t::hold:        return color_idx_to_rgb( COL_DARK_PURPLE );
 			default:                            return color_idx_to_rgb( COL_GREY3 );
 		}
 	}
@@ -895,7 +897,9 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 			if(  line >= 0  &&  line < schedule->get_count()  ) {
 				const uint8 count = schedule_entry_t::max_stop_type;
 				schedule_entry_t &entry = schedule->entries[line];
-				entry.stop_type = (uint8)( (entry.stop_type + (gui_schedule_entry_t::is_toggle_backwards(p.i) ? count-1 : 1)) % count );
+				do {
+					entry.stop_type = (uint8)( (entry.stop_type + (gui_schedule_entry_t::is_toggle_backwards(p.i) ? count-1 : 1)) % count );
+				} while(  entry.stop_type == schedule_entry_t::hold  &&  !schedule->allows_hold()  );
 				schedule->set_current_stop( line );
 				update_selection();
 			}

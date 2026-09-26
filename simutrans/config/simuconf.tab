@@ -601,6 +601,14 @@ bits_per_month = 20
 #minutes_per_month = 0
 #calendar_seasons = 1
 
+# Fork, needs the calendar: a train about to leave a stop inside a choose area (between a
+# choose signal and an end-of-choose sign) waits while a train passing that station without
+# stopping would arrive within passing_hold_minutes (0 = never wait); passenger trains wait
+# only for passing passenger trains. It waits at most passing_hold_max_minutes per stop.
+# Saved with the game.
+#passing_hold_minutes = 5
+#passing_hold_max_minutes = 20
+
 # Fork: show the list of doubled pak objects at start (1, stock) or only log it (0)
 #warn_doubled_objects = 1
 

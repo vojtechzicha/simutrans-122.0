@@ -144,7 +144,8 @@ void convoi_info_t::init(convoihandle_t cnv)
 	}
 	end_table();
 
-	add_table(4,1)->set_force_equal_columns(true);
+	const bool is_rail = cnv->get_vehicle_count()>0  &&  (cnv->front()->get_typ()==obj_t::rail_vehicle  ||  cnv->front()->get_typ()==obj_t::monorail_vehicle  ||  cnv->front()->get_typ()==obj_t::maglev_vehicle  ||  cnv->front()->get_typ()==obj_t::narrowgauge_vehicle);
+	add_table(is_rail ? 5 : 4,1)->set_force_equal_columns(true);
 	{
 		// this convoi doesn't belong to an AI
 		button.init(button_t::roundbox | button_t::flexible, "Fahrplan");
@@ -161,6 +162,13 @@ void convoi_info_t::init(convoihandle_t cnv)
 		no_load_button.set_tooltip("No goods are loaded onto this convoi.");
 		no_load_button.add_listener(this);
 		add_component(&no_load_button);
+
+		if(  is_rail  ) {
+			hold_button.init(button_t::roundbox_state | button_t::flexible, "Hold");
+			hold_button.set_tooltip("Hold marker tooltip");
+			hold_button.add_listener(this);
+			add_component(&hold_button);
+		}
 
 		follow_button.init(button_t::roundbox_state | button_t::flexible, "follow me");
 		follow_button.set_tooltip("Follow the convoi on the map.");
@@ -303,8 +311,13 @@ void convoi_info_t::update_labels()
 	// fork: when this convoy is going to leave (timetable slot, or the end of its maximum wait)
 	sint64 slot = 0;
 	bool latest = false;
-	const bool show_departure = cnv->get_planned_departure( slot, latest );
-	if(  show_departure  ) {
+	const convoihandle_t passing = cnv->get_passing_hold_for();
+	const bool show_departure = passing.is_bound()  ||  cnv->get_planned_departure( slot, latest );
+	if(  passing.is_bound()  ) {
+		// fork: waiting at the stop for a passing train to go by
+		departure_label.buf().printf( translator::translate("Waiting for %s to pass"), passing->get_name() );
+	}
+	else if(  show_departure  ) {
 		const sint64 now = welt->get_calendar_minutes();
 		const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
 		const karte_t::calendar_date_t today = welt->get_calendar_date( now );
@@ -376,6 +389,8 @@ void convoi_info_t::draw(scr_coord pos, scr_size size)
 		}
 		no_load_button.pressed = cnv->get_no_load();
 		no_load_button.enable();
+		hold_button.pressed = cnv->get_hold_marker();
+		hold_button.enable();
 	}
 	else {
 		if(  line_bound  ) {
@@ -387,6 +402,8 @@ void convoi_info_t::draw(scr_coord pos, scr_size size)
 		button.disable();
 		go_home_button.disable();
 		no_load_button.disable();
+		hold_button.pressed = cnv->get_hold_marker();
+		hold_button.disable();
 	}
 
 	// update button & labels
@@ -469,6 +486,11 @@ bool convoi_info_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 
 		if(  comp == &no_load_button    &&    !route_search_in_progress  ) {
 			cnv->call_convoi_tool( 'n', NULL );
+			return true;
+		}
+
+		if(  comp == &hold_button  ) {
+			cnv->call_convoi_tool( 'h', NULL );
 			return true;
 		}
 

@@ -1573,9 +1573,15 @@ Only load
 Only load
 Only unload
 Only unload
+Hold
+Hold
+Hold marker tooltip
+Let passing trains overtake: at the choose signal of a station not in the schedule the train steps into a free platform when a passing train comes, and waits there for it.
+Waiting for %s to pass
+Waiting for %s to pass
 no boarding
 no boarding
 Stop type tooltip
-Regular: load, unload, transfer. Terminal: everything off, load, no transfers, nothing rides through. All off: everything off, no loading. Only load: no unloading. Only unload: no loading.
+Regular: load, unload, transfer. Terminal: everything off, load, no transfers, nothing rides through. All off: everything off, no loading. Only load: no unloading. Only unload: no loading. Hold: no loading or unloading, only waits for passing trains.
 Also at (min)
 Also at (min)

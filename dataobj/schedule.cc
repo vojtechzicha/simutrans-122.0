@@ -259,7 +259,7 @@ void schedule_t::rdwr(loadsave_t *file)
 			if(file->is_version_atleast(122, 3)) {
 				// fork: stop type
 				file->rdwr_byte(entries[i].stop_type);
-				if(  entries[i].stop_type >= schedule_entry_t::max_stop_type  ) {
+				if(  entries[i].stop_type >= schedule_entry_t::max_stop_type  ||  (entries[i].stop_type == schedule_entry_t::hold  &&  !allows_hold())  ) {
 					entries[i].stop_type = schedule_entry_t::regular;
 				}
 			}
@@ -515,7 +515,27 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		}
 		entries.append(entry);
 	}
+	sanitize_stop_types();
 	return true;
+}
+
+
+bool schedule_t::allows_hold() const
+{
+	const waytype_t wt = get_waytype();
+	return wt == track_wt  ||  wt == tram_wt  ||  wt == monorail_wt  ||  wt == maglev_wt  ||  wt == narrowgauge_wt;
+}
+
+
+void schedule_t::sanitize_stop_types()
+{
+	if(  !allows_hold()  ) {
+		FOR( minivec_tpl<schedule_entry_t>, &entry, entries ) {
+			if(  entry.stop_type == schedule_entry_t::hold  ) {
+				entry.stop_type = schedule_entry_t::regular;
+			}
+		}
+	}
 }
 
 
@@ -636,6 +656,7 @@ const char *schedule_entry_t::get_stop_type_name(uint8 stop_type)
 		case all_off:     return "All off";
 		case only_load:   return "Only load";
 		case only_unload: return "Only unload";
+		case hold:        return "Hold";
 		default:          return "Regular stop";
 	}
 }

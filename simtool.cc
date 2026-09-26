@@ -6906,6 +6906,10 @@ bool tool_change_convoi_t::init( player_t *player )
 			cnv->set_no_load( cnv->get_withdraw() );
 			break;
 
+		case 'h': // fork: change Hold marker (step aside for passing trains)
+			cnv->set_hold_marker( !cnv->get_hold_marker() );
+			break;
+
 		case 'd': // goto depot
 		{
 			const char* msg = cnv->send_to_depot(is_local_execution());
@@ -7162,6 +7166,14 @@ bool tool_change_line_t::init( player_t *player )
 			{
 				if (line.is_bound()) {
 					line->set_withdraw( atoi(p) );
+				}
+			}
+			break;
+
+		case 'h': // fork: change Hold marker of all convois of the line
+			{
+				if (line.is_bound()) {
+					line->set_hold_marker( atoi(p) != 0 );
 				}
 			}
 			break;

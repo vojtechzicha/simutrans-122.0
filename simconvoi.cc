@@ -123,6 +123,10 @@ void convoi_t::init(player_t *player)
 	withdraw = false;
 	has_obsolete = false;
 	no_load = false;
+	hold_marker = false;
+	hold_divert = false;
+	passing_hold_since = 0;
+	passing_hold_released = false;
 	wait_lock = 0;
 	arrived_time = 0;
 
@@ -1001,6 +1005,9 @@ sync_result convoi_t::sync_step(uint32 delta_t)
  */
 bool convoi_t::drive_to()
 {
+	// a new route to the schedule's next stop: no platform detour to let a train by any more
+	hold_divert = false;
+
 	if(  anz_vehikel>0  ) {
 
 		// unreserve all tiles that are covered by the train but do not contain one of the wagons,
@@ -1283,6 +1290,7 @@ void convoi_t::step()
 				if(  v->can_enter_tile( restart_speed, 0 )  ) {
 					// can reserve new block => drive on
 					state = (steps_driven>=0) ? LEAVING_DEPOT : DRIVING;
+					clear_passing_hold();
 					if(haltestelle_t::get_halt(v->get_pos(),owner).is_bound()) {
 						v->play_sound();
 					}
@@ -1579,6 +1587,17 @@ void convoi_t::ziel_erreicht()
 	// check, what is at destination!
 	const grund_t *gr = welt->lookup(v->get_pos());
 	depot_t *dp = gr->get_depot();
+
+	if(  hold_divert  &&  !dp  ) {
+		// fork: at the platform we took to let a passing train go by; wait there (see
+		// rail_vehicle_t::is_held_for_passing_train), then go on to the next stop of the schedule
+		hold_divert = false;
+		clear_passing_hold();
+		akt_speed = 0;
+		state = ROUTING_1;
+		wait_lock = 0;
+		return;
+	}
 
 	if(dp) {
 		// ok, we are entering a depot
@@ -2576,10 +2595,22 @@ void convoi_t::rdwr(loadsave_t *file)
 		file->rdwr_short( next_reservation_index );
 	}
 
+	if(  file->is_version_atleast(122, 5)  ) {
+		// fork: Hold marker, on the way to a platform to let a passing train go by
+		file->rdwr_bool( hold_marker );
+		file->rdwr_bool( hold_divert );
+	}
+
 	if(  file->is_loading()  ) {
 		reserve_route();
 		recalc_catg_index();
 	}
+}
+
+
+bool convoi_t::is_hold_marked() const
+{
+	return hold_marker  ||  (line.is_bound()  &&  line->get_hold_marker());
 }
 
 
