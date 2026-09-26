@@ -1051,6 +1051,7 @@ public:
 	// fork, rail: track claimed at the next station of a single-track section (see claim_path)
 	bool has_claim() const { return !claim_path.empty(); }
 	koord3d get_claim_boundary() const { return claim_path.empty() ? koord3d::invalid : claim_path[0]; }
+	koord3d get_claim_end() const { return claim_path.empty() ? koord3d::invalid : claim_path.back(); }
 	bool is_claimed_tile(koord3d pos) const;
 	// path: from the station boundary through the track; reserves its tiles from first on;
 	// for_stop: the schedule stop whose way enters that station

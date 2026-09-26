@@ -269,6 +269,12 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   choose signal `reserve_to_partner` routes to the partner's platform (`couple_search` mode of
   `check_next_tile`/`is_target`); a partner still running in (route reserved into the stop) makes
   the train wait at red and try again; no way there falls back to the stock choice.
+  Single-track stations (`P`/`LT`): at the `P` (only when the partner already stands at the stop
+  the train goes to now, i.e. no schedule stop in between) and again at the `LT` (the partner may
+  have come after the claim) `find_partner_track` claims the platform right behind the standing
+  partner (`couple_in_station`: the search does not pass a signal or boundary that applies; no
+  platform tile left behind it, or its track taken: the stock choice). At the `LT` a train also waits
+  while its partner is DRIVING into the stop (at most 30 calendar minutes, `section_waited_long`).
 - Different platforms of the same stop (no choose signal, or no way over): they couple anyway. The
   joining train's vehicles move to the track behind the primary, the way the primary came in
   (`couple`, needs those tiles free of other trains and long enough); otherwise they keep waiting.

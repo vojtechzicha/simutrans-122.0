@@ -2472,6 +2472,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	couple_in_station = false;
 	section_after_pos = koord3d::invalid;
 	section_after_stop = 0;
 	section_after_found = false;
@@ -2530,6 +2531,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	couple_in_station = false;
 	section_after_pos = koord3d::invalid;
 	section_after_stop = 0;
 	section_after_found = false;
@@ -2676,6 +2678,10 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 
 	if(  couple_search.is_bound()  ) {
 		// fork, coupling: the way to our partner, over any track up to the end of choose
+		if(  couple_in_station  &&  track_search_block  ) {
+			// not on past a signal or station boundary
+			return false;
+		}
 		if(  sch->has_sign()  ) {
 			const roadsign_t* rs = bd->find<roadsign_t>();
 			if(  rs  &&  rs->get_desc()->get_wtyp()==get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA)  ) {
@@ -2757,7 +2763,19 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 	}
 	if(  couple_search.is_bound()  ) {
 		// fork, coupling: a tile of our partner standing there, or the end of its route into the stop
-		return couple_goal!=koord3d::invalid ? gr->get_pos()==couple_goal : sch1->get_reserved_convoi()==couple_search;
+		if(  couple_goal!=koord3d::invalid ? gr->get_pos()==couple_goal : sch1->get_reserved_convoi()==couple_search  ) {
+			return true;
+		}
+		if(  couple_in_station  ) {
+			// in a station (find_partner_track): never search on past a signal or boundary that applies
+			track_search_block = false;
+			if(  prev_gr  ) {
+				const ribi_t::ribi dir = ribi_type( prev_gr->get_pos(), gr->get_pos() );
+				const roadsign_t *lt = get_station_boundary( gr );
+				track_search_block = signal_applies( gr, dir )  ||  (lt  &&  lt->applies_to( dir ));
+			}
+		}
+		return false;
 	}
 	if(  detour_target!=koord3d::invalid  ) {
 		// way through a choose area: back on the planned route at the end of choose tile,
@@ -3340,6 +3358,66 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 }
 
 
+bool rail_vehicle_t::find_partner_track(const route_t *route, uint32 start, convoihandle_t partner, route_t &path)
+{
+	path.clear();
+	if(  start+1 >= route->get_count()  ) {
+		return false;
+	}
+	route_t target_rt;
+	couple_search = partner;
+	couple_goal = koord3d::invalid;
+	couple_in_station = true;
+	track_search_block = false;
+	const ribi_t::ribi start_dir = ribi_type( route->at(start), route->at(start+1) );
+	const bool found = target_rt.find_route( welt, route->at(start), this, speed_to_kmh( cnv->get_min_top_speed() ), start_dir, welt->get_settings().get_max_choose_route_steps() );
+	couple_search = convoihandle_t();
+	couple_in_station = false;
+	track_search_block = false;
+	if(  !found  ||  target_rt.get_count()<3  ) {
+		return false;
+	}
+	// up to the tile right behind it
+	target_rt.remove_koord_from( target_rt.get_count()-2 );
+	// on its platform (not in the throat), and its track behind it must be free (the throat is reserved at the station boundary)
+	const uint16 track_start = get_track_start( target_rt, get_waytype() );
+	grund_t const* const end_gr = welt->lookup( target_rt.back() );
+	if(  track_start==0  ||  end_gr==NULL  ||  !end_gr->is_halt()  ) {
+		return false;
+	}
+	for(  uint32 i=track_start;  i<target_rt.get_count();  i++  ) {
+		grund_t const* const gr = welt->lookup( target_rt.at(i) );
+		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+		if(  sch==NULL  ||  !sch->can_reserve( cnv->self )  ) {
+			return false;
+		}
+	}
+	path.append( &target_rt );
+	return true;
+}
+
+
+// the track at pos leads on to a tile reserved by c
+static bool leads_to_convoi(koord3d pos, convoihandle_t c, waytype_t wt)
+{
+	grund_t *gr = world()->lookup( pos );
+	weg_t const* const way = gr ? gr->get_weg( wt ) : NULL;
+	if(  way==NULL  ) {
+		return false;
+	}
+	for(  int r=0;  r<4;  r++  ) {
+		grund_t *to;
+		if(  (way->get_ribi_unmasked() & ribi_t::nsew[r])  &&  gr->get_neighbour( to, wt, ribi_t::nsew[r] )  ) {
+			schiene_t const* const sch = (schiene_t const*)to->get_weg( wt );
+			if(  sch  &&  sch->get_reserved_convoi()==c  ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 uint32 rail_vehicle_t::get_onward_length(koord3d from, koord3d next_stop)
 {
 	route_t on;
@@ -3539,7 +3617,11 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			const uint8 needs = stops ? get_platform_needs( schedule->entries[leg_entry], halt ) : 0;
 			const koord3d next_stop = stops ? schedule->entries[ (leg_entry+1) % schedule->get_count() ].pos : koord3d::invalid;
 			route_t path;
-			if(  !find_station_track( &leg_route, at, halt, needs, next_stop, path )  ) {
+			// fork, coupling: right behind our partner standing there, if we couple at the stop we go to now
+			bool standing = false;
+			const convoihandle_t partner = stops  &&  leg==0 ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
+			const bool to_partner = partner.is_bound()  &&  standing  &&  find_partner_track( &leg_route, at, partner, path );
+			if(  !to_partner  &&  !find_station_track( &leg_route, at, halt, needs, next_stop, path )  ) {
 				grund_t const* const end_gr = welt->lookup( leg_route.back() );
 				const halthandle_t full_halt = halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t());
 				sig->set_state( roadsign_t::rot );
@@ -3550,10 +3632,11 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			}
 			const uint16 track_start = get_track_start( path, get_waytype() );
 			if(  track_start>0  ) {
-				// the last free track there only if the trains there can still get away (3.8)
+				// the last free track there only if the trains there can still get away (3.8);
+				// behind our partner we take no track of its own
 				grund_t const* const track_gr = welt->lookup( path.at(track_start) );
 				const halthandle_t track_halt = track_gr ? track_gr->get_halt() : halthandle_t();
-				if(  keeps_last_track( track_halt, path.at(track_start), next_block )  ) {
+				if(  !to_partner  &&  keeps_last_track( track_halt, path.at(track_start), next_block )  ) {
 					sig->set_state( roadsign_t::rot );
 					cnv->set_section_wait( convoi_t::SECTION_WAIT_LAST_TRACK, track_halt );
 					restart_speed = 0;
@@ -3591,6 +3674,9 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 }
 
 
+static bool section_waited_long(const convoi_t *c);
+
+
 /* fork: entering a station from a single-track line: into the claimed track when the throat is free;
  * a train without a claim chooses a track here
  */
@@ -3602,17 +3688,44 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 		// claimed for another station: out of date
 		cnv->release_claim( true );
 	}
-	if(  !cnv->has_claim()  ) {
+	bool stops = true;
+	for(  uint32 i=next_block+1;  stops  &&  i+1<route->get_count();  i++  ) {
+		stops = !is_stop_point( route, i );
+	}
+	schedule_t const* const schedule = cnv->get_schedule();
+	const halthandle_t halt = stops ? haltestelle_t::get_halt( route->back(), get_owner() ) : halthandle_t();
+
+	// fork, coupling: right behind our partner in this station; it may have come after we chose a track
+	bool to_partner = false;
+	bool standing = false;
+	const convoihandle_t partner = halt.is_bound() ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
+	if(  partner.is_bound()  &&  standing  ) {
+		const koord3d end = cnv->has_claim() ? cnv->get_claim_end() : route->back();
+		to_partner = leads_to_convoi( end, partner, get_waytype() );
+		if(  !to_partner  ) {
+			if(  !cnv->is_waiting()  ) {
+				restart_speed = -1;
+				return false;
+			}
+			route_t path;
+			if(  find_partner_track( route, next_block, partner, path )  ) {
+				cnv->set_claim( path, get_track_start( path, get_waytype() ), true, schedule->get_current_entry().pos );
+				to_partner = true;
+			}
+		}
+	}
+	else if(  partner.is_bound()  &&  partner->get_state()==convoi_t::DRIVING  &&  !section_waited_long( cnv )  ) {
+		// our partner is still running in: we can follow it once it stands
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_ENTRY, halthandle_t() );
+		restart_speed = 0;
+		return false;
+	}
+
+	if(  !cnv->has_claim()  &&  !to_partner  ) {
 		if(  !cnv->is_waiting()  ) {
 			restart_speed = -1;
 			return false;
 		}
-		bool stops = true;
-		for(  uint32 i=next_block+1;  stops  &&  i+1<route->get_count();  i++  ) {
-			stops = !is_stop_point( route, i );
-		}
-		schedule_t const* const schedule = cnv->get_schedule();
-		const halthandle_t halt = stops ? haltestelle_t::get_halt( route->back(), get_owner() ) : halthandle_t();
 		if(  !stops  ||  halt.is_bound()  ) {
 			const uint8 needs = stops ? get_platform_needs( schedule->get_current_entry(), halt ) : 0;
 			const koord3d next_stop = stops ? schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos : koord3d::invalid;

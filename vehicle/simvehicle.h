@@ -562,6 +562,13 @@ private:
 	// when it stands there, else couple_goal (the end of its route); unbound while no such search runs
 	convoihandle_t couple_search;
 	koord3d couple_goal;
+	// with couple_search: the search stays in the station, not past a signal or station boundary that applies
+	bool couple_in_station;
+
+	// fork, coupling: from the station boundary at route index start, the way to our partner standing in
+	// that station, ending right behind it on its platform; false when there is none, there is no platform
+	// left behind it, or its track behind it is taken
+	bool find_partner_track(const route_t *route, uint32 start, convoihandle_t partner, route_t &path);
 
 	// fork, coupling: at a choose signal, the way to the platform of our partner:
 	// 1 reserved, 0 wait at red (partner still running in, or the way is taken), -1 no way there
