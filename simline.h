@@ -145,7 +145,8 @@ public:
 	/**
 	 * Timetable (fork): the slot that is open right now for this entry, if any.
 	 * Slots start at departure_offset minutes after midnight, every departure_interval
-	 * minutes, and stay open for half an interval. Returns false outside a slot.
+	 * minutes, and stay open for the entry's departure window (default half the gap to the
+	 * next slot). Returns false outside a slot.
 	 */
 	static bool get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot);
 

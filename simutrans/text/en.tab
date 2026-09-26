@@ -1595,6 +1595,10 @@ Stop type tooltip
 Regular: load, unload, transfer. Terminal: everything off, load, no transfers, nothing rides through. All off: everything off, no loading. Only load: no unloading. Only unload: no loading. Hold: no loading or unloading, only waits for passing trains.
 Also at (min)
 Also at (min)
+Leave up to (min late)
+Leave up to (min late)
+(half the gap)
+(half the gap)
 idle
 idle
 off wires

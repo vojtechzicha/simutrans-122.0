@@ -61,6 +61,9 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_label_t lb_interval, lb_offset;
 	gui_numberinput_t numimp_interval, numimp_offset;
 	gui_label_minw_t lb_interval_fmt, lb_offset_fmt; // the same as hours and minutes
+	gui_label_t lb_window;           // how late a convoy may still leave in its slot
+	gui_numberinput_t numimp_window;
+	gui_label_minw_t lb_window_fmt;  // "auto" while it is half the gap to the next slot
 	gui_label_t lb_extra;            // more departures per cycle, as a comma separated list
 	gui_textinput_t input_extra;
 	char extra_buf[64];

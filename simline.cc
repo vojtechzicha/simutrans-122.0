@@ -233,7 +233,7 @@ void simline_t::keep_slots_across_edit(const schedule_t *old_schedule, const sch
 /*
  * Timetable slots (fork). A day is divided into cycles of departure_interval minutes starting
  * at midnight; within every cycle the entry's offsets are departure slots (all below 1440).
- * A slot stays open for half the gap to the following slot.
+ * A slot stays open for the entry's departure window, by default half the gap to the following slot.
  */
 
 // splits calendar minutes into day and minute of the day
@@ -312,7 +312,7 @@ static sint64 first_departure_slot(const schedule_entry_t &entry, sint64 now)
 	sint64 prev;
 	if(  slot_at_or_before( entry, offsets, n, minute_of_day, prev )  ) {
 		const sint64 gap = slot_after( entry, offsets, n, prev ) - prev;
-		if(  (minute_of_day - prev) * 2 <= gap  ) {
+		if(  entry.is_slot_open( minute_of_day - prev, gap )  ) {
 			return day * 1440 + prev;
 		}
 	}
@@ -384,7 +384,7 @@ bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &s
 		return false;
 	}
 	const sint64 gap = slot_after( entry, offsets, n, prev ) - prev;
-	if(  (minute_of_day - prev) * 2 > gap  ) {
+	if(  !entry.is_slot_open( minute_of_day - prev, gap )  ) {
 		// the slot is closed again, wait for the next one
 		return false;
 	}

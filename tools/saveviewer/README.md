@@ -58,7 +58,8 @@ while it rides along and right after it was uncoupled. `max_speed`, `sum_power`,
 `uncouples_at` is the stop where a coupled pair parts (null: not coupled, or they stay coupled).
 `running_late` is set for a train that missed its coupling.
 Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
-null) and `couple_max_wait` in calendar minutes. Schedules have `no_standing` and `no_overcrowding`
+null) and `couple_max_wait` in calendar minutes, and `departure_window`: how many minutes after a
+timetable slot a train may still leave in it (null: half the gap to the next slot). Schedules have `no_standing` and `no_overcrowding`
 (passenger vehicles take no standing or no overcrowded passengers; no standing implies no overcrowding).
 
 What the convoy window shows under the destination is in `waiting_for` (null, or an object with

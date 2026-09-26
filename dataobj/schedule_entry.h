@@ -33,7 +33,10 @@ public:
 	/// more departure offsets per cycle besides departure_offset (fork)
 	static const uint8 MAX_EXTRA_OFFSETS = 7;
 
-	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), stop_type(regular), couple_line_id(0), couple_max_wait(0) {}
+	/// departure_window value: a slot stays open for half the gap to the next slot (fork)
+	static const uint16 WINDOW_AUTO = 0xFFFF;
+
+	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), departure_window(WINDOW_AUTO), stop_type(regular), couple_line_id(0), couple_max_wait(0) {}
 
 	schedule_entry_t(koord3d const& pos, uint const minimum_loading, sint8 const waiting_time_shift, uint16 const waiting_time = 0, uint16 const departure_interval = 0, uint16 const departure_offset = 0, uint8 const stop_type = regular) :
 		pos(pos),
@@ -43,6 +46,7 @@ public:
 		departure_interval(departure_interval),
 		departure_offset(departure_offset),
 		extra_offset_count(0),
+		departure_window(WINDOW_AUTO),
 		stop_type(stop_type < max_stop_type ? stop_type : (uint8)regular),
 		couple_line_id(0),
 		couple_max_wait(0)
@@ -104,6 +108,22 @@ public:
 	/// keeps only valid extra offsets: below the interval, not the main offset, unique, sorted
 	void set_extra_offsets(const uint16 *offsets, uint8 count);
 
+	/**
+	 * How many calendar minutes after its slot a convoy may still leave in it (fork);
+	 * WINDOW_AUTO = half the gap to the following slot. Never past the following slot.
+	 */
+	uint16 departure_window;
+
+	bool has_departure_window() const { return departure_window != WINDOW_AUTO; }
+
+	/// is a slot still open this many minutes after it, with the given gap to the following slot?
+	bool is_slot_open(sint64 minutes_since_slot, sint64 gap) const {
+		return has_departure_window() ? minutes_since_slot <= departure_window : minutes_since_slot * 2 <= gap;
+	}
+
+	/// the automatic window in minutes: half the shortest gap between two slots
+	uint16 get_auto_departure_window() const;
+
 	/// one of stop_type_t
 	uint8 stop_type;
 
@@ -140,6 +160,7 @@ inline bool operator ==(const schedule_entry_t &a, const schedule_entry_t &b)
 	return a.pos == b.pos  &&  a.minimum_loading == b.minimum_loading  &&  a.waiting_time_shift == b.waiting_time_shift  &&  a.waiting_time == b.waiting_time
 		&&  a.departure_interval == b.departure_interval  &&  a.departure_offset == b.departure_offset  &&  a.stop_type == b.stop_type
 		&&  a.extra_offset_count == b.extra_offset_count  &&  memcmp( a.extra_offsets, b.extra_offsets, a.extra_offset_count * sizeof(uint16) ) == 0
+		&&  a.departure_window == b.departure_window
 		&&  a.couple_line_id == b.couple_line_id  &&  a.couple_max_wait == b.couple_max_wait;
 }
 

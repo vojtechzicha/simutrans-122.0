@@ -129,8 +129,12 @@ Timetable (savegame 122.2, offsets list 122.4): a stop entry may have `departure
 `departure_offset` in calendar minutes, plus up to seven `extra_offsets` for lines that leave
 several times per cycle (every 60 at 1, 11, 31, 41). Slots are `cycle * interval + offset` counted
 from midnight, and stay open for half the gap to the next slot (`simline.cc` slot helpers,
-`schedule_entry_t::get_departure_offsets` gives the sorted list). The dialog keeps the single
-offset input and adds an "Also at (min)" text field for the extras. A convoy leaves only when its loading rules are met (minimum load or
+`schedule_entry_t::get_departure_offsets` gives the sorted list), or for `departure_window` minutes
+when set (savegame 122.9, `WINDOW_AUTO` = half the gap, `is_slot_open`; e.g. S6a and S6b every 60
+but 30 apart need 15). The dialog keeps the single offset input and adds an "Also at (min)" text
+field for the extras and a "Leave up to (min late)" row that shows the automatic value with "(half
+the gap)" until set; changing the interval resets it to automatic. The entry list shows a set
+window as `[1h+30' late 15']`, the export as `departure_window` (null = automatic). A convoy leaves only when its loading rules are met (minimum load or
 maximum wait, unchanged) and a slot is open that no other convoy of the line used at that entry
 (`simline_t::take_departure_slot`, `last_departure_slot` saved with the line; a schedule edit
 keeps it, and the missed couplings, for the entries that stayed: `keep_slots_across_edit` matches

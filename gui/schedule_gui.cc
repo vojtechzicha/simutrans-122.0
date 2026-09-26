@@ -374,6 +374,7 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	lb_load("Full load"),
 	lb_interval("Departure every (min)"),
 	lb_offset("Offset (min)"),
+	lb_window("Leave up to (min late)"),
 	lb_extra("Also at (min)"),
 	lb_couple("Couple with"),
 	lb_couple_wait("Wait for it (min)"),
@@ -500,8 +501,8 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	end_table();
 
 	if(  welt->has_calendar()  ) {
-		// timetable: departure slots, 0 = none; three rows (interval, offset, more offsets)
-		add_table(3,3);
+		// timetable: departure slots, 0 = none; four rows (interval, offset, more offsets, window)
+		add_table(3,4);
 		{
 			add_component(&lb_interval);
 			numimp_interval.set_width( 84 );
@@ -531,6 +532,17 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			input_extra.set_width( 120 );
 			input_extra.add_listener(this);
 			add_component(&input_extra, 2);
+
+			// how long a slot stays open; half the gap to the next slot until set by hand
+			add_component(&lb_window);
+			numimp_window.set_width( 84 );
+			numimp_window.set_value( 0 );
+			numimp_window.set_limits( 0, 24*60-1 );
+			numimp_window.set_increment_mode( 1 );
+			numimp_window.add_listener(this);
+			add_component(&numimp_window);
+			lb_window_fmt.set_min_width( max( proportional_string_width("= 23h59"), proportional_string_width( translator::translate("(half the gap)") ) ) );
+			add_component(&lb_window_fmt);
 		}
 		end_table();
 	}
@@ -696,8 +708,10 @@ void schedule_gui_t::update_selection()
 	lb_interval.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	lb_offset.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	lb_extra.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	lb_window.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	numimp_interval.disable();
 	numimp_offset.disable();
+	numimp_window.disable();
 	lb_couple.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	lb_couple_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	couple_selector.disable();
@@ -728,6 +742,20 @@ void schedule_gui_t::update_selection()
 			lb_offset_fmt.update();
 			lb_interval_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
 			lb_offset_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			numimp_window.set_limits( 0, entry.departure_interval > 1 ? entry.departure_interval - 1 : 0 );
+			numimp_window.set_value( entry.has_departure_window() ? entry.departure_window : entry.get_auto_departure_window() );
+			if(  entry.departure_interval == 0  ) {
+				lb_window_fmt.buf().clear();
+			}
+			else if(  entry.has_departure_window()  ) {
+				lb_window_fmt.buf().append("= ");
+				schedule_t::append_minutes( lb_window_fmt.buf(), entry.departure_window );
+			}
+			else {
+				lb_window_fmt.buf().append( translator::translate("(half the gap)") );
+			}
+			lb_window_fmt.update();
+			lb_window_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
 			show_extra_offsets( entry );
 			if(  has_line()  ) {
 				lb_interval.set_color( SYSCOL_TEXT );
@@ -736,6 +764,10 @@ void schedule_gui_t::update_selection()
 					lb_offset.set_color( SYSCOL_TEXT );
 					numimp_offset.enable();
 					lb_extra.set_color( SYSCOL_TEXT );
+					if(  entry.departure_interval > 1  ) {
+						lb_window.set_color( SYSCOL_TEXT );
+						numimp_window.enable();
+					}
 				}
 			}
 
@@ -798,6 +830,9 @@ void schedule_gui_t::update_selection()
 			numimp_load.set_value( 0 );
 			numimp_interval.set_value( 0 );
 			numimp_offset.set_value( 0 );
+			numimp_window.set_value( 0 );
+			lb_window_fmt.buf().clear();
+			lb_window_fmt.update();
 			lb_interval_fmt.buf().clear();
 			lb_interval_fmt.update();
 			lb_offset_fmt.buf().clear();
@@ -934,7 +969,12 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 	}
 	else if(comp == &numimp_interval) {
 		if(!schedule->empty()) {
-			schedule->entries[schedule->get_current_stop()].departure_interval = (uint16)p.i;
+			schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+			if(  entry.departure_interval != (uint16)p.i  ) {
+				// a new frequency starts again from half the gap
+				entry.departure_window = schedule_entry_t::WINDOW_AUTO;
+			}
+			entry.departure_interval = (uint16)p.i;
 			update_selection(); // clamps the offset
 		}
 	}
@@ -944,6 +984,12 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 			entry.departure_offset = (uint16)p.i;
 			// the main offset must not appear in the list as well
 			entry.set_extra_offsets( entry.extra_offsets, entry.extra_offset_count );
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_window) {
+		if(!schedule->empty()) {
+			schedule->entries[schedule->get_current_stop()].departure_window = (uint16)p.i;
 			update_selection();
 		}
 	}
@@ -1154,6 +1200,7 @@ void schedule_gui_t::set_windowsize(scr_size size)
 	// four digits plus the arrows need more than the stock 60 pixels
 	numimp_interval.set_size( scr_size(max(numimp_load.get_size().w, 84), numimp_interval.get_size().h) );
 	numimp_offset.set_size( scr_size(max(numimp_load.get_size().w, 84), numimp_offset.get_size().h) );
+	numimp_window.set_size( scr_size(max(numimp_load.get_size().w, 84), numimp_window.get_size().h) );
 	// make scrolly take all of space
 	scrolly.set_size( scr_size(scrolly.get_size().w, get_client_windowsize().h - scrolly.get_pos().y - D_MARGIN_BOTTOM));
 

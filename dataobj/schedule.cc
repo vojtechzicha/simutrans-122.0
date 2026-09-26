@@ -290,6 +290,10 @@ void schedule_t::rdwr(loadsave_t *file)
 					entries[i].couple_max_wait = 0;
 				}
 			}
+			if(file->is_version_atleast(122, 9)) {
+				// fork: how late a convoy may still leave in its timetable slot
+				file->rdwr_short(entries[i].departure_window);
+			}
 		}
 	}
 	if(  file->is_version_atleast(122, 8)  ) {
@@ -459,7 +463,7 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 		for(  uint8 k=0;  k<i.extra_offset_count;  k++  ) {
 			buf.printf(",%i", (int)i.extra_offsets[k]);
 		}
-		buf.printf(",%i,%i", (int)i.couple_line_id, (int)i.couple_max_wait);
+		buf.printf(",%i,%i,%i", (int)i.couple_line_id, (int)i.couple_max_wait, (int)i.departure_window);
 		buf.append("|");
 	}
 }
@@ -510,9 +514,9 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 	}
 	p++;
 	// now scan the entries: nine fixed values, then the number of extra offsets and those offsets,
-	// then the coupling line and its maximum wait
+	// then the coupling line and its maximum wait, then the departure window
 	while(  *p>0  ) {
-		const int max_values = 12 + schedule_entry_t::MAX_EXTRA_OFFSETS;
+		const int max_values = 13 + schedule_entry_t::MAX_EXTRA_OFFSETS;
 		sint32 values[max_values];
 		int count = 0;
 		while(  *p  &&  *p != '|'  ) {
@@ -550,6 +554,9 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		if(  count >= 12 + extra_count  &&  12 + extra_count <= max_values  ) {
 			entry.couple_line_id = (uint16)values[10 + extra_count];
 			entry.couple_max_wait = (uint16)values[11 + extra_count];
+		}
+		if(  count >= 13 + extra_count  &&  13 + extra_count <= max_values  ) {
+			entry.departure_window = (uint16)values[12 + extra_count];
 		}
 		entries.append(entry);
 	}
@@ -607,6 +614,22 @@ uint8 schedule_entry_t::get_departure_offsets(uint16 *out) const
 		n ++;
 	}
 	return n;
+}
+
+
+uint16 schedule_entry_t::get_auto_departure_window() const
+{
+	uint16 offsets[MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = get_departure_offsets( offsets );
+	if(  n == 0  ) {
+		return 0;
+	}
+	// the gap over the end of the cycle, then the gaps within it
+	uint16 gap = departure_interval - offsets[n-1] + offsets[0];
+	for(  uint8 k=1;  k<n;  k++  ) {
+		gap = min( gap, offsets[k] - offsets[k-1] );
+	}
+	return gap / 2;
 }
 
 
@@ -684,6 +707,11 @@ void schedule_t::append_timetable( cbuffer_t &buf, schedule_entry_t const& entry
 		else if(  entry.departure_offset > 0  ) {
 			buf.append("+");
 			append_minutes( buf, entry.departure_offset );
+		}
+		if(  entry.has_departure_window()  ) {
+			// set by hand: how late it may still leave, e.g. [1h+30' late 15']
+			buf.append(" late ");
+			append_minutes( buf, entry.departure_window );
 		}
 		buf.append("]");
 	}

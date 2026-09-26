@@ -348,6 +348,13 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 			}
 		}
 		w.end_array();
+		// fork: minutes a convoy may still leave after its slot, null = half the gap to the next slot
+		if(  entry.has_departure_window()  ) {
+			w.kv_int( "departure_window", entry.departure_window );
+		}
+		else {
+			w.kv_null( "departure_window" );
+		}
 		w.kv_int( "stop_type", entry.stop_type );
 		// fork, coupling: a train of this schedule joins a train of that line here
 		if(  entry.has_coupling()  ) {
