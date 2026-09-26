@@ -2199,6 +2199,21 @@ uint32 haltestelle_t::get_ware_summe(const goods_desc_t *wtyp) const
 }
 
 
+uint32 haltestelle_t::get_ware_summe_missed(const goods_desc_t *wtyp) const
+{
+	uint32 sum = 0;
+	const vector_tpl<ware_t> * warray = cargo[wtyp->get_catg_index()];
+	if(warray!=NULL) {
+		FOR(vector_tpl<ware_t>, const& i, *warray) {
+			if(  wtyp->get_index() == i.get_index()  &&  i.missed_connection  ) {
+				sum += i.menge;
+			}
+		}
+	}
+	return sum;
+}
+
+
 uint32 haltestelle_t::get_ware_fuer_zielpos(const goods_desc_t *wtyp, const koord zielpos) const
 {
 	const vector_tpl<ware_t> * warray = cargo[wtyp->get_catg_index()];

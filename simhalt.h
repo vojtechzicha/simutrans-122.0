@@ -585,6 +585,9 @@ public:
 	/// @returns total amount of the good waiting at this halt.
 	uint32 get_ware_summe(const goods_desc_t *warentyp) const;
 
+	/// fork: amount of the good waiting here that missed a full vehicle (may board overcrowded)
+	uint32 get_ware_summe_missed(const goods_desc_t *warentyp) const;
+
 	/**
 	 * returns total number for a certain position (since more than one factory might connect to a stop)
 	 */

@@ -178,6 +178,19 @@ table.grid td.clip { max-width: 440px; overflow: hidden; text-overflow: ellipsis
 
 .bar { display: inline-block; width: 54px; height: 9px; background: var(--border); border-radius: 2px; overflow: hidden; vertical-align: -1px; }
 .bar > i { display: block; height: 100%; background: var(--accent); }
+.bar.over > i { background: var(--warn); }
+.warnc { color: var(--warn); }
+.badge.stype { color: var(--accent); background: var(--accent-bg); font-weight: 600; padding: 0 4px; }
+.note { color: var(--text-dim); }
+.pair { border-left: 3px solid var(--accent); }
+.pairhead { font-weight: 600; margin-bottom: 6px; }
+.kv dt.sep, .kv dd.sep { border-top: 1px solid var(--border); padding-top: 4px; margin-top: 3px; }
+.bad { color: var(--neg); }
+ol.sched li.shared { box-shadow: inset 4px 0 var(--accent); padding-left: 8px; }
+ol.sched .cpl { color: var(--accent); font-size: 12px; }
+ol.sched .cpl.end { color: var(--warn); }
+ol.sched .cpl.bad { color: var(--neg); }
+.legendbar { display: inline-block; width: 4px; height: 12px; background: var(--accent); vertical-align: -1px; margin-right: 3px; }
 
 .backlink { display: inline-block; margin-bottom: 8px; }
 .detail-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -312,17 +325,42 @@ function typeBadge(t) {
 var TRACTION_TEXT = { under_wire_electric: "under wires, electric only", under_wire_all: "under wires, all engines",
   off_wire: "off wires" };
 var BAD_STATES = { loss: 1, no_convoys: 1, nothing_moved: 1, missing_scheduled_slots: 1 };
-var WARN_STATES = { overcrowded: 1, obsolete: 1, no_route: 1, self_destruct: 1 };
+var WARN_STATES = { overcrowded: 1, obsolete: 1, no_route: 1, self_destruct: 1, uncoupling: 1 };
 function stateBadge(s) {
   s = str(s, "unknown");
-  var cls = s === "ok" || s === "driving" || s === "loading" ? "ok"
+  var cls = s === "ok" || s === "driving" || s === "loading" || s === "coupled" ? "ok"
           : BAD_STATES[s] ? "bad" : WARN_STATES[s] ? "warn" : "";
   return '<span class="badge state ' + cls + '">' + esc(titleOf(s)) + "</span>";
 }
+/* passenger vehicles load standing and overcrowded passengers past their seats, so a level can pass 100% */
 function loadBar(pct) {
-  pct = Math.max(0, Math.min(100, Math.round(num(pct))));
-  return '<span class="bar" title="' + pct + '%"><i style="width:' + pct + '%"></i></span> ' +
-         '<span class="dim">' + pct + "%</span>";
+  pct = Math.max(0, Math.round(num(pct)));
+  var w = Math.min(100, pct);
+  return '<span class="bar' + (pct > 100 ? " over" : "") + '" title="' + pct + '%"><i style="width:' + w + '%"></i></span> ' +
+         '<span class="' + (pct > 100 ? "warnc" : "dim") + '">' + pct + "%</span>";
+}
+/* fork stop types (schedule_entry_t::stop_type_t), shown as the lettered badge of the schedule dialog */
+var STOP_TYPES = [null, { l: "T", t: "Terminal: everything off, then load" }, { l: "A", t: "All off: everything off, no loading" },
+  { l: "L", t: "Only load: no unloading" }, { l: "U", t: "Only unload: no loading" },
+  { l: "H", t: "Hold: no loading or unloading, only to let trains pass" }];
+function stopTypeBadge(t) {
+  var s = STOP_TYPES[num(t)];
+  return s ? '<span class="badge stype" title="' + esc(s.t) + '">' + s.l + "</span> " : "";
+}
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+/* world calendar (fork): the clock and date the status bar shows, next to the game year */
+function calendarText(d) {
+  var c = obj(obj(d).calendar);
+  if (!c.year) return "";
+  return pad2(num(c.hour)) + ":" + pad2(num(c.minute)) + ", " + num(c.day) + " " +
+         MONTH_NAMES[Math.max(0, Math.min(11, num(c.month, 1) - 1))] + " " + c.year;
+}
+function crowdText(cr) {
+  cr = obj(cr);
+  if (!num(cr.seats)) return "";
+  return "seats " + fmtInt(cr.seated) + "/" + fmtInt(cr.seats) +
+         ", standing " + fmtInt(cr.standing) + "/" + fmtInt(cr.standing_places) +
+         ", overcrowded " + fmtInt(cr.overcrowded) + "/" + fmtInt(cr.overcrowded_places);
 }
 function monthLabel(i) {
   var d = obj(D && D.meta && D.meta.date);
@@ -353,6 +391,7 @@ function buildIndex() {
   arr(D.players).forEach(function (p) { i.player[p.id] = p; });
   arr(D.goods).forEach(function (g) { i.goods[g.index] = g; });
   IDX = i;
+  IDX.couplings = computeCouplings();
 }
 function playerName(id) {
   if (id === null || id === undefined) return "-";
@@ -438,6 +477,7 @@ function renderTop() {
   var bits = [];
   bits.push("<b>" + esc(str(m.save_file, "unnamed save")) + "</b>");
   if (d.year) bits.push(MONTH_NAMES[Math.max(0, Math.min(11, num(d.month, 1) - 1))] + " " + d.year);
+  if (calendarText(d)) bits.push(esc(calendarText(d)));
   if (str(m.pakset)) bits.push(esc(m.pakset));
   if (str(m.game_version)) bits.push("version " + esc(m.game_version));
   if (mp.width) bits.push(mp.width + " x " + mp.height);
@@ -674,6 +714,10 @@ function viewOverview(host) {
     ["Factories", arr(D.factories).length], ["Players", arr(D.players).length],
     ["Goods", arr(D.goods).length], ["Settings", Object.keys(obj(D.settings)).length]
   ];
+  var pairs = arr(D.convoys).filter(function (c) { return c.coupling === "primary"; }).length;
+  if (pairs) stats.push(["Coupled pairs", pairs]);
+  var late = arr(D.convoys).filter(function (c) { return c.running_late; }).length;
+  if (late) stats.push(["Running late", late]);
   var sh = '<div class="cards">';
   stats.forEach(function (s) {
     sh += '<div class="stat"><div class="n">' + fmtInt(s[1]) + '</div><div class="l">' + s[0] + "</div></div>";
@@ -690,6 +734,7 @@ function viewOverview(host) {
     ["Exported at", esc(str(m.exported_at, "unknown"))],
     ["In-game date", d.year ? MONTH_NAMES[Math.max(0, Math.min(11, num(d.month, 1) - 1))] + " " + d.year +
       ' <span class="faint">(tick ' + fmtInt(d.ticks) + ")</span>" : "unknown"],
+    ["Calendar", calendarText(d) ? esc(calendarText(d)) : '<span class="faint">off</span>'],
     ["Map size", mp.width ? mp.width + " x " + mp.height + " tiles" : "unknown"]
   ];
   var kv = '<div class="card"><dl class="kv">';
@@ -825,12 +870,17 @@ function viewLines(host) {
       html: function (l) { return fmtMoney(statAt(l, "revenue", 0)); } },
     { key: "pr", label: "Profit", num: true, title: "Profit this month",
       value: function (l) { return statAt(l, "profit", 0); },
-      html: function (l) { return signed(statAt(l, "profit", 0), true); } }
+      html: function (l) { return signed(statAt(l, "profit", 0), true); } },
+    { key: "cpl", label: "Coupled with", clip: true, value: function (l) { return couplingPartnerNames(l); },
+      html: function (l) {
+        var n = couplingPartnerNames(l);
+        return n ? esc(n) : '<span class="faint">-</span>';
+      } }
   ], rows, { state: f.state, rerender: rerender, href: function (l) { return "#line/" + l.id; },
              emptyText: "No lines match this filter." });
 }
 
-function scheduleList(host, sched) {
+function scheduleList(host, sched, opt) {
   sched = obj(sched);
   var entries = arr(sched.entries);
   if (!entries.length) {
@@ -841,8 +891,11 @@ function scheduleList(host, sched) {
   entries.forEach(function (e, i) {
     e = obj(e);
     var here = num(sched.current_stop, -1) === i;
-    h += '<li class="' + (here ? "here" : "") + '">';
-    if (e.halt_id === null || e.halt_id === undefined) {
+    var mark = opt && opt.marks ? opt.marks[i] : null;
+    h += '<li class="' + (here ? "here " : "") + (mark && mark.shared ? "shared" : "") + '">' + stopTypeBadge(e.stop_type);
+    if (e.depot) {
+      h += '<span class="wp">Depot</span> ' + fmtPos(e.pos);
+    } else if (e.halt_id === null || e.halt_id === undefined) {
       h += '<span class="wp">Waypoint</span> ' + fmtPos(e.pos);
     } else {
       h += stopLink(e.halt_id) + " " + fmtPos(e.pos);
@@ -859,9 +912,11 @@ function scheduleList(host, sched) {
     var stopTypes = ["", "terminal", "all off", "only load", "only unload", "hold"];
     if (stopTypes[num(e.stop_type)]) opts.push(stopTypes[num(e.stop_type)]);
     if (opts.length) h += ' <span class="opts">(' + esc(opts.join(", ")) + ")</span>";
-    if (e.couple_line_id !== null && e.couple_line_id !== undefined) {
+    if (mark && mark.notes.length) {
+      h += mark.notes.map(function (n) { return '<div class="cpl ' + n.cls + '">' + n.html + "</div>"; }).join("");
+    } else if (!(opt && opt.marks) && e.couple_line_id !== null && e.couple_line_id !== undefined) {
       h += ' <span class="opts">(couples with ' + lineLink(e.couple_line_id) +
-           (num(e.couple_max_wait) > 0 ? ", waits up to " + num(e.couple_max_wait) + " min" : "") + ")</span>";
+           ", waits up to " + num(e.couple_max_wait) + " min)</span>";
     }
     h += "</li>";
   });
@@ -869,8 +924,198 @@ function scheduleList(host, sched) {
   var flags = [];
   if (sched.bidirectional) flags.push("bidirectional");
   if (sched.mirrored) flags.push("mirrored");
+  if (sched.no_standing) flags.push("no standing passengers");
+  else if (sched.no_overcrowding) flags.push("no overcrowded passengers");
   if (flags.length) h += '<div class="dim" style="margin-top:4px">Schedule flags: ' + esc(flags.join(", ")) + "</div>";
   html(host, h);
+}
+
+/* ---- coupled running (fork) ----
+   A schedule entry of line J with couple_line_id = P: a train of J joins a train of P there, behind it.
+   Played forward like convoi_t::get_uncouple_halt(): they couple at an entry of P at the same stop that
+   goes on to the same next stop, stay together while both schedules go on to the same next stop
+   (waypoints skipped, a depot ends the run) and part at the first stop where the next stops differ. */
+function isStop(e) { e = obj(e); return e.halt_id !== null && e.halt_id !== undefined; }
+function nextStopIdx(entries, i) {
+  for (var k = 1; k <= entries.length; k++) {
+    var idx = (i + k) % entries.length, e = obj(entries[idx]);
+    if (isStop(e)) return idx;
+    if (e.depot) return -1;
+  }
+  return -1;
+}
+/* stop names in this pakset carry line lists: "Zábřeh na Moravě [M1,...] <001,...> / Zábřeh, žel.st." */
+function shortStop(id) {
+  var n = str(obj(IDX.stop[id]).name, "Stop " + id);
+  var cut = n.search(/\s[\[(<]/);
+  return cut > 0 ? n.slice(0, cut) : n;
+}
+function shortStopLink(id) {
+  if (!IDX.stop[id]) return '<span class="faint">?</span>';
+  return '<a href="#stop/' + id + '" title="' + esc(str(IDX.stop[id].name)) + '">' + esc(shortStop(id)) + "</a>";
+}
+function computeCouplings() {
+  var list = [];
+  arr(D.lines).forEach(function (J) {
+    var je = arr(obj(J.schedule).entries);
+    je.forEach(function (e, j) {
+      if (!e || e.couple_line_id === null || e.couple_line_id === undefined) return;
+      var P = IDX.line[e.couple_line_id] || null;
+      var c = { primary: P, joined: J, jEntry: j, halt: e.halt_id, maxWait: num(e.couple_max_wait),
+                pEntry: -1, shared: [], split: null, staysCoupled: false,
+                jNextHalt: nextStopIdx(je, j) >= 0 ? je[nextStopIdx(je, j)].halt_id : null };
+      list.push(c);
+      if (!P || !isStop(e) || c.jNextHalt === null) return;
+      var pe = arr(obj(P.schedule).entries);
+      for (var p = 0; p < pe.length && c.pEntry < 0; p++) {
+        var pn = nextStopIdx(pe, p);
+        if (isStop(pe[p]) && pe[p].halt_id === e.halt_id && pn >= 0 && pe[pn].halt_id === c.jNextHalt) c.pEntry = p;
+      }
+      if (c.pEntry < 0) return;
+      var pi = c.pEntry, ci = j, seen = {};
+      for (;;) {
+        seen[pi + "/" + ci] = 1;
+        c.shared.push({ p: pi, j: ci, halt: pe[pi].halt_id });
+        var np = nextStopIdx(pe, pi), nj = nextStopIdx(je, ci);
+        if (np < 0 || nj < 0 || pe[np].halt_id !== je[nj].halt_id) {
+          c.split = { p: pi, j: ci, halt: pe[pi].halt_id,
+                      pNext: np >= 0 ? pe[np].halt_id : null, jNext: nj >= 0 ? je[nj].halt_id : null };
+          return;
+        }
+        if (seen[np + "/" + nj]) { c.staysCoupled = true; return; }
+        pi = np; ci = nj;
+      }
+    });
+  });
+  return list;
+}
+/* names of the lines this line runs coupled with (front or behind), for the lines table */
+function couplingPartnerNames(l) {
+  var names = [];
+  IDX.couplings.forEach(function (c) {
+    var other = c.primary === l ? c.joined : (c.joined === l ? c.primary : null);
+    if (other && names.indexOf(str(other.name)) < 0) names.push(str(other.name));
+  });
+  return names.join(", ");
+}
+/* the coupling of list whose run passes the coupling point of c already coupled, or null */
+function subsumedBy(c, list) {
+  for (var i = 0; i < list.length; i++) {
+    var o = list[i];
+    if (o === c) continue;
+    for (var s = 1; s < o.shared.length; s++) {
+      if (o.shared[s].p === c.pEntry && o.shared[s].j === c.jEntry) return o;
+    }
+  }
+  return null;
+}
+/* departure rule of a schedule entry in words */
+function timetableText(e) {
+  e = obj(e);
+  if (num(e.departure_interval) > 0) {
+    var offs = arr(e.departure_offsets).length ? arr(e.departure_offsets) : [num(e.departure_offset)];
+    return "every " + num(e.departure_interval) + " min at +" + offs.join(", +");
+  }
+  if (num(e.waiting_time_minutes) > 0) return "no timetable, waits up to " + num(e.waiting_time_minutes) + " min";
+  return "no timetable";
+}
+/* both lines' departure rules at the coupling stop; a mismatch means the trains rarely meet there */
+function timetableCompare(ours, theirs, other) {
+  var a = timetableText(ours), b = timetableText(theirs);
+  var h = "ours " + esc(a) + "; " + (other ? esc(shortLineName(other)) : "theirs") + " " + esc(b);
+  var oi = num(obj(ours).departure_interval), ti = num(obj(theirs).departure_interval);
+  if (oi > 0 && ti > 0 && a !== b) h += ' <span class="warnc">(different, the trains will not always meet)</span>';
+  else if (oi > 0 && ti > 0) h += ' <span class="pos">(same slots)</span>';
+  return h;
+}
+function shortLineName(l) { return str(l.name, "Line " + l.id).split(" ")[0]; }
+/* passed coupled by a run from another coupling point of the same two lines (and not the other way round) */
+function isFallback(c, list) {
+  var o = c.shared.length ? subsumedBy(c, list) : null;
+  return !!o && !subsumedBy(o, [c]);
+}
+/* how many different stop entries of our schedule the coupled run covers */
+function distinctOurs(c, key) {
+  var seen = {}, n = 0;
+  c.shared.forEach(function (s) { if (!seen[s[key]]) { seen[s[key]] = 1; n++; } });
+  return n;
+}
+/* entry index -> { shared, notes: [{ cls, html }] } for the schedule of line l */
+function couplingMarks(l, couplings) {
+  var entries = arr(obj(l.schedule).entries), marks = {};
+  function at(i) { return marks[i] || (marks[i] = { shared: false, notes: [] }); }
+  couplings.forEach(function (c) {
+    var weP = c.primary && c.primary.id === l.id;
+    var key = weP ? "p" : "j";
+    var other = weP ? c.joined : c.primary;
+    var otherTxt = other ? lineLink(other.id) : "a missing line";
+    if (!c.shared.length) {
+      if (!weP) at(c.jEntry).notes.push({ cls: "bad", html: "&#9888; set to couple with " + otherTxt +
+        ", but that line never stops here on the way to " + (c.jNextHalt !== null ? shortStopLink(c.jNextHalt) : "the same next stop") +
+        ", so the trains never couple" });
+      return;
+    }
+    /* every entry of our schedule from the first to the last shared stop, waypoints between included */
+    for (var s = 0; s < c.shared.length; s++) {
+      at(c.shared[s][key]).shared = true;
+      if (s + 1 < c.shared.length) {
+        for (var i = (c.shared[s][key] + 1) % entries.length; i !== c.shared[s + 1][key]; i = (i + 1) % entries.length) at(i).shared = true;
+      }
+    }
+    if (isFallback(c, couplings)) {
+      at(c.shared[0][key]).notes.push({ cls: "", html: "&#9901; also a coupling point with " + otherTxt +
+        ", used only when the trains arrive here separately; a coupled pair runs through" });
+      return;
+    }
+    var first = c.shared[0][key];
+    at(first).notes.push({ cls: "start", html: "&#9901; " + (weP ? otherTxt + " joins behind us here" : "we join " + otherTxt + " here, behind its train") +
+      ", whichever train is first waits up to " + c.maxWait + " min" });
+    if (c.split) {
+      var ourNext = weP ? c.split.pNext : c.split.jNext, theirNext = weP ? c.split.jNext : c.split.pNext;
+      at(c.split[key]).notes.push({ cls: "end", html: "&#9986; uncouples from " + otherTxt + ": we go on to " +
+        (ourNext !== null ? shortStopLink(ourNext) : "the depot") + ", it goes on to " + (theirNext !== null ? shortStopLink(theirNext) : "the depot") });
+    }
+  });
+  return marks;
+}
+
+/* what the convoy window shows under the destination (fork): why it waits, or when it leaves */
+function waitText(c, links) {
+  var w = obj(c.waiting_for);
+  var stop = function (id) { return links ? stopLink(id) : esc(str(obj(IDX.stop[id]).name, "?")); };
+  switch (w.reason) {
+    case "passing_train": return "Waiting for " + (links ? convoyLink(w.convoy_id) : esc(str(w.convoy_name, "a train"))) + " to pass";
+    case "no_free_track": return "No free track at " + stop(w.halt_id);
+    case "last_free_track": return "Keeping the last track at " + stop(w.halt_id) + " free";
+    case "station_entry": return "Waiting to enter the station";
+    case "single_track": return "Waiting for the single track";
+    case "coupling_partner": return "Waiting for the train to couple with";
+    case "platform_after_uncoupling": return "Uncoupled, waiting for the platform";
+  }
+  if (w.reason) return esc(titleOf(w.reason));
+  var d = c.departure;
+  if (!d) return "";
+  var t = "Departure: " + (d.latest ? "by " : "") + pad2(num(d.hour)) + ":" + pad2(num(d.minute)) +
+          (num(d.days_ahead) > 0 ? " +" + num(d.days_ahead) + "d" : "") +
+          (num(d.in_minutes) > 0 ? " (in " + num(d.in_minutes) + " min)" : " (now)") +
+          (num(d.ahead) > 0 ? ", " + num(d.ahead) + " ahead" : "");
+  return esc(t);
+}
+/* short badges for tables: coupling, late, hold marker, waiting */
+function convoyNotes(c) {
+  var b = [];
+  if (c.coupling === "primary") b.push('<span class="badge state ok" title="Coupled, the joined train runs behind">pair, front</span>');
+  if (c.coupling === "joined") b.push('<span class="badge state ok" title="Coupled behind another train">pair, behind</span>');
+  if (c.running_late) b.push('<span class="badge state warn" title="Missed its coupling">late</span>');
+  if (c.hold_marker) b.push('<span class="badge state" title="Hold marker: lets passing trains overtake">hold</span>');
+  if (c.hold_divert) b.push('<span class="badge state" title="Heading for a platform to let a train pass">diverted</span>');
+  var w = waitText(c, false);
+  if (w) b.push('<span class="note">' + w + "</span>");
+  return b.join(" ");
+}
+function convoyNotesValue(c) {
+  return (c.coupling ? "pair " : "") + (c.running_late ? "late " : "") + (c.hold_marker ? "hold " : "") +
+         obj(c.waiting_for).reason + " " + (c.departure ? "departure" : "");
 }
 
 function convoyMiniTable(host, ids) {
@@ -880,6 +1125,7 @@ function convoyMiniTable(host, ids) {
       html: function (c) { return convoyLink(c.id); } },
     { key: "state", label: "State", value: function (c) { return str(c.state); },
       html: function (c) { return stateBadge(c.state); } },
+    { key: "notes", label: "Notes", sortable: false, html: convoyNotes },
     { key: "load", label: "Loading", num: true, value: function (c) { return num(c.loading_level); },
       html: function (c) { return loadBar(c.loading_level); } },
     { key: "cap", label: "Loaded / capacity", num: true,
@@ -908,7 +1154,87 @@ function viewLineDetail(host, id) {
       ' <span class="faint">(' + fmtInt(arr(obj(l.schedule).entries).length) + " entries)</span></dd>" +
     "<dt>This month</dt><dd>" + fmtInt(statAt(l, "transported", 0)) + " transported, " +
       fmtMoney(statAt(l, "revenue", 0)) + " revenue, " + signed(statAt(l, "profit", 0), true) + " profit</dd>" +
+    (l.hold_marker ? "<dt>Hold marker</dt><dd>its trains let passing trains overtake</dd>" : "") +
     "</dl></div>");
+
+  /* coupled running: one card per partner line, the same on both lines */
+  var mine = IDX.couplings.filter(function (c) { return c.joined === l || c.primary === l; });
+  var byOther = {}, order = [];
+  mine.forEach(function (c) {
+    var other = c.primary === l ? c.joined : c.primary;
+    var k = other ? String(other.id) : "missing";
+    if (!byOther[k]) { byOther[k] = { other: other, list: [] }; order.push(k); }
+    byOther[k].list.push(c);
+  });
+  var ourStops = lineStopCount(l);
+  order.forEach(function (k) {
+    var g = byOther[k], other = g.other, weP = g.list[0].primary === l;
+    var otherTxt = other ? lineLink(other.id) : '<span class="faint">a line missing from this export</span>';
+    var ch = '<div class="card pair" style="margin-top:10px"><div class="pairhead">Runs coupled with ' + otherTxt + "</div>" +
+      '<dl class="kv"><dt>Formation</dt><dd>' + (weP
+        ? "our train in front, it drives the pair; the train of " + otherTxt + " runs behind"
+        : "our train runs behind the train of " + otherTxt + ", which drives the pair") + "</dd>";
+    var seats = function (line) {
+      var caps = arr(line && line.convoy_ids).map(function (id) { return obj(IDX.convoy[id]).total_capacity; })
+                 .filter(function (v) { return typeof v === "number"; });
+      if (!caps.length) return "?";
+      var lo = Math.min.apply(null, caps), hi = Math.max.apply(null, caps);
+      return lo === hi ? fmtInt(lo) : fmtInt(lo) + "–" + fmtInt(hi);
+    };
+    if (other) ch += "<dt>Capacity together</dt><dd>" + (weP ? "ours " + seats(l) + " + theirs " + seats(other)
+      : "theirs " + seats(other) + " + ours " + seats(l)) + ' <span class="dim">(seats, or capacity for goods, per train)</span></dd>';
+    /* a coupling point the pair passes already coupled (a run from another point goes through it) is only a
+       fallback for trains that arrive there separately: show it inside that run, not as a run of its own */
+    var runs = g.list.filter(function (c) { return !isFallback(c, g.list); });
+    var key = weP ? "p" : "j";
+    runs.forEach(function (c, n) {
+      var sep = runs.length > 1 ? ' class="sep"' : "";
+      if (!c.shared.length) {
+        ch += "<dt" + sep + ">Coupling " + (n + 1) + '</dt><dd class="bad' + (sep ? " sep" : "") + '">' + "&#9888; " + (weP ? otherTxt + " is set" : "we are set") +
+          " to couple at " + (c.halt !== null ? shortStopLink(c.halt) : "a waypoint") + ", but " + (weP ? "we" : otherTxt) +
+          " never stop there on the way to " + (c.jNextHalt !== null ? shortStopLink(c.jNextHalt) : "the same next stop") +
+          ", so the trains never couple</dd>";
+        return;
+      }
+      /* the stops of the run; a stop whose neighbours are the same stop is where the pair turns */
+      var sh = c.shared;
+      var chain = sh.map(function (s, i) {
+        var turns = i > 0 && i + 1 < sh.length && sh[i - 1].halt === sh[i + 1].halt;
+        return shortStopLink(s.halt) + (turns ? ' <span class="dim">(turns)</span>' : "");
+      }).join(' <span class="faint">&rarr;</span> ');
+      var ourE = arr(obj(l.schedule).entries), theirE = arr(obj(other && other.schedule).entries);
+      var ourIdx = sh[0][key], theirIdx = sh[0][weP ? "j" : "p"];
+      ch += "<dt" + sep + ">Couples at</dt><dd" + sep + ">" + shortStopLink(sh[0].halt) +
+        ' <span class="dim">(our entry ' + (ourIdx + 1) + "; whichever train is first waits up to " + c.maxWait + " min)</span></dd>" +
+        "<dt>Timetable there</dt><dd>" + timetableCompare(ourE[ourIdx], theirE[theirIdx], other) + "</dd>" +
+        "<dt>Shared section</dt><dd>" + chain + ' <span class="dim">(' + sh.length + " stops" +
+          (ourStops ? ", " + Math.round(100 * distinctOurs(c, key) / ourStops) + "% of our stops" : "") + ")</span></dd>";
+      g.list.forEach(function (f) {
+        if (f === c || !f.shared.length || subsumedBy(f, [c]) === null) return;
+        ch += "<dt>Also couples at</dt><dd>" + shortStopLink(f.halt) + ' <span class="dim">(our entry ' + (f.shared[0][key] + 1) +
+          ", only when the trains arrive there separately; a pair coming from " + esc(shortStop(sh[0].halt)) +
+          " passes it coupled)</span><br>timetable there: " +
+          timetableCompare(ourE[f.shared[0][key]], theirE[f.shared[0][weP ? "j" : "p"]], other) + "</dd>";
+      });
+      if (c.split) {
+        var ourNext = weP ? c.split.pNext : c.split.jNext, theirNext = weP ? c.split.jNext : c.split.pNext;
+        ch += "<dt>Uncouples at</dt><dd>" + shortStopLink(c.split.halt) + ' <span class="dim">(our entry ' + (c.split[key] + 1) +
+          ")</span>; then we go on to " + (ourNext !== null ? shortStopLink(ourNext) : "the depot") +
+          ", " + (other ? lineLink(other.id) : "the other train") + " goes on to " + (theirNext !== null ? shortStopLink(theirNext) : "the depot") + "</dd>";
+      } else if (c.staysCoupled) {
+        ch += "<dt>Uncouples at</dt><dd>never, the two schedules stay together all the way round</dd>";
+      }
+    });
+    var pairs = arr(l.convoy_ids).map(function (id) { return IDX.convoy[id]; })
+      .filter(function (c) { return c && c.coupling && IDX.convoy[c.coupled_with] && other && IDX.convoy[c.coupled_with].line_id === other.id; });
+    ch += '<dt class="sep">Coupled now</dt><dd class="sep">' + (pairs.length ? pairs.map(function (c) {
+      var pc = c.coupling === "primary" ? c : IDX.convoy[c.coupled_with];
+      return convoyLink(c.id) + (c.coupling === "primary" ? " with " : " behind ") + convoyLink(c.coupled_with) +
+        (pc.uncouples_at !== null && pc.uncouples_at !== undefined ? ' <span class="dim">(until ' + esc(shortStop(pc.uncouples_at)) + ")</span>" : "");
+    }).join("<br>") : '<span class="faint">no pair at the moment</span>') + "</dd>";
+    ch += "</dl></div>";
+    html(host, ch);
+  });
 
   var cols = document.createElement("div");
   cols.className = "cols";
@@ -917,7 +1243,11 @@ function viewLineDetail(host, id) {
   cols.appendChild(left); cols.appendChild(right);
 
   heading(left, "Schedule");
-  scheduleList(left, l.schedule);
+  if (mine.length) {
+    html(left, '<div class="dim" style="margin-bottom:5px"><span class="legendbar"></span> runs coupled ' +
+      "&nbsp; &#9901; couples &nbsp; &#9986; uncouples</div>");
+  }
+  scheduleList(left, l.schedule, { marks: couplingMarks(l, mine) });
   heading(right, "Convoys on this line");
   convoyMiniTable(right, l.convoy_ids);
 
@@ -1014,7 +1344,9 @@ function viewStopDetail(host, id) {
     "<dt>Tiles</dt><dd>" + fmtInt(arr(s.tiles).length) + "</dd>" +
     "<dt>Handles</dt><dd>" + (enabled.length ? esc(enabled.join(", ")) : '<span class="faint">nothing</span>') + "</dd>" +
     "<dt>Capacity</dt><dd><span class='mono'>" + capText(s.capacity) + '</span> <span class="faint">(passengers / mail / goods)</span></dd>' +
-    "<dt>Waiting now</dt><dd><span class='mono'>" + capText(s.waiting_total) + '</span> <span class="faint">(passengers / mail / goods)</span></dd>' +
+    "<dt>Waiting now</dt><dd><span class='mono'>" + capText(s.waiting_total) + '</span> <span class="faint">(passengers / mail / goods)</span>' +
+      (num(obj(s.waiting_total).missed) > 0 ? ', <span class="warnc">' + fmtInt(obj(s.waiting_total).missed) +
+        " missed a full vehicle</span>" : "") + "</dd>" +
     "<dt>Passengers this month</dt><dd>" + fmtInt(pax.happy) + " happy, " + fmtInt(pax.unhappy) +
       " unhappy, " + fmtInt(pax.no_route) + " without a route</dd>" +
     "</dl></div>");
@@ -1030,7 +1362,9 @@ function viewStopDetail(host, id) {
     { key: "g", label: "Goods", value: function (w) { return str(w.goods_name, goodsName(w.goods_index)); },
       html: function (w) { return esc(str(w.goods_name, goodsName(w.goods_index))); } },
     { key: "a", label: "Amount", num: true, value: function (w) { return num(w.amount); },
-      html: function (w) { return fmtInt(w.amount); } }
+      html: function (w) { return fmtInt(w.amount); } },
+    { key: "m", label: "Missed a full vehicle", num: true, title: "May board the next vehicle overcrowded",
+      html: function (w) { return num(w.missed) ? fmtInt(w.missed) : '<span class="faint">-</span>'; } }
   ], arr(s.waiting), { short: true, onSort: false, emptyText: "Nothing is waiting here." });
 
   heading(left, "Lines serving this stop");
@@ -1084,10 +1418,19 @@ function viewStopDetail(host, id) {
 /* ---- convoys ---- */
 
 function viewConvoys(host) {
-  var f = filters.convoys || (filters.convoys = { q: "", owner: "", line: "", state: { sort: null, dir: 1 } });
+  var f = filters.convoys || (filters.convoys = { q: "", owner: "", line: "", flag: "", state: { sort: null, dir: 1 } });
   html(host, "<h1>Convoys</h1>");
   var all = arr(D.convoys);
+  var FLAGS = {
+    coupled: function (c) { return !!c.coupling; },
+    waiting: function (c) { return !!c.waiting_for; },
+    departure: function (c) { return !!c.departure; },
+    late: function (c) { return !!c.running_late; },
+    hold: function (c) { return !!c.hold_marker || !!c.hold_divert; },
+    crowded: function (c) { return num(obj(c.crowd).standing) + num(obj(c.crowd).overcrowded) > 0; }
+  };
   var rows = all.filter(function (c) {
+    if (f.flag && FLAGS[f.flag] && !FLAGS[f.flag](c)) return false;
     if (f.owner !== "" && String(num(c.owner_id, -1)) !== f.owner) return false;
     if (f.line === "none" && c.line_id !== null && c.line_id !== undefined) return false;
     if (f.line !== "" && f.line !== "none" && String(c.line_id) !== f.line) return false;
@@ -1101,6 +1444,10 @@ function viewConvoys(host) {
     textFilter(f.q, "Filter by name, state, line", function (v) { f.q = v; rerender(); }),
     selectFilter(f.owner, ownerOptions(), function (v) { f.owner = v; rerender(); }),
     selectFilter(f.line, lineOpts, function (v) { f.line = v; rerender(); }),
+    selectFilter(f.flag, [{ value: "", label: "All convoys" }, { value: "coupled", label: "Coupled" },
+      { value: "waiting", label: "Waiting (signals, passing, coupling)" }, { value: "departure", label: "With a planned departure" },
+      { value: "late", label: "Running late" }, { value: "hold", label: "Hold marker or diverted" },
+      { value: "crowded", label: "Standing or overcrowded passengers" }], function (v) { f.flag = v; rerender(); }),
     countLabel(rows.length, all.length, "convoys")
   ]);
   renderTable(host, [
@@ -1126,7 +1473,8 @@ function viewConvoys(host) {
     { key: "speed", label: "Max speed", num: true, value: function (c) { return num(c.max_speed); },
       html: function (c) { return fmtInt(c.max_speed); } },
     { key: "profit", label: "Profit this month", num: true, value: function (c) { return num(c.profit_this_month); },
-      html: function (c) { return signed(c.profit_this_month, true); } }
+      html: function (c) { return signed(c.profit_this_month, true); } },
+    { key: "notes", label: "Notes", value: convoyNotesValue, html: convoyNotes }
   ], rows, { state: f.state, rerender: rerender, href: function (c) { return "#convoy/" + c.id; },
              emptyText: "No convoys match this filter." });
 }
@@ -1146,37 +1494,76 @@ function viewConvoyDetail(host, id) {
     "<dt>Position</dt><dd>" + fmtPos(c.pos) + "</dd>" +
     "<dt>Home depot</dt><dd>" + fmtPos(c.home_depot) + "</dd>" +
     "<dt>Vehicles</dt><dd>" + fmtInt(num(c.vehicle_count, arr(c.vehicles).length)) + "</dd>" +
-    "<dt>Max speed</dt><dd>" + fmtInt(c.max_speed) + "</dd>" +
+    "<dt>" + (c.coupling ? "Pair's max speed" : "Max speed") + "</dt><dd>" + fmtInt(c.max_speed) + " km/h" +
+      (num(c.sum_power) ? ", " + fmtInt(c.sum_power) + " kW" : "") + "</dd>" +
     (c.traction ? "<dt>Traction</dt><dd>" + esc(TRACTION_TEXT[c.traction] || c.traction) + "</dd>" : "") +
-    (c.coupling === "primary" ? "<dt>Coupled with</dt><dd>" + convoyLink(c.coupled_with) + ' <span class="dim">(runs behind this train)</span></dd>' : "") +
-    (c.coupling === "joined" ? "<dt>Coupled to</dt><dd>" + convoyLink(c.coupled_with) + ' <span class="dim">(this train runs behind it)</span></dd>' : "") +
+    (waitText(c, true) ? "<dt>" + (c.waiting_for ? "Waiting" : "Departure") + "</dt><dd>" +
+      waitText(c, true).replace(/^Departure: /, "") + "</dd>" : "") +
     (c.running_late ? '<dt>Running late</dt><dd>missed its coupling</dd>' : "") +
+    (c.hold_marker ? "<dt>Hold marker</dt><dd>lets passing trains overtake</dd>" : "") +
+    (c.hold_divert ? "<dt>Diverted</dt><dd>heading for a platform to let a passing train by</dd>" : "") +
+    (c.claim_boundary ? "<dt>Claimed track</dt><dd>at the next station, boundary " +
+      '<span class="mono">(' + esc(c.claim_boundary) + ")</span></dd>" : "") +
     "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +
       (num(c.loading_limit) > 0 ? ' <span class="dim">(waits for ' + num(c.loading_limit) + "%)</span>" : "") + "</dd>" +
-    "<dt>Loaded</dt><dd>" + fmtInt(c.total_loaded) + " of " + fmtInt(c.total_capacity) + "</dd>" +
+    "<dt>Loaded</dt><dd>" + fmtInt(c.total_loaded) + " of " + fmtInt(c.total_capacity) +
+      (c.crowd ? ' <span class="dim">(' + esc(crowdText(c.crowd)) + ")</span>" : "") + "</dd>" +
     "<dt>Revenue this month</dt><dd>" + fmtMoney(c.revenue_this_month) + "</dd>" +
     "<dt>Profit this month</dt><dd>" + signed(c.profit_this_month, true) + "</dd>" +
     "<dt>Profit last year</dt><dd>" + signed(c.profit_last_year, true) + "</dd>" +
     "</dl></div>");
 
-  heading(host, "Vehicles");
-  renderTable(host, [
-    { key: "name", label: "Name", value: function (v) { return str(v.name); },
-      html: function (v) { return esc(str(v.name, "unnamed")); } },
-    { key: "catg", label: "Carries", value: function (v) { return catgName(num(v.goods_catg)); },
-      html: function (v) { return esc(catgName(num(v.goods_catg))); } },
-    { key: "cap", label: "Capacity", num: true, value: function (v) { return num(v.capacity); },
-      html: function (v) { return fmtInt(v.capacity); } },
-    { key: "loaded", label: "Loaded", num: true, value: function (v) { return num(v.loaded); },
-      html: function (v) { return fmtInt(v.loaded); } },
-    { key: "speed", label: "Max speed", num: true, value: function (v) { return num(v.max_speed); },
-      html: function (v) { return fmtInt(v.max_speed); } },
-    { key: "power", label: "Power", num: true, value: function (v) { return num(v.power); },
-      html: function (v) {
-        if (!num(v.power)) return '<span class="faint">0</span>';
-        return fmtInt(v.power) + (v.idle ? ' <span class="dim">(idle)</span>' : "");
-      } }
-  ], arr(c.vehicles), { short: true, onSort: false, emptyText: "No vehicle list in this export." });
+  /* coupled pair: the other train, where they part and its load, like the convoy window */
+  var partner = c.coupling ? IDX.convoy[c.coupled_with] : null;
+  if (c.coupling) {
+    var ph = '<div class="card pair" style="margin-top:10px"><dl class="kv">' +
+      "<dt>" + (c.coupling === "primary" ? "Coupled with" : "Coupled to") + "</dt><dd>" + convoyLink(c.coupled_with) +
+        ' <span class="dim">(' + (c.coupling === "primary" ? "behind this train" : "in front, it drives the pair") + ")</span></dd>";
+    if (partner) {
+      ph += "<dt>Its line</dt><dd>" + (IDX.line[partner.line_id] ? lineLink(partner.line_id) : '<span class="faint">none</span>') + "</dd>" +
+        "<dt>Its load</dt><dd>" + (partner.crowd ? esc(crowdText(partner.crowd)) : loadBar(partner.loading_level)) + "</dd>";
+    }
+    ph += "<dt>Uncouples at</dt><dd>" + (c.uncouples_at !== null && c.uncouples_at !== undefined
+      ? stopLink(c.uncouples_at) : '<span class="dim">stays coupled</span>') + "</dd></dl></div>";
+    html(host, ph);
+  }
+
+  /* the whole train front first, like the vehicle details: primary's vehicles, then the joined train's */
+  var front = c.coupling === "joined" && partner ? partner : c;
+  var back = c.coupling === "primary" ? partner : (c.coupling === "joined" ? c : null);
+  var vrows = [];
+  arr(front.vehicles).forEach(function (v) { vrows.push({ v: v, cnv: front }); });
+  if (back && back !== front) arr(back.vehicles).forEach(function (v) { vrows.push({ v: v, cnv: back }); });
+  var anyCrowd = vrows.some(function (r) { return r.v.seated !== undefined; });
+  var vcols = [];
+  if (back) {
+    vcols.push({ key: "part", label: "Train", html: function (r) {
+      return r.cnv === c ? '<span class="dim">this train</span>' : convoyLink(r.cnv.id);
+    } });
+  }
+  vcols.push(
+    { key: "name", label: "Name", value: function (r) { return str(r.v.name); },
+      html: function (r) { return esc(str(r.v.name, "unnamed")); } },
+    { key: "catg", label: "Carries", html: function (r) { return esc(catgName(num(r.v.goods_catg))); } },
+    { key: "cap", label: anyCrowd ? "Capacity (seats)" : "Capacity", num: true, html: function (r) { return fmtInt(r.v.capacity); } },
+    { key: "loaded", label: "Loaded", num: true, html: function (r) { return fmtInt(r.v.loaded); } });
+  if (anyCrowd) {
+    vcols.push(
+      { key: "standing", label: "Standing", num: true, html: function (r) {
+        return r.v.seated === undefined ? '<span class="faint">-</span>' : fmtInt(r.v.standing) + '<span class="faint">/' + fmtInt(r.v.standing_max) + "</span>";
+      } },
+      { key: "over", label: "Overcrowded", num: true, html: function (r) {
+        return r.v.seated === undefined ? '<span class="faint">-</span>' : fmtInt(r.v.overcrowded) + '<span class="faint">/' + fmtInt(r.v.overcrowded_max) + "</span>";
+      } });
+  }
+  vcols.push(
+    { key: "speed", label: "Max speed", num: true, html: function (r) { return fmtInt(r.v.max_speed); } },
+    { key: "power", label: "Power", num: true, html: function (r) {
+      if (!num(r.v.power)) return '<span class="faint">0</span>';
+      return fmtInt(r.v.power) + (r.v.idle ? ' <span class="dim">(idle)</span>' : "");
+    } });
+  heading(host, back ? "Vehicles of the coupled train, front first" : "Vehicles");
+  renderTable(host, vcols, vrows, { short: true, onSort: false, emptyText: "No vehicle list in this export." });
 
   heading(host, "Schedule");
   if (c.schedule) {

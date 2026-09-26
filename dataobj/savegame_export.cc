@@ -311,6 +311,7 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 		w.value_null();
 		return;
 	}
+	karte_ptr_t welt;
 	w.start_object();
 	w.kv_int( "current_stop", schedule->get_current_stop() );
 	// 122.0 has no bidirectional/mirrored schedules
@@ -330,6 +331,9 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 		else {
 			w.kv_null( "halt_id" );
 		}
+		// a depot entry ends a coupled run like a stop the other train skips (next_stop_halt in simconvoi.cc)
+		const grund_t *gr = halt.is_bound() ? NULL : welt->lookup( entry.pos );
+		w.kv_bool( "depot", gr  &&  gr->get_depot() );
 		w.kv_int( "minimum_loading", entry.minimum_loading );
 		w.kv_int( "waiting_time", entry.waiting_time_shift );
 		w.kv_int( "waiting_time_minutes", entry.waiting_time );
@@ -786,6 +790,7 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 		sint64 waiting_pax = 0;
 		sint64 waiting_mail = 0;
 		sint64 waiting_goods = 0;
+		sint64 waiting_missed = 0;
 		w.array_key( "waiting" );
 		for(  uint8 i = 0;  i < goods_manager_t::get_count();  i++  ) {
 			const goods_desc_t *ware = goods_manager_t::get_info( i );
@@ -810,6 +815,10 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 			w.kv_string( "goods_name", ware->get_name() );
 			w.kv_int( "catg_index", ware->get_catg_index() );
 			w.kv_int( "amount", amount );
+			// fork: waiting after a full vehicle left without them, may board overcrowded
+			const uint32 missed = halt->get_ware_summe_missed( ware );
+			waiting_missed += missed;
+			w.kv_int( "missed", missed );
 			w.end_object();
 		}
 		w.end_array();
@@ -818,6 +827,7 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 		w.kv_int( "passengers", waiting_pax );
 		w.kv_int( "mail", waiting_mail );
 		w.kv_int( "goods", waiting_goods );
+		w.kv_int( "missed", waiting_missed );
 		w.end_object();
 
 		w.object_key( "pax" );
@@ -896,6 +906,75 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 }
 
 
+/**
+ * Fork: what the convoy window shows under the destination: why the convoy waits
+ * ("waiting_for", null if it does not) and when it is going to leave ("departure", null if unknown).
+ * driver is the convoy itself, or for a joined train the primary it rides with.
+ */
+static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t cnv, convoihandle_t driver )
+{
+	const char *reason = NULL;
+	convoihandle_t for_cnv;
+	halthandle_t at_halt;
+	if(  cnv->get_state() == convoi_t::UNCOUPLING  ) {
+		reason = "platform_after_uncoupling";
+	}
+	else if(  driver->get_passing_hold_for().is_bound()  ) {
+		reason = "passing_train";
+		for_cnv = driver->get_passing_hold_for();
+	}
+	else if(  driver->get_section_wait() != convoi_t::SECTION_WAIT_NONE  &&  driver->is_waiting()  ) {
+		switch(  driver->get_section_wait()  ) {
+			case convoi_t::SECTION_WAIT_TRACK:      reason = "no_free_track";   break;
+			case convoi_t::SECTION_WAIT_LAST_TRACK: reason = "last_free_track"; break;
+			case convoi_t::SECTION_WAIT_ENTRY:      reason = "station_entry";   break;
+			default:                                reason = "single_track";    break;
+		}
+		at_halt = driver->get_section_wait_halt();
+	}
+	else if(  cnv->is_waiting_for_coupling()  ) {
+		reason = "coupling_partner";
+	}
+
+	if(  reason  ) {
+		w.object_key( "waiting_for" );
+		w.kv_string( "reason", reason );
+		if(  for_cnv.is_bound()  ) {
+			w.kv_int( "convoy_id", for_cnv.get_id() );
+			w.kv_string( "convoy_name", for_cnv->get_name() );
+		}
+		if(  at_halt.is_bound()  ) {
+			w.kv_int( "halt_id", at_halt.get_id() );
+		}
+		w.end_object();
+	}
+	else {
+		w.kv_null( "waiting_for" );
+	}
+
+	sint64 slot = 0;
+	bool latest = false;
+	if(  reason == NULL  &&  driver->get_planned_departure( slot, latest )  ) {
+		const sint64 now = welt->get_calendar_minutes();
+		const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
+		const karte_t::calendar_date_t today = welt->get_calendar_date( now );
+		w.object_key( "departure" );
+		w.kv_int( "hour", date.hour );
+		w.kv_int( "minute", date.minute );
+		w.kv_int( "days_ahead", date.day_number - today.day_number );
+		w.kv_int( "in_minutes", slot > now ? slot - now : 0 );
+		// true: at the latest (the maximum wait ends then), it may leave earlier once loaded
+		w.kv_bool( "latest", latest );
+		const bool timetabled = driver->get_line().is_bound()  &&  driver->get_schedule()->get_current_entry().has_timetable();
+		w.kv_int( "ahead", timetabled ? driver->get_line()->count_earlier_waiting( driver ) : 0 );
+		w.end_object();
+	}
+	else {
+		w.kv_null( "departure" );
+	}
+}
+
+
 static void export_convoys( json_writer_t &w, karte_t *welt )
 {
 	w.array_key( "convoys" );
@@ -937,9 +1016,21 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			w.kv_null( "coupled_with" );
 		}
 		w.kv_bool( "running_late", cnv->is_running_late() );
+		// fork, coupling: the primary drives both trains, so speed, power, departure and waits are its own
+		const convoihandle_t driver = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
+		const halthandle_t uncouple_halt = driver->is_coupled_primary() ? driver->get_uncouple_halt() : halthandle_t();
+		if(  uncouple_halt.is_bound()  ) {
+			w.kv_int( "uncouples_at", uncouple_halt.get_id() );
+		}
+		else {
+			w.kv_null( "uncouples_at" );
+		}
+
+		export_convoy_wait( w, welt, cnv, driver );
 
 		sint64 total_capacity = 0;
 		sint64 total_loaded = 0;
+		uint32 seats = 0, seated = 0, standing_places = 0, standing = 0, overcrowded_places = 0, overcrowded = 0;
 		w.array_key( "vehicles" );
 		for(  uint8 i = 0;  i < own_vehicles;  i++  ) {
 			const vehicle_t *v = cnv->get_vehikel( i );
@@ -972,26 +1063,58 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			}
 			// fork, mixed traction: engine hauled without pulling right now
 			w.kv_bool( "idle", v->is_idle() );
+			// fork: passenger vehicles take standing and overcrowded passengers beyond their seats (capacity)
+			if(  v->can_carry_crowd()  ) {
+				uint16 s, st, o;
+				v->get_crowd_split( s, st, o );
+				w.kv_int( "seated", s );
+				w.kv_int( "standing", st );
+				w.kv_int( "overcrowded", o );
+				w.kv_int( "standing_max", v->get_standing_max() - v->get_cargo_max() );
+				w.kv_int( "overcrowded_max", v->get_overcrowded_max() - v->get_standing_max() );
+				seats += v->get_cargo_max();
+				seated += s;
+				standing += st;
+				overcrowded += o;
+				standing_places += v->get_standing_max() - v->get_cargo_max();
+				overcrowded_places += v->get_overcrowded_max() - v->get_standing_max();
+			}
 			w.end_object();
 		}
 		w.end_array();
 
+		if(  seats > 0  ) {
+			w.object_key( "crowd" );
+			w.kv_int( "seats", seats );
+			w.kv_int( "seated", seated );
+			w.kv_int( "standing_places", standing_places );
+			w.kv_int( "standing", standing );
+			w.kv_int( "overcrowded_places", overcrowded_places );
+			w.kv_int( "overcrowded", overcrowded );
+			w.end_object();
+		}
+		else {
+			w.kv_null( "crowd" );
+		}
+
 		// min_top_speed is in internal speed units, the dialogs show it as km/h
-		w.kv_int( "max_speed", speed_to_kmh( cnv->get_min_top_speed() ) );
-		w.kv_int( "sum_power", cnv->get_sum_power() );
+		w.kv_int( "max_speed", speed_to_kmh( driver->get_min_top_speed() ) );
+		w.kv_int( "sum_power", driver->get_sum_power() );
 		// fork, mixed traction (electric and other engines): which engines pull now, null otherwise
-		if(  cnv->has_mixed_traction()  ) {
-			w.kv_string( "traction", cnv->is_traction_off_wire() ? "off_wire" : (cnv->get_traction_both_under_wire() ? "under_wire_all" : "under_wire_electric") );
+		if(  driver->has_mixed_traction()  ) {
+			w.kv_string( "traction", driver->is_traction_off_wire() ? "off_wire" : (driver->get_traction_both_under_wire() ? "under_wire_all" : "under_wire_electric") );
 		}
 		else {
 			w.kv_null( "traction" );
 		}
-		w.kv_int( "loading_level", cnv->get_loading_level() );
+		// like convoi_t::calc_loading(), from the own vehicles (the cached level of a joined train is not kept up)
+		w.kv_int( "loading_level", total_capacity > 0 ? (total_loaded * 100) / total_capacity : 100 );
 		w.kv_int( "loading_limit", cnv->get_loading_limit() );
 		w.kv_int( "total_capacity", total_capacity );
 		w.kv_int( "total_loaded", total_loaded );
 		w.kv_bool( "has_obsolete_vehicles", cnv->has_obsolete_vehicles() );
 		w.kv_bool( "hold_marker", cnv->get_hold_marker() );
+		w.kv_bool( "hold_divert", cnv->is_hold_divert() );
 		if(  cnv->has_claim()  ) {
 			// fork: station boundary of the track claimed at the next station of a single-track section
 			w.kv_string( "claim_boundary", cnv->get_claim_boundary().get_str() );

@@ -52,11 +52,40 @@ line, its own schedule. A convoy with electric and other engines (mixed traction
 have `idle` when an engine is hauled without pulling; `max_speed` is the top speed of the engines
 that pull at that moment. Coupled trains have `coupling` (`primary` for the train in front, `joined`
 for the one running behind it, null otherwise) and `coupled_with` (the other convoy's id); each lists
-only its own vehicles, and the states `coupled` and `uncoupling` are the joined train while it rides
-along and right after it was uncoupled. `running_late` is set for a train that missed its coupling.
+only its own vehicles, load and money, and the states `coupled` and `uncoupling` are the joined train
+while it rides along and right after it was uncoupled. `max_speed`, `sum_power`, `traction`,
+`waiting_for` and `departure` of a joined train are those of the primary, which drives both.
+`uncouples_at` is the stop where a coupled pair parts (null: not coupled, or they stay coupled).
+`running_late` is set for a train that missed its coupling.
 Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
 null) and `couple_max_wait` in calendar minutes. Schedules have `no_standing` and `no_overcrowding`
 (passenger vehicles take no standing or no overcrowded passengers; no standing implies no overcrowding).
+
+What the convoy window shows under the destination is in `waiting_for` (null, or an object with
+`reason`: `passing_train` with `convoy_id` and `convoy_name`, `no_free_track` / `last_free_track` with
+`halt_id`, `station_entry`, `single_track`, `coupling_partner`, `platform_after_uncoupling`) and
+`departure` (null, or `hour`, `minute`, `days_ahead`, `in_minutes`, `latest` when it is the end of the
+maximum wait, and `ahead`, the trains of its line that leave first). `hold_marker` and `hold_divert`
+are the Hold marker and a diversion to let a passing train by. Passenger vehicles have `seated`,
+`standing`, `overcrowded`, `standing_max` and `overcrowded_max` (`capacity` is the seats), and the
+convoy sums them in `crowd` (null without passenger vehicles), so `total_loaded` and `loading_level`
+can pass the capacity and 100%. Stops give `missed` per waiting good and in `waiting_total`: waiting
+passengers who missed a full vehicle and may board the next one overcrowded.
+
+Schedule entries also have `depot` (true for a depot entry; like a waypoint it has no `halt_id`).
+
+A line that runs coupled with another gets a card per partner line, the same on both lines: which
+train runs in front, capacity together, where they couple, both timetables there, the shared stops
+(with the turn at a terminus), where they uncouple and where each goes on, and the pairs coupled now.
+The viewer plays the schedules forward like `convoi_t::get_uncouple_halt()`: the trains couple at an
+entry of the front line at the same stop that goes on to the same next stop, and stay together while
+both schedules go on to the same next stop (waypoints skipped, a depot ends it). A coupling point a
+pair from another point passes already coupled is listed as a fallback. The schedule marks the
+coupled stretch with a bar and notes where they couple and uncouple; the lines table has a
+"Coupled with" column. The viewer also shows the stop type as the schedule dialog's letter badge,
+a coupling card on convoy pages (the other train, where it parts, the whole train's vehicles front
+first), the wait or departure text and badges in the convoy tables (with a filter for
+coupled, waiting, late, hold and crowded convoys), and the calendar clock in the top bar.
 
 Map draws the whole map extent on a canvas: cities as labeled dots, stops as small squares, and each
 line schedule as a polyline in the color of its type. Drag to pan, use the wheel or the plus and
