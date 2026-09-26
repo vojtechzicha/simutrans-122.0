@@ -284,7 +284,8 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   revenue, running costs (and their share of way tolls), distance and transported goods stay with
   each train and line; at every stop each part loads for its own schedule (portions in
   `hat_gehalten`), and the joined train's minimum load and maximum wait hold the whole train too.
-  At most 255 vehicles together (the vehicle count is a uint8). The joined train's schedule follows
+  At most 255 vehicles together (the vehicle count is a uint8). A primary's load
+  (`calc_loading`), sale value (`calc_restwert`) and purchase cost count only its own vehicles. The joined train's schedule follows
   (`follow_to_stop` on arrival, `advance` on departure, its timetable slot is marked used too).
 - Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
   or on arrival at a stop the joined train's schedule skips. The joined train goes off the map

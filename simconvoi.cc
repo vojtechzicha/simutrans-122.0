@@ -3530,7 +3530,8 @@ sint64 convoi_t::calc_restwert() const
 {
 	sint64 result = 0;
 
-	for(uint i=0; i<anz_vehikel; i++) {
+	// fork, coupling: the joined train's vehicles count for the joined train
+	for(uint i=0; i<get_own_vehicle_count(); i++) {
 		result += fahr[i]->calc_sale_value();
 	}
 	return result;
@@ -3544,7 +3545,8 @@ void convoi_t::calc_loading()
 {
 	int fracht_max = 0;
 	int fracht_menge = 0;
-	for(unsigned i=0; i<anz_vehikel; i++) {
+	// fork, coupling: a primary's load is that of its own vehicles, the joined train has its own
+	for(unsigned i=0; i<get_own_vehicle_count(); i++) {
 		const vehicle_t* v = fahr[i];
 		fracht_max += v->get_cargo_max();
 		fracht_menge += v->get_total_cargo();
@@ -3911,7 +3913,7 @@ void convoi_t::init_financial_history()
 sint64 convoi_t::get_purchase_cost() const
 {
 	sint64 purchase_cost = 0;
-	for(  unsigned i = 0;  i < get_vehicle_count();  i++  ) {
+	for(  unsigned i = 0;  i < get_own_vehicle_count();  i++  ) {
 		purchase_cost += fahr[i]->get_desc()->get_price();
 	}
 	return purchase_cost;
