@@ -2388,12 +2388,16 @@ void road_vehicle_t::set_convoi(convoi_t *c)
 
 
 /* from now on rail vehicles (and other vehicles using blocks) */
+// platforms tried by reserve_hold_platform that do not lead on to the end of choose
+static vector_tpl<koord3d> hold_platform_excluded;
+
 rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : vehicle_t()
 {
 	detour_start = detour_target = detour_exit = koord3d::invalid;
 	platform_needs = 0;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
+	detour_any_track = false;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2443,6 +2447,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	platform_needs = 0;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
+	detour_any_track = false;
 }
 
 
@@ -2568,7 +2573,7 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 			}
 		}
 		// only free track, not even our own
-		return !sch->is_reserved();
+		return detour_any_track  ||  !sch->is_reserved();
 	}
 
 	if(  target_halt.is_bound()  &&  cnv->is_waiting()  ) {
@@ -2636,6 +2641,10 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		// platform to let a passing train by: any of our stops (check_next_tile made sure the way is free)
 		const halthandle_t halt = haltestelle_t::get_halt( gr->get_pos(), get_owner() );
 		if(  !gr->is_halt()  ||  !halt.is_bound()  ) {
+			return false;
+		}
+		if(  hold_platform_excluded.is_contained( gr->get_pos() )  ) {
+			// no way on to the end of choose from there (see reserve_hold_platform)
 			return false;
 		}
 		if(  hold_search==1  ) {
@@ -2945,9 +2954,27 @@ uint8 rail_vehicle_t::get_platform_needs(const schedule_entry_t &entry, halthand
 		}
 	}
 	if(  needs  ) {
-		// a station without such a platform on our track: take any rather than wait forever
+		// a station without such a platform long enough for us: take any rather than wait forever
+		const uint16 length = cnv->get_tile_length();
 		FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
-			if(  tile.grund->get_weg( get_waytype() )  &&  (get_platform_enables( tile.grund ) & needs)  ) {
+			weg_t const* const way = tile.grund->get_weg( get_waytype() );
+			if(  way==NULL  ||  (get_platform_enables( tile.grund ) & needs)==0  ) {
+				continue;
+			}
+			// suitable tiles of this halt in a row along the track, through this tile
+			uint16 run = 1;
+			for(  int r=0;  r<4  &&  run<length;  r++  ) {
+				if(  (way->get_ribi_unmasked() & ribi_t::nsew[r])==0  ) {
+					continue;
+				}
+				const grund_t *gr = tile.grund;
+				grund_t *to;
+				while(  run<length  &&  gr->get_neighbour( to, get_waytype(), ribi_t::nsew[r] )  &&  to->get_halt()==halt  &&  (get_platform_enables( to ) & needs)  ) {
+					run ++;
+					gr = to;
+				}
+			}
+			if(  run >= length  ) {
 				return needs;
 			}
 		}
@@ -3252,6 +3279,27 @@ uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
 }
 
 
+bool rail_vehicle_t::has_onward_path(const route_t &to_platform, const uint16 end_of_choose)
+{
+	route_t const* const route = cnv->get_route();
+	const uint32 n = to_platform.get_count();
+	if(  n < 2  ) {
+		return false;
+	}
+	// the passing train may already hold parts of that way, so any track counts
+	route_t onward;
+	detour_start = to_platform.back();
+	detour_target = route->at(end_of_choose);
+	detour_exit = route->at(end_of_choose+1);
+	detour_any_track = true;
+	const ribi_t::ribi dir = ribi_type( to_platform.at(n-2), to_platform.at(n-1) );
+	const bool found = onward.find_route( welt, detour_start, this, speed_to_kmh(cnv->get_min_top_speed()), dir, welt->get_settings().get_max_choose_route_steps() );
+	detour_start = detour_target = detour_exit = koord3d::invalid;
+	detour_any_track = false;
+	return found;
+}
+
+
 bool rail_vehicle_t::reserve_hold_platform(const uint16 start_block, const uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing)
 {
 	route_t const* const route = cnv->get_route();
@@ -3266,11 +3314,25 @@ bool rail_vehicle_t::reserve_hold_platform(const uint16 start_block, const uint1
 	hold_avoid_to = end_of_choose;
 	const ribi_t::ribi start_dir = ribi_type( route->at(start_block), route->at(start_block+1) );
 	for(  uint8 pass=1;  !found  &&  pass<=2;  pass++  ) {
-		hold_search = pass;
-		found = target_rt.find_route( welt, detour_start, this, speed_to_kmh(cnv->get_min_top_speed()), start_dir, welt->get_settings().get_max_choose_route_steps() );
+		// the platform must lead on forward to our end of choose (no bay platform, no reversing);
+		// otherwise try the next one, a few times
+		hold_platform_excluded.clear();
+		for(  uint8 attempt=0;  !found  &&  attempt<4;  attempt++  ) {
+			detour_start = route->at(start_block);
+			hold_search = pass;
+			if(  !target_rt.find_route( welt, detour_start, this, speed_to_kmh(cnv->get_min_top_speed()), start_dir, welt->get_settings().get_max_choose_route_steps() )  ) {
+				break;
+			}
+			hold_search = 0;
+			found = has_onward_path( target_rt, end_of_choose );
+			if(  !found  ) {
+				hold_platform_excluded.append( target_rt.back() );
+			}
+		}
 	}
 	hold_search = 0;
 	detour_start = koord3d::invalid;
+	hold_platform_excluded.clear();
 	if(  !found  ) {
 		return false;
 	}

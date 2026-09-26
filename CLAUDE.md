@@ -191,7 +191,8 @@ save/load mid-detour, waypoints) with a throwaway harness; re-verify in the Wind
 All rail only, in `vehicle/simvehicle.cc` unless noted.
 - Platform types: a train stopping in a choose area only takes platforms whose station building
   enables what it carries (`get_platform_needs`: passengers or mail need PAX|POST, anything else WARE;
-  no capacity or a Hold stop = any; a station without any such platform on that track = any). Every
+  no capacity or a Hold stop = any; a station without such a platform on that track long enough for
+  the train, counted as suitable tiles in a row, = any). Every
   tile the train stands on must suit (`is_platform_suitable` in `is_stop_position`); an unsuitable
   planned platform is searched away even when free (`is_planned_platform_suitable`).
 - Hold stop type (H badge): see Stop types. The train leaves right away unless it waits as below.
@@ -213,7 +214,10 @@ All rail only, in `vehicle/simvehicle.cc` unless noted.
   signal of an area it passes without stopping, a marked train whose passing train is coming
   (same finder, which must still have our signal tile ahead) takes a free platform of any of our
   halts before the end-of-choose sign, first off its planned way (`reserve_hold_platform`,
-  `hold_search` 1 then 2), and sets `convoi_t::hold_divert` (saved). Arriving there
+  `hold_search` 1 then 2). The platform must lead on forward to that end-of-choose sign
+  (`has_onward_path`: a second search over any track, reserved or not, since the passing train may
+  already hold part of it); a bay or dead-end platform is excluded and the next one tried, up to four
+  per pass. Then it sets `convoi_t::hold_divert` (saved). Arriving there
   (`ziel_erreicht`) is no schedule stop: it goes to ROUTING_1, gets a new route to its unchanged next
   stop, and waits as above. `drive_to` clears `hold_divert`. No diversion while a schedule waypoint
   is pending (the new route would skip it). It diverts only when a passing train is actually coming,

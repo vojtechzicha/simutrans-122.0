@@ -531,6 +531,12 @@ private:
 	uint8 hold_search;
 	uint16 hold_avoid_from, hold_avoid_to;
 
+	// during the check that a Hold platform leads on to the end of choose: any track, reserved or not
+	bool detour_any_track;
+
+	// from the end of this way to a platform, the track leads on forward to the end of choose
+	bool has_onward_path(const route_t &to_platform, uint16 end_of_choose);
+
 	// end of choose index on the route, if this train passes the choose area of the signal at
 	// start_block without stopping (no schedule waypoint in the area either); else INVALID_INDEX
 	uint16 get_passed_end_of_choose(uint16 start_block) const;
