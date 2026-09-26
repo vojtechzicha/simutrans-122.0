@@ -534,6 +534,18 @@ public:
 	 */
 	bool get_planned_departure(sint64 &minutes, bool &latest) const;
 
+	/**
+	 * Fork: appends "Departure: HH:MM (in N min), K ahead" from get_planned_departure; false if unknown.
+	 * For the convoy window and the label over the train.
+	 */
+	bool append_departure_text(cbuffer_t &buf) const;
+
+	/**
+	 * Fork: appends why a convoy standing at a signal or stop does not go on: a passing train it
+	 * waits for, or the single-track section rules; false if neither. For the window and the label.
+	 */
+	bool append_wait_reason(cbuffer_t &buf) const;
+
 	/* true, if electrification needed for this convoi */
 	bool needs_electrification() const { return is_electric; }
 

@@ -141,6 +141,10 @@ calendar on and greys them out for line-less convoys; the entry list appends "(e
 A convoy that arrived after another convoy of its line at the same entry only unloads until
 that one has left (`count_earlier_waiting`), so passengers board the train that leaves first;
 the convoy window shows "Departure: HH:MM (in N min), K ahead" from `get_planned_departure`.
+The label over a train (`show_vehicle_states`, `vehicle_t::display_after`) shows the same texts:
+loading plus coupling wait or late running plus departure, and at a signal the passing-train or
+single-track reason instead of "Waiting for clearance" (`convoi_t::append_departure_text`,
+`append_wait_reason`, shared with the convoy window).
 Not done yet: the stop departure boards still estimate from arrival plus wait.
 
 Stop types (savegame 122.3, `schedule_entry_t::stop_type`): Regular, Terminal (everything off,

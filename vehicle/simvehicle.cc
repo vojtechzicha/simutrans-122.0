@@ -1805,14 +1805,34 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 			case convoi_t::CAN_START:
 			case convoi_t::CAN_START_ONE_MONTH:
 				if(  state>=3  ) {
-					snprintf( tooltip_text, lengthof(tooltip_text), "%s (%s)", translator::translate("Waiting for clearance!"), cnv->get_schedule()->get_current_entry().pos.get_str() );
+					// fork: a passing train or the single-track rules say more than "waiting"
+					cbuffer_t reason;
+					if(  cnv->append_wait_reason( reason )  ) {
+						tstrncpy( tooltip_text, reason, lengthof(tooltip_text) );
+					}
+					else {
+						snprintf( tooltip_text, lengthof(tooltip_text), "%s (%s)", translator::translate("Waiting for clearance!"), cnv->get_schedule()->get_current_entry().pos.get_str() );
+					}
 					color = color_idx_to_rgb(COL_YELLOW);
 				}
 				break;
 
 			case convoi_t::LOADING:
 				if(  state>=3  ) {
-					sprintf( tooltip_text, translator::translate("Loading (%i->%i%%)!"), cnv->get_loading_level(), cnv->get_loading_limit() );
+					cbuffer_t buf;
+					buf.printf( translator::translate("Loading (%i->%i%%)!"), cnv->get_loading_level(), cnv->get_loading_limit() );
+					// fork: coupling and timetable
+					if(  cnv->is_waiting_for_coupling()  ) {
+						buf.printf( " - %s", translator::translate("Waiting for the train to couple with") );
+					}
+					else if(  cnv->is_running_late()  ) {
+						buf.printf( " - %s", translator::translate("Running late (missed coupling)") );
+					}
+					cbuffer_t departure;
+					if(  cnv->append_departure_text( departure )  ) {
+						buf.printf( " - %s", (const char *)departure );
+					}
+					tstrncpy( tooltip_text, buf, lengthof(tooltip_text) );
 					color = color_idx_to_rgb(COL_YELLOW);
 				}
 				break;
@@ -1848,8 +1868,16 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 
 			case convoi_t::WAITING_FOR_CLEARANCE_TWO_MONTHS:
 			case convoi_t::CAN_START_TWO_MONTHS:
-				snprintf( tooltip_text, lengthof(tooltip_text), "%s (%s)", translator::translate("clf_chk_stucked"), cnv->get_schedule()->get_current_entry().pos.get_str() );
-				color = color_idx_to_rgb(COL_ORANGE);
+				{
+					snprintf( tooltip_text, lengthof(tooltip_text), "%s (%s)", translator::translate("clf_chk_stucked"), cnv->get_schedule()->get_current_entry().pos.get_str() );
+					// fork: and why, if the single-track rules know
+					cbuffer_t reason;
+					if(  cnv->append_wait_reason( reason )  ) {
+						const size_t len = strlen( tooltip_text );
+						snprintf( tooltip_text + len, lengthof(tooltip_text) - len, " - %s", (const char *)reason );
+					}
+					color = color_idx_to_rgb(COL_ORANGE);
+				}
 				break;
 
 			case convoi_t::NO_ROUTE:

@@ -3827,6 +3827,65 @@ bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
 }
 
 
+bool convoi_t::append_departure_text(cbuffer_t &buf) const
+{
+	sint64 slot = 0;
+	bool latest = false;
+	if(  !get_planned_departure( slot, latest )  ) {
+		return false;
+	}
+	const sint64 now = welt->get_calendar_minutes();
+	const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
+	const karte_t::calendar_date_t today = welt->get_calendar_date( now );
+	buf.printf( translator::translate(latest ? "Departure: by %02d:%02d" : "Departure: %02d:%02d"), date.hour, date.minute );
+	if(  date.day_number != today.day_number  ) {
+		buf.printf( " +%dd", (int)(date.day_number - today.day_number) );
+	}
+	if(  slot > now  ) {
+		buf.printf( translator::translate(" (in %d min)"), (int)(slot - now) );
+	}
+	else {
+		buf.append( translator::translate(" (now)") );
+	}
+	const uint32 ahead = line.is_bound()  &&  schedule->get_current_entry().has_timetable() ? line->count_earlier_waiting( self ) : 0;
+	if(  ahead > 0  ) {
+		buf.printf( translator::translate(", %d ahead"), (int)ahead );
+	}
+	return true;
+}
+
+
+bool convoi_t::append_wait_reason(cbuffer_t &buf) const
+{
+	if(  passing_hold_for.is_bound()  ) {
+		// waiting at the stop for a passing train to go by
+		buf.printf( translator::translate("Waiting for %s to pass"), passing_hold_for->get_name() );
+		return true;
+	}
+	const bool waiting = state>=WAITING_FOR_CLEARANCE  &&  state<=CAN_START_TWO_MONTHS  &&  state!=SELF_DESTRUCT;
+	if(  section_wait == SECTION_WAIT_NONE  ||  !waiting  ) {
+		return false;
+	}
+	// at a platform signal or station boundary of a single-track line
+	const char *halt_name = section_wait_halt.is_bound() ? section_wait_halt->get_name() : "?";
+	switch(  section_wait  ) {
+		case SECTION_WAIT_TRACK:
+			buf.printf( translator::translate("No free track at %s"), halt_name );
+			break;
+		case SECTION_WAIT_LAST_TRACK:
+			buf.printf( translator::translate("Keeping the last track at %s free"), halt_name );
+			break;
+		case SECTION_WAIT_ENTRY:
+			buf.append( translator::translate("Waiting to enter the station") );
+			break;
+		default:
+			buf.append( translator::translate("Waiting for the single track") );
+			break;
+	}
+	return true;
+}
+
+
 sint64 convoi_t::calc_restwert() const
 {
 	sint64 result = 0;

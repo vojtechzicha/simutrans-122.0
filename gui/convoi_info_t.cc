@@ -415,53 +415,9 @@ void convoi_info_t::update_labels()
 
 	// fork: when this convoy is going to leave (timetable slot, or the end of its maximum wait);
 	// a coupled train leaves with its primary
-	sint64 slot = 0;
-	bool latest = false;
 	const convoihandle_t dep_cnv = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
-	const convoihandle_t passing = dep_cnv->get_passing_hold_for();
-	const bool section_wait = dep_cnv->get_section_wait()!=convoi_t::SECTION_WAIT_NONE  &&  dep_cnv->is_waiting();
-	const bool show_departure = passing.is_bound()  ||  section_wait  ||  dep_cnv->get_planned_departure( slot, latest );
-	if(  passing.is_bound()  ) {
-		// fork: waiting at the stop for a passing train to go by
-		departure_label.buf().printf( translator::translate("Waiting for %s to pass"), passing->get_name() );
-	}
-	else if(  section_wait  ) {
-		// fork: waiting at a platform signal or station boundary of a single-track line
-		const halthandle_t halt = dep_cnv->get_section_wait_halt();
-		switch(  dep_cnv->get_section_wait()  ) {
-			case convoi_t::SECTION_WAIT_TRACK:
-				departure_label.buf().printf( translator::translate("No free track at %s"), halt.is_bound() ? halt->get_name() : "?" );
-				break;
-			case convoi_t::SECTION_WAIT_LAST_TRACK:
-				departure_label.buf().printf( translator::translate("Keeping the last track at %s free"), halt.is_bound() ? halt->get_name() : "?" );
-				break;
-			case convoi_t::SECTION_WAIT_ENTRY:
-				departure_label.buf().append( translator::translate("Waiting to enter the station") );
-				break;
-			default:
-				departure_label.buf().append( translator::translate("Waiting for the single track") );
-				break;
-		}
-	}
-	else if(  show_departure  ) {
-		const sint64 now = welt->get_calendar_minutes();
-		const karte_t::calendar_date_t date = welt->get_calendar_date( slot );
-		const karte_t::calendar_date_t today = welt->get_calendar_date( now );
-		departure_label.buf().printf( translator::translate(latest ? "Departure: by %02d:%02d" : "Departure: %02d:%02d"), date.hour, date.minute );
-		if(  date.day_number != today.day_number  ) {
-			departure_label.buf().printf( " +%dd", (int)(date.day_number - today.day_number) );
-		}
-		if(  slot > now  ) {
-			departure_label.buf().printf( translator::translate(" (in %d min)"), (int)(slot - now) );
-		}
-		else {
-			departure_label.buf().append( translator::translate(" (now)") );
-		}
-		const uint32 ahead = dep_cnv->get_line().is_bound()  &&  dep_cnv->get_schedule()->get_current_entry().has_timetable() ? dep_cnv->get_line()->count_earlier_waiting( dep_cnv ) : 0;
-		if(  ahead > 0  ) {
-			departure_label.buf().printf( translator::translate(", %d ahead"), (int)ahead );
-		}
-	}
+	// waiting for a passing train or at a single-track section, else the planned departure
+	const bool show_departure = dep_cnv->append_wait_reason( departure_label.buf() )  ||  dep_cnv->append_departure_text( departure_label.buf() );
 	departure_label.update();
 	if(  departure_label.is_visible() != show_departure  ) {
 		departure_label.set_visible( show_departure );
