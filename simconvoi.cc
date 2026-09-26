@@ -749,9 +749,13 @@ void convoi_t::add_running_cost( const weg_t *weg )
 		}
 		// the rest is ours
 		const sint32 all_costs = sum_running_costs;
+		const uint32 speed_sum_before = sum_speed_limit;
 		sum_running_costs -= coupled_costs;
 		add_running_cost_own( weg );
 		sum_running_costs = all_costs;
+		// the joined train ran this tile at the same speed (average speed statistics)
+		c->distance_since_last_stop ++;
+		c->sum_speed_limit += sum_speed_limit - speed_sum_before;
 		return;
 	}
 	add_running_cost_own( weg );
@@ -3326,15 +3330,17 @@ station_tile_search_ready: ;
 		joined->loading_limit = joined->schedule->get_current_entry().minimum_loading;
 	}
 
-	// update statistics of average speed
-	if(  distance_since_last_stop  ) {
-		financial_history[0][CONVOI_MAXSPEED] *= maxspeed_average_count;
-		financial_history[0][CONVOI_MAXSPEED] += get_speedbonus_kmh();
-		maxspeed_average_count ++;
-		financial_history[0][CONVOI_MAXSPEED] /= maxspeed_average_count;
+	// update statistics of average speed (fork, coupling: the joined train's too)
+	for(  convoi_t *c = this;  c;  c = (c==this ? joined : NULL)  ) {
+		if(  c->distance_since_last_stop  ) {
+			c->financial_history[0][CONVOI_MAXSPEED] *= c->maxspeed_average_count;
+			c->financial_history[0][CONVOI_MAXSPEED] += c->get_speedbonus_kmh();
+			c->maxspeed_average_count ++;
+			c->financial_history[0][CONVOI_MAXSPEED] /= c->maxspeed_average_count;
+		}
+		c->distance_since_last_stop = 0;
+		c->sum_speed_limit = 0;
 	}
-	distance_since_last_stop = 0;
-	sum_speed_limit = 0;
 
 	if(gewinn) {
 		jahresgewinn += gewinn;
@@ -4840,7 +4846,7 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 
 	// the joined train rides along
 	C->state = COUPLED;
-	C->arrived_time = P->arrived_time;
+	// (its arrived_time stays its own: its maximum wait counts from its own arrival)
 	C->couple_wait_since = 0;
 	C->couple_hold_slot = -1;
 	C->running_late = false;

@@ -281,9 +281,10 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   primary. The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
   its vehicles (for its window, finances, save) but the vehicles belong to the primary
   (`coupled_first`, `get_vehicle_owner`, `get_own_vehicle_count`). Fixed costs, goods categories,
-  revenue, running costs (and their share of way tolls), distance and transported goods stay with
-  each train and line; at every stop each part loads for its own schedule (portions in
-  `hat_gehalten`), and the joined train's minimum load and maximum wait hold the whole train too.
+  revenue, running costs (and their share of way tolls), distance, average speed and transported
+  goods stay with each train and line; at every stop each part loads for its own schedule (portions
+  in `hat_gehalten`), and the joined train's minimum load and maximum wait (counted from its own
+  arrival) hold the whole train too.
   At most 255 vehicles together (the vehicle count is a uint8). A primary's load
   (`calc_loading`), sale value (`calc_restwert`) and purchase cost count only its own vehicles. The joined train's schedule follows
   (`follow_to_stop` on arrival, `advance` on departure, its timetable slot is marked used too).
