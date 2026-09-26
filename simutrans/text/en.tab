@@ -1597,3 +1597,23 @@ off wires %d kW, %d km/h loaded
 off wires %d kW, %d km/h loaded
 (pulling %d kW, %s)
 (pulling %d kW, %s)
+Couple with
+Couple with
+Wait for it (min)
+Wait for it (min)
+<no coupling>
+<no coupling>
+Coupled to %s
+Coupled to %s
+Coupled with %s
+Coupled with %s
+Uncoupled, waiting for the platform
+Uncoupled, waiting for the platform
+Waiting for the train to couple with
+Waiting for the train to couple with
+Running late (missed coupling)
+Running late (missed coupling)
+Not allowed!\nThis train is coupled to another\ntrain. Change its line's\nschedule instead.
+Not allowed!\nThis train is coupled to another\ntrain. Change its line's\nschedule instead.
+Not allowed while coupled to another train
+Not allowed while coupled to another train

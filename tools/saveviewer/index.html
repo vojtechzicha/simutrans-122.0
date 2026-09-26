@@ -859,6 +859,10 @@ function scheduleList(host, sched) {
     var stopTypes = ["", "terminal", "all off", "only load", "only unload", "hold"];
     if (stopTypes[num(e.stop_type)]) opts.push(stopTypes[num(e.stop_type)]);
     if (opts.length) h += ' <span class="opts">(' + esc(opts.join(", ")) + ")</span>";
+    if (e.couple_line_id !== null && e.couple_line_id !== undefined) {
+      h += ' <span class="opts">(couples with ' + lineLink(e.couple_line_id) +
+           (num(e.couple_max_wait) > 0 ? ", waits up to " + num(e.couple_max_wait) + " min" : "") + ")</span>";
+    }
     h += "</li>";
   });
   h += "</ol></div>";
@@ -1144,6 +1148,9 @@ function viewConvoyDetail(host, id) {
     "<dt>Vehicles</dt><dd>" + fmtInt(num(c.vehicle_count, arr(c.vehicles).length)) + "</dd>" +
     "<dt>Max speed</dt><dd>" + fmtInt(c.max_speed) + "</dd>" +
     (c.traction ? "<dt>Traction</dt><dd>" + esc(TRACTION_TEXT[c.traction] || c.traction) + "</dd>" : "") +
+    (c.coupling === "primary" ? "<dt>Coupled with</dt><dd>" + convoyLink(c.coupled_with) + ' <span class="dim">(runs behind this train)</span></dd>' : "") +
+    (c.coupling === "joined" ? "<dt>Coupled to</dt><dd>" + convoyLink(c.coupled_with) + ' <span class="dim">(this train runs behind it)</span></dd>' : "") +
+    (c.running_late ? '<dt>Running late</dt><dd>missed its coupling</dd>' : "") +
     "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +
       (num(c.loading_limit) > 0 ? ' <span class="dim">(waits for ' + num(c.loading_limit) + "%)</span>" : "") + "</dd>" +
     "<dt>Loaded</dt><dd>" + fmtInt(c.total_loaded) + " of " + fmtInt(c.total_capacity) + "</dd>" +

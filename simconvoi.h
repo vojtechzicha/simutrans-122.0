@@ -18,6 +18,7 @@
 #include "vehicle/overtaker.h"
 #include "tpl/array_tpl.h"
 #include "tpl/minivec_tpl.h"
+#include "tpl/vector_tpl.h"
 
 #include "convoihandle_t.h"
 #include "halthandle_t.h"
@@ -71,6 +72,8 @@ public:
 		CAN_START_TWO_MONTHS,
 		LEAVING_DEPOT,
 		ENTERING_DEPOT,
+		COUPLED,        ///< fork: joined to a primary train, which drives its vehicles (see coupled_convoi)
+		UNCOUPLING,     ///< fork: just uncoupled, off the map until the primary has left the platform
 		MAX_STATES
 	};
 
@@ -240,6 +243,34 @@ private:
 	bool passing_hold_released;
 
 	/**
+	 * Fork, coupling (rail). A primary train carries the vehicles of the train that joined it at
+	 * the end of fahr, from index coupled_first on, and coupled_convoi is that train. The joined
+	 * train is in state COUPLED: its fahr points to the same vehicles (they belong to the primary
+	 * while coupled, see get_vehicle_owner) and its coupled_convoi is the primary.
+	 * A train in state UNCOUPLING has just been uncoupled: its vehicles are off the map until the
+	 * primary (its coupled_convoi) has left uncouple_span (tiles, rear to front), then it appears
+	 * there. The primary hands over the span tiles as its last vehicle leaves them (handover_to).
+	 */
+	convoihandle_t coupled_convoi;
+	uint8 coupled_first;
+	convoihandle_t handover_to;
+	vector_tpl<koord3d> uncouple_span;
+
+	/**
+	 * Fork, coupling: waiting at a stop for the partner since this tick (0 = not waiting), and the
+	 * timetable slot held meanwhile (-1 = none), so a late departure keeps it.
+	 */
+	uint32 couple_wait_since;
+	sint64 couple_hold_slot;
+
+	/**
+	 * Fork, coupling: running late after the primary left without us; late_slot is the slot
+	 * inherited for the current stop (-1 = none), see simline_t::get_late_departure_slot.
+	 */
+	bool running_late;
+	sint64 late_slot;
+
+	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
 	*/
 	bool freight_info_resort;
@@ -406,6 +437,34 @@ private:
 	void unregister_stops();
 
 	uint32 move_to(uint16 start_index);
+
+	/**
+	 * Puts the whole train on the start of its route and drives it on until it is completely on
+	 * the track (the vehicles are placed without hopping). Returns true if the route was too
+	 * short for that, i.e. the train is at its destination already.
+	 */
+	bool lay_out_on_route();
+
+	/// fork, coupling: the tiles under the vehicles, rear to front
+	void get_train_tiles(vector_tpl<koord3d> &tiles) const;
+
+	/// fork, coupling: joins the train C to the primary P standing next to it at a stop
+	static bool couple(convoihandle_t P, convoihandle_t C);
+
+	/// fork, coupling: at a stop where the schedules part, the joined train stays behind
+	void uncouple_here();
+
+	/// fork, coupling: while UNCOUPLING, takes the span tiles over and appears when all are ours
+	void step_uncoupling();
+
+	/// fork, coupling: the joined train takes its vehicles back where they stand (primary removed)
+	void release_coupled_in_place();
+
+	/// fork, coupling: a primary gives the joined train its vehicles back (they stay where they are)
+	void detach_coupled_vehicles();
+
+	/// fork, coupling: the joined train's schedule follows the primary to this stop; false if it does not stop here
+	bool follow_to_stop(halthandle_t halt);
 
 public:
 	/**
@@ -650,6 +709,9 @@ public:
 	 * Add the costs for travelling one tile
 	 */
 	void add_running_cost( const weg_t *weg );
+
+	/// fork, coupling: add_running_cost for our own vehicles (sum_running_costs)
+	void add_running_cost_own( const weg_t *weg );
 
 	/**
 	 * moving the vehicles of a convoi and acceleration/deceleration
@@ -897,6 +959,41 @@ public:
 
 	// standing at a stop (loading, or finding its route before leaving): road traffic may pass it
 	bool is_standing() const { return state==LOADING  ||  state==ROUTING_1  ||  state==NO_ROUTE; }
+
+	// fork, coupling (see coupled_convoi)
+	bool is_coupled() const { return state==COUPLED; }
+	bool is_coupled_primary() const { return coupled_convoi.is_bound()  &&  state!=COUPLED  &&  state!=UNCOUPLING; }
+	convoihandle_t get_coupled_convoi() const { return coupled_convoi; }
+	uint8 get_coupled_first() const { return coupled_first; }
+	/// the convoi whose vehicle i is (the joined train for its part of a coupled primary)
+	convoihandle_t get_vehicle_owner(uint8 i) const { return is_coupled_primary()  &&  i>=coupled_first ? coupled_convoi : self; }
+	/// the number of the primary's own vehicles, at the start of fahr
+	uint8 get_own_vehicle_count() const { return is_coupled_primary() ? coupled_first : anz_vehikel; }
+	bool is_running_late() const { return running_late; }
+	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
+	/// fork, coupling: the primary hands the tile over to the train it just uncoupled
+	void handover_tile(koord3d pos);
+
+	/**
+	 * Fork, coupling: does this train wait for a partner at its current stop? max_wait is the
+	 * waiting time in calendar minutes; for a primary also the line and entry of the partner.
+	 */
+	bool expects_partner(uint16 &max_wait, linehandle_t &partner_line, uint8 &partner_entry) const;
+
+	/**
+	 * Fork, coupling: the partner at the stop this train heads for, standing there or with its
+	 * route reserved into it (standing is set accordingly). Unbound if there is none.
+	 */
+	convoihandle_t find_partner_at(halthandle_t halt, bool &standing) const;
+
+	/**
+	 * Fork, coupling, called when reserving: cut our route before the first tile of our partner
+	 * standing at our next stop, so we stop right behind it. Returns true if the route was cut.
+	 */
+	bool cut_route_before_partner(uint16 start_index);
+
+	/// fork, coupling: can the train C join the primary P at the stop where both stand?
+	static bool can_couple_here(const convoi_t *P, const convoi_t *C);
 
 	// fork, rail: marked as Hold by itself or by its line
 	bool get_hold_marker() const { return hold_marker; }

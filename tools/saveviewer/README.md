@@ -50,7 +50,12 @@ and this month's profit. The detail page lists the vehicles and, for a convoy th
 line, its own schedule. A convoy with electric and other engines (mixed traction) has `traction`
 (`under_wire_electric`, `under_wire_all` or `off_wire`, null for other convoys) and its vehicles
 have `idle` when an engine is hauled without pulling; `max_speed` is the top speed of the engines
-that pull at that moment.
+that pull at that moment. Coupled trains have `coupling` (`primary` for the train in front, `joined`
+for the one running behind it, null otherwise) and `coupled_with` (the other convoy's id); each lists
+only its own vehicles, and the states `coupled` and `uncoupling` are the joined train while it rides
+along and right after it was uncoupled. `running_late` is set for a train that missed its coupling.
+Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
+null) and `couple_max_wait` in calendar minutes.
 
 Map draws the whole map extent on a canvas: cities as labeled dots, stops as small squares, and each
 line schedule as a polyline in the color of its type. Drag to pan, use the wheel or the plus and

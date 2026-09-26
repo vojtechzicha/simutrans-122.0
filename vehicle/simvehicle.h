@@ -435,7 +435,8 @@ public:
 	* Remove freight that no longer can reach it's destination
 	* i.e. because of a changed schedule
 	*/
-	void remove_stale_cargo();
+	/// fork: sched is the schedule to check against (default: the convoi's; a coupled train's own)
+	void remove_stale_cargo(const schedule_t *sched = NULL);
 
 	/**
 	* Generate a matching schedule for the vehicle type
@@ -542,6 +543,15 @@ private:
 
 	// during the check that a Hold platform leads on to the end of choose: any track, reserved or not
 	bool detour_any_track;
+
+	// fork, coupling: during the search for the way to the platform of this partner: any of its tiles
+	// when it stands there, else couple_goal (the end of its route); unbound while no such search runs
+	convoihandle_t couple_search;
+	koord3d couple_goal;
+
+	// fork, coupling: at a choose signal, the way to the platform of our partner:
+	// 1 reserved, 0 wait at red (partner still running in, or the way is taken), -1 no way there
+	int reserve_to_partner(signal_t *sig, uint16 start_block, convoihandle_t partner, bool standing, sint32 &restart_speed);
 
 	// from the end of this way to a platform, the track leads on forward to the end of choose
 	bool has_onward_path(const route_t &to_platform, uint16 end_of_choose);

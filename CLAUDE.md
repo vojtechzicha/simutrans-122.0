@@ -248,6 +248,68 @@ catenary once the convoy has another engine and shows the off-wire power and spe
 details show installed and pulling power and the mode and mark idle engines; the JSON export has `traction` per convoy and
 `idle` per vehicle. Convoys with only one kind of engine behave as stock.
 
+## Coupling trains (fork feature, savegame 122.6)
+
+Two lines share a trunk with one train, like R12 Brno -> Zabreh -> Sumperk / Jesenik: R12a and R12b
+keep their full schedules, and a schedule entry of R12b says "Couple with R12a, wait up to N min"
+(`schedule_entry_t::couple_line_id` / `couple_max_wait`, rail schedules only; schedule dialog row
+"Couple with", entry list shows `[+ R12a]`). R12a is the primary, R12b the joining train; the
+primary line carries no setting, it learns from the stop's `registered_lines`. All logic is in
+`simconvoi.cc` (block "Fork: coupling of trains") plus hooks in `vehicle/simvehicle.cc`.
+- When: both trains stand at the stop of that entry and both schedules go on to the same next stop
+  (`can_couple_here`, waypoints skipped). One partner per train. Whichever train is ready first waits
+  up to the max wait (`expects_partner`, counted from when it would otherwise leave; the timetable
+  slot is held in `couple_hold_slot`, so it leaves late but in its slot). Needs the calendar.
+- Getting next to each other: `cut_route_before_partner`, called from `block_reserver`, cuts a
+  train's route right before the tiles of its partner standing at its next stop, so a signal that is
+  red only because of the partner turns green and the train stops behind it (or head to head). At a
+  choose signal `reserve_to_partner` routes to the partner's platform (`couple_search` mode of
+  `check_next_tile`/`is_target`); a partner still running in (route reserved into the stop) makes
+  the train wait at red and try again; no way there falls back to the stock choice.
+- Different platforms of the same stop (no choose signal, or no way over): they couple anyway. The
+  joining train's vehicles move to the track behind the primary, the way the primary came in
+  (`couple`, needs those tiles free of other trains and long enough); otherwise they keep waiting.
+  Not realistic, but it keeps a missed platform from breaking the pair.
+- Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
+  become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
+  primary's direction (`lay_out_on_route`, the stock reversal code), all tiles reserved for the
+  primary. The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
+  its vehicles (for its window, finances, save) but the vehicles belong to the primary
+  (`coupled_first`, `get_vehicle_owner`, `get_own_vehicle_count`). Fixed costs, goods categories,
+  revenue, running costs and transported goods stay with each train and line; at every stop each
+  part loads for its own schedule (portions in `hat_gehalten`). The joined train's schedule follows
+  (`follow_to_stop` on arrival, `advance` on departure, its timetable slot is marked used too).
+- Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
+  or on arrival at a stop the joined train's schedule skips. The joined train goes off the map
+  (UNCOUPLING) and remembers the tiles of the whole train (`uncouple_span`); the primary leaves on
+  green, hands each span tile over as its last vehicle leaves it (`handover_tile` from
+  `rail_vehicle_t::leave_tile`, `move_to` keeps span tiles), and tiles it will not drive through are
+  taken in `step_uncoupling`. When all are ours, the train appears at the rear of the span and loads
+  there as a train of its own. Nothing else can take the platform in between, so single track with
+  full stop signals behaves like two stock trains.
+- Missed coupling: a primary that leaves alone after the max wait gives its slot to the joining line
+  (`simline_t::add_missed_coupling`); the next train of that line arriving alone at that entry takes
+  it (`late_slot`, `running_late`), does not wait for the gone partner, and leaves at once. While
+  late it takes the oldest unused due slot at timetabled stops (`get_late_departure_slot`) until a
+  slot lies ahead again or it couples; spare time at the branch terminus recovers it.
+- Other: depot entry of a coupled primary takes both trains in as two convoys; deleting either
+  train keeps the other (a deleted primary leaves the joined train standing where it is); the joined
+  train's schedule window is refused while coupled; the convoy window shows "Coupled to/with",
+  "Uncoupled, waiting for the platform", waiting for the partner, "Running late"; the departure
+  board lists the joined train's destination with the primary's time; JSON export `coupling`,
+  `coupled_with`, `running_late` per convoy (each lists only its own vehicles) and `couple_line_id`,
+  `couple_max_wait` per schedule entry.
+- Saved (122.6): the entry fields, both handles, `coupled_first`, `handover_to`, the span, the wait
+  and late state, the line's missed slots. The primary saves its own vehicles and the joined train
+  its own; `finish_rd` of the primary joins them again. `-saveversion 0.122.0` writes a joined
+  train as a train of its own (state ROUTING_1) behind the primary; one waiting to reappear keeps
+  its old tile positions (rare, short window).
+Tested headless on pak64 with a throwaway harness (not committed): couple, run, split, rejoin,
+terminus reversal while coupled, the primary turning back through the span, choose signals with the
+partner on the other platform, coupling across platforms without choose signals, missed coupling with timetable and late running, save/load while
+coupled, uncoupling and waiting, downgrade, deleting either train, depot entry. The GUI parts
+(schedule dialog row, convoy window, departure board) are compiled but not seen on screen.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds
