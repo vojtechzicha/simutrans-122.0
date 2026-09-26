@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef
-#define
+#ifndef SIMHALT_H
+#define SIMHALT_H
 
 
 #include "convoihandle_t.h"

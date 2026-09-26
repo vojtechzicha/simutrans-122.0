@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef
-#define
+#ifndef SIMVERSION_H
+#define SIMVERSION_H
 
 
 #if defined(REVISION_FROM_FILE)  &&  !defined(REVISION)

@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef
-#define
+#ifndef SIMWARE_H
+#define SIMWARE_H
 
 
 #include "halthandle_t.h"
