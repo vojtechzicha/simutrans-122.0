@@ -7184,6 +7184,26 @@ bool tool_change_line_t::init( player_t *player )
 			}
 			break;
 
+		case 'D': // fork: duplicate line, same schedule and settings, no convois
+			{
+				if (line.is_bound()) {
+					linehandle_t copy = player->simlinemgmt.create_line( line->get_linetype(), player, line->get_schedule() );
+					copy->get_schedule()->finish_editing();
+					cbuffer_t name;
+					name.printf( translator::translate("%s (copy)"), line->get_name() );
+					copy->set_name( name );
+					copy->set_hold_marker( line->get_hold_marker() );
+					player->simlinemgmt.sort_lines();
+					if(  can_use_gui()  ) {
+						schedule_list_gui_t *sl = dynamic_cast<schedule_list_gui_t *>(win_get_magic(magic_line_management_t+player->get_player_nr()));
+						if(  sl  ) {
+							sl->show_lineinfo( copy );
+						}
+					}
+				}
+			}
+			break;
+
 		case 'h': // fork: change Hold marker of all convois of the line
 			{
 				if (line.is_bound()) {
