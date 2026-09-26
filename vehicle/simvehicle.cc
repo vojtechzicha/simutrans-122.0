@@ -960,6 +960,8 @@ vehicle_t::vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t* player) 
 	check_for_finish = false;
 	use_calc_height = true;
 	has_driven = false;
+	idle = false;
+	on_wire = true;
 
 	previous_direction = direction = ribi_t::none;
 	target_halt = halthandle_t();
@@ -982,6 +984,8 @@ vehicle_t::vehicle_t() :
 	leading = last = false;
 	check_for_finish = false;
 	use_calc_height = true;
+	idle = false;
+	on_wire = true;
 
 	previous_direction = direction = ribi_t::none;
 }
@@ -1164,6 +1168,14 @@ void vehicle_t::hop(grund_t* gr)
 		speed_limit = SPEED_UNLIMITED;
 	}
 
+	// fork, mixed traction: an electric engine entering or leaving catenary changes which engines pull
+	if(  cnv->has_mixed_traction()  &&  desc->get_power()  &&  desc->get_engine_type()==vehicle_desc_t::electric  ) {
+		const bool was_on_wire = on_wire;
+		if(  update_on_wire() != was_on_wire  ) {
+			cnv->recalc_traction( false );
+		}
+	}
+
 	if(  leading  ) {
 		if(  check_for_finish  &&  (direction==ribi_t::north  ||  direction==ribi_t::west)  ) {
 			steps_next = (steps_next/2)+1;
@@ -1228,10 +1240,24 @@ void vehicle_t::calc_friction(const grund_t *gr)
 }
 
 
+bool vehicle_t::update_on_wire()
+{
+	if(  const grund_t *gr = welt->lookup( get_pos() )  ) {
+		const weg_t *w = gr->get_weg( get_waytype() );
+		if(  w == NULL  &&  get_waytype() == tram_wt  ) {
+			// tram depots stand on track
+			w = gr->get_weg( track_wt );
+		}
+		on_wire = w != NULL  &&  w->is_electrified();
+	}
+	return on_wire;
+}
+
+
 void vehicle_t::make_smoke() const
 {
-	// does it smoke at all?
-	if(  smoke  &&  desc->get_smoke()  ) {
+	// does it smoke at all? (fork: an idle engine does not)
+	if(  smoke  &&  !idle  &&  desc->get_smoke()  ) {
 		// only produce smoke when heavily accelerating or steam engine
 		if(  cnv->get_akt_speed() < (sint32)((cnv->get_speed_limit() * 7u) >> 3)  ||  desc->get_engine_type() == vehicle_desc_t::steam  ) {
 			grund_t* const gr = welt->lookup( get_pos() );
@@ -2549,7 +2575,8 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 	if(sch->has_sign()) {
 		const roadsign_t* rs = bd->find<roadsign_t>();
 		if(  rs->get_desc()->get_wtyp()==get_waytype()  ) {
-			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_min_top_speed()  ) {
+			// fork, mixed traction: the engines that pull on this tile decide
+			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_traction_top_speed( sch->is_electrified() )  ) {
 				// below speed limit
 				return false;
 			}

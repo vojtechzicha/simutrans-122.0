@@ -227,6 +227,27 @@ express, local ignores fast freight, freight waits for freight, both tracks held
 at red releases both, marked convoy and marked line divert, save/load mid-diversion, 20 minute limit,
 no hold outside a choose area, plus the earlier overtaking cases).
 
+## Mixed traction (fork feature)
+
+A convoy with electric engines and other engines (diesel, steam, ...) needs no catenary
+(`convoi_t::needs_electrification()` is true only when all engines are electric). The electric
+engines pull only while every one of them is on a tile with catenary; otherwise only the other
+engines pull. Under wires the other engines pull too only when that gives a higher top speed with
+the current load (`traction_both_under_wire`, chosen in `recalc_traction(true)` from
+`calc_speedbonus_kmh`, i.e. at start and at every departure). An idle engine adds no power, no
+running cost, no top speed limit, no smoke (`vehicle_t::idle`) and no start sound
+(`play_start_sound`); its fixed cost stays. `convoi_t::recalc_traction` sets `sum_gear_and_power`,
+`min_top_speed`, `sum_running_costs`, `is_electric` and (road convoys) the overtaking speed
+`max_power_speed` for the current mode; `vehicle_t::hop` calls
+it when an electric engine of a mixed convoy enters or leaves catenary (`on_wire`). The bonus speed
+assumes the better choice under wires; `add_running_cost` credits each tile with the speed the
+pulling engines reach with the departure load (`traction_power_speed_*`), so slow unwired sections
+lower the average. Minimum speed signs are checked per tile with `get_traction_top_speed(electrified)`.
+Nothing is saved: the mode is rebuilt on load. The depot offers electric vehicles in a depot without
+catenary once the convoy has another engine and shows the off-wire power and speed; the convoy
+details show installed and pulling power and the mode and mark idle engines; the JSON export has `traction` per convoy and
+`idle` per vehicle. Convoys with only one kind of engine behave as stock.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

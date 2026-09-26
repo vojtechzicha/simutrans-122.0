@@ -720,6 +720,16 @@ void depot_frame_t::build_vehicle_lists()
 	const weg_t *w = welt->lookup(depot->get_pos())->get_weg(wt!=tram_wt ? wt : track_wt);
 	const bool weg_electrified = w ? w->is_electrified() : false;
 
+	// fork, mixed traction: unless the convoy has another engine that takes it off the wires
+	bool other_traction = false;
+	{
+		convoihandle_t cnv = depot->get_convoi(icnv);
+		for(  uint8 i=0;  cnv.is_bound()  &&  i<cnv->get_vehicle_count();  i++  ) {
+			const vehicle_desc_t *desc = cnv->get_vehikel(i)->get_desc();
+			other_traction |= desc->get_power()>0  &&  desc->get_engine_type()!=vehicle_desc_t::electric;
+		}
+	}
+
 	img_bolt.set_image( weg_electrified ? skinverwaltung_t::electricity->get_image_id(0) : IMG_EMPTY );
 
 	sort_by_action = depot->selected_sort_by;
@@ -759,7 +769,7 @@ void depot_frame_t::build_vehicle_lists()
 
 			// current vehicle
 			if( is_in_vehicle_list(info)  ||
-				((weg_electrified  ||  info->get_engine_type()!=vehicle_desc_t::electric)  &&
+				((weg_electrified  ||  other_traction  ||  info->get_engine_type()!=vehicle_desc_t::electric)  &&
 					 ((!info->is_future(month_now))  &&  (show_retired_vehicles  ||  (!info->is_retired(month_now)) )  ) )) {
 				// check, if allowed
 				bool append = true;
@@ -1026,7 +1036,6 @@ void depot_frame_t::update_data()
 	uint32 total_mail = 0;
 	uint32 total_goods = 0;
 
-	uint64 total_power = 0;
 	uint32 total_empty_weight = 0;
 	uint32 total_selected_weight = 0;
 	uint32 total_max_weight = 0;
@@ -1046,8 +1055,6 @@ void depot_frame_t::update_data()
 
 			for(  unsigned i = 0;  i < cnv->get_vehicle_count();  i++  ) {
 				const vehicle_desc_t *desc = cnv->get_vehikel(i)->get_desc();
-
-				total_power += desc->get_power()*desc->get_gear();
 
 				uint32 sel_weight = 0; // actual weight using vehicle filter selected good to fill
 				uint32 max_weight = 0;
@@ -1107,10 +1114,11 @@ void depot_frame_t::update_data()
 				empty_kmh = sel_kmh = max_kmh = min_kmh = speed_to_kmh( cnv->get_min_top_speed() );
 			}
 			else {
-				empty_kmh = speed_to_kmh(convoi_t::calc_max_speed(total_power, total_empty_weight, cnv->get_min_top_speed()));
-				sel_kmh =   speed_to_kmh(convoi_t::calc_max_speed(total_power, total_selected_weight, cnv->get_min_top_speed()));
-				max_kmh =   speed_to_kmh(convoi_t::calc_max_speed(total_power, total_min_weight,   cnv->get_min_top_speed()));
-				min_kmh =   speed_to_kmh(convoi_t::calc_max_speed(total_power, total_max_weight,   cnv->get_min_top_speed()));
+				// fork: under wires with the better choice of engines (same as all engines without mixed traction)
+				empty_kmh = speed_to_kmh(cnv->calc_traction_max_speed(total_empty_weight, false));
+				sel_kmh =   speed_to_kmh(cnv->calc_traction_max_speed(total_selected_weight, false));
+				max_kmh =   speed_to_kmh(cnv->calc_traction_max_speed(total_min_weight, false));
+				min_kmh =   speed_to_kmh(cnv->calc_traction_max_speed(total_max_weight, false));
 			}
 
 			const sint32 convoi_length = (cnv->get_vehicle_count()) * CARUNITS_PER_TILE / 2 - 1;
@@ -1148,6 +1156,19 @@ void depot_frame_t::update_data()
 					convoi_length_ok_sb = convoi_length;
 					convoi_length_slower_sb = 0;
 					convoi_length_too_slow_sb = 0;
+			}
+			if(  cnv->has_mixed_traction()  &&  cnv->front()->get_waytype() != air_wt  ) {
+				// fork: power and loaded top speed of the engines that pull off wires
+				uint32 off_wire_power = 0;
+				for(  uint8 i=0;  i<cnv->get_vehicle_count();  i++  ) {
+					const vehicle_desc_t *desc = cnv->get_vehikel(i)->get_desc();
+					if(  desc->get_engine_type()!=vehicle_desc_t::electric  ) {
+						off_wire_power += desc->get_power();
+					}
+				}
+				const sint32 off_wire_kmh = speed_to_kmh(cnv->calc_traction_max_speed(use_sel_weight ? total_selected_weight : total_max_weight, true));
+				txt_convoi_speed.append( "; " );
+				txt_convoi_speed.printf( translator::translate("off wires %d kW, %d km/h loaded"), off_wire_power, off_wire_kmh );
 			}
 
 			{

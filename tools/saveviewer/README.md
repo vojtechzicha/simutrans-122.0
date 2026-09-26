@@ -47,7 +47,10 @@ direct connections, and the monthly statistics.
 
 Convoys lists every convoy with its line, state, vehicle count, loading level, load against capacity
 and this month's profit. The detail page lists the vehicles and, for a convoy that runs without a
-line, its own schedule.
+line, its own schedule. A convoy with electric and other engines (mixed traction) has `traction`
+(`under_wire_electric`, `under_wire_all` or `off_wire`, null for other convoys) and its vehicles
+have `idle` when an engine is hauled without pulling; `max_speed` is the top speed of the engines
+that pull at that moment.
 
 Map draws the whole map extent on a canvas: cities as labeled dots, stops as small squares, and each
 line schedule as a polyline in the color of its type. Drag to pan, use the wheel or the plus and

@@ -10,6 +10,7 @@
 #include "components/gui_image.h"
 #include "components/gui_textarea.h"
 
+#include "../display/simgraph.h"
 #include "../simconvoi.h"
 #include "../vehicle/simvehicle.h"
 #include "../simcolor.h"
@@ -31,6 +32,7 @@ class gui_vehicleinfo_t : public gui_aligned_container_t
 	vehicle_t *v;
 	cbuffer_t freight_info;
 	gui_label_buf_t label_resale, label_friction;
+	gui_label_minw_t label_power; // fork: keeps room for the idle mark
 	gui_textarea_t freight;
 
 public:
@@ -70,9 +72,12 @@ public:
 			end_table();
 			// power
 			if(v->get_desc()->get_power()>0) {
-				l = new_component<gui_label_buf_t>();
-				l->buf().printf("%s %i kW, %s %.2f", translator::translate("Power:"), v->get_desc()->get_power(), translator::translate("Gear:"), v->get_desc()->get_gear()/64.0 );
-				l->update();
+				if(  v->get_convoi()  &&  v->get_convoi()->has_mixed_traction()  ) {
+					cbuffer_t widest;
+					widest.printf("%s %i kW, %s %.2f (%s)", translator::translate("Power:"), v->get_desc()->get_power(), translator::translate("Gear:"), v->get_desc()->get_gear()/64.0, translator::translate("idle") );
+					label_power.set_min_width( proportional_string_width(widest) );
+				}
+				add_component(&label_power);
 			}
 			// friction
 			add_component(&label_friction);
@@ -108,6 +113,14 @@ public:
 		label_resale.update();
 		label_friction.buf().printf( "%s %i", translator::translate("Friction:"), v->get_frictionfactor() );
 		label_friction.update();
+		if(v->get_desc()->get_power()>0) {
+			label_power.buf().printf("%s %i kW, %s %.2f", translator::translate("Power:"), v->get_desc()->get_power(), translator::translate("Gear:"), v->get_desc()->get_gear()/64.0 );
+			if(  v->is_idle()  ) {
+				// fork, mixed traction: hauled without pulling
+				label_power.buf().printf(" (%s)", translator::translate("idle"));
+			}
+			label_power.update();
+		}
 		if(v->get_cargo_max() > 0) {
 			freight_info.clear();
 			v->get_cargo_info(freight_info);
@@ -144,6 +157,19 @@ void convoi_detail_t::init(convoihandle_t cnv)
 
 	add_table(3,1);
 	{
+		if(  cnv->has_mixed_traction()  ) {
+			// fork: room for the longest traction text, it changes while driving
+			scr_coord_val w = 0;
+			static const char *traction_texts[] = { "off wires", "under wires, all engines", "under wires, electric only" };
+			for(  uint8 i=0;  i<3;  i++  ) {
+				cbuffer_t buf;
+				buf.printf( translator::translate("Leistung: %d kW"), cnv->get_sum_power() );
+				buf.append(" ");
+				buf.printf( translator::translate("(pulling %d kW, %s)"), cnv->get_sum_power(), translator::translate(traction_texts[i]) );
+				w = max( w, proportional_string_width(buf) );
+			}
+			label_power.set_min_width( w );
+		}
 		add_component(&label_power);
 
 		new_component<gui_fill_t>();
@@ -189,6 +215,12 @@ void convoi_detail_t::update_labels()
 	label_odometer.buf().printf(translator::translate("Odometer: %s km"), number );
 	label_odometer.update();
 	label_power.buf().printf( translator::translate("Leistung: %d kW"), cnv->get_sum_power() );
+	if(  cnv->has_mixed_traction()  ) {
+		// fork: installed power first, then the power of the engines that pull now and why
+		label_power.buf().append(" ");
+		label_power.buf().printf( translator::translate("(pulling %d kW, %s)"), cnv->get_active_power(),
+			translator::translate( cnv->is_traction_off_wire() ? "off wires" : (cnv->get_traction_both_under_wire() ? "under wires, all engines" : "under wires, electric only") ) );
+	}
 	label_power.update();
 	label_length.buf().printf("%s %i %s %i", translator::translate("Vehicle count:"), cnv->get_vehicle_count(), translator::translate("Station tiles:"), cnv->get_tile_length());
 	label_length.update();

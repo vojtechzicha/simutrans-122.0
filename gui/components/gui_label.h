@@ -152,4 +152,23 @@ protected:
 	using gui_label_t::set_text_pointer;
 };
 
+
+/**
+ * Label whose column keeps a minimum width, so a longer text later on is not clipped
+ * to an ellipsis (the layout is computed once, with the text of that moment).
+ */
+class gui_label_minw_t : public gui_label_buf_t
+{
+	scr_coord_val min_w;
+public:
+	gui_label_minw_t() : min_w(0) {}
+	void set_min_width(scr_coord_val w) { min_w = w; }
+	scr_size get_min_size() const OVERRIDE
+	{
+		scr_size s = gui_label_buf_t::get_min_size();
+		s.w = max( s.w, min_w );
+		return s;
+	}
+};
+
 #endif

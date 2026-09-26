@@ -91,15 +91,18 @@ static const char * state_names[convoi_t::MAX_STATES] =
 
 
 /**
- * Calculates speed of slowest vehicle in the given array
+ * Fork, mixed traction: true, if the vehicle pulls (or is no engine) in the given mode,
+ * so its power, running cost and top speed count.
  */
-static int calc_min_top_speed(const array_tpl<vehicle_t*>& fahr, uint8 anz_vehikel)
+static bool is_traction_active(const vehicle_desc_t *desc, bool mixed, bool off_wire, bool both_under_wire)
 {
-	int min_top_speed = SPEED_UNLIMITED;
-	for(uint8 i=0; i<anz_vehikel; i++) {
-		min_top_speed = min(min_top_speed, kmh_to_speed( fahr[i]->get_desc()->get_topspeed() ) );
+	if(  !mixed  ||  desc->get_power()==0  ) {
+		return true;
 	}
-	return min_top_speed;
+	if(  desc->get_engine_type()==vehicle_desc_t::electric  ) {
+		return !off_wire;
+	}
+	return off_wire  ||  both_under_wire;
 }
 
 
@@ -108,6 +111,9 @@ void convoi_t::init(player_t *player)
 	owner = player;
 
 	is_electric = false;
+	traction_mixed = traction_off_wire = traction_both_under_wire = false;
+	traction_top_speed_under_wire = traction_top_speed_off_wire = SPEED_UNLIMITED;
+	traction_power_speed_under_wire = traction_power_speed_off_wire = SPEED_UNLIMITED;
 	sum_gesamtweight = sum_weight = 0;
 	sum_running_costs = sum_fixed_costs = sum_gear_and_power = previous_delta_v = 0;
 	sum_power = 0;
@@ -645,7 +651,7 @@ void convoi_t::add_running_cost( const weg_t *weg )
 		// running on non-public way costs toll (since running costs are positive => invert)
 		sint32 toll = -(sum_running_costs*welt->get_settings().get_way_toll_runningcost_percentage())/100l;
 		if(  welt->get_settings().get_way_toll_waycost_percentage()  ) {
-			if(  weg->is_electrified()  &&  needs_electrification()  ) {
+			if(  weg->is_electrified()  &&  draws_electricity()  ) {
 				// toll for using electricity
 				grund_t *gr = welt->lookup(weg->get_pos());
 				for(  int i=1;  i<gr->get_top();  i++  ) {
@@ -675,7 +681,12 @@ void convoi_t::add_running_cost( const weg_t *weg )
 	total_distance_traveled ++;
 	distance_since_last_stop++;
 
-	sum_speed_limit += speed_to_kmh( min( min_top_speed, speed_limit ));
+	sint32 tile_speed = min( min_top_speed, speed_limit );
+	if(  traction_mixed  ) {
+		// fork: the engines that pull here may not reach their top speed with this load (diesel off wires)
+		tile_speed = min( tile_speed, traction_off_wire ? traction_power_speed_off_wire : traction_power_speed_under_wire );
+	}
+	sum_speed_limit += speed_to_kmh( tile_speed );
 	book( 1, CONVOI_DISTANCE );
 }
 
@@ -1292,7 +1303,7 @@ void convoi_t::step()
 					state = (steps_driven>=0) ? LEAVING_DEPOT : DRIVING;
 					clear_passing_hold();
 					if(haltestelle_t::get_halt(v->get_pos(),owner).is_bound()) {
-						v->play_sound();
+						play_start_sound();
 					}
 				}
 				else if(  steps_driven==0  ) {
@@ -1672,17 +1683,13 @@ DBG_MESSAGE("convoi_t::add_vehikel()","extend array_tpl to %i totals.",fahr.get_
 		anz_vehikel ++;
 
 		const vehicle_desc_t *info = v->get_desc();
-		if(info->get_power()) {
-			is_electric |= info->get_engine_type()==vehicle_desc_t::electric;
-		}
 		sum_power += info->get_power();
-		sum_gear_and_power += info->get_power()*info->get_gear();
 		sum_weight += info->get_weight();
-		sum_running_costs -= info->get_running_cost();
 		sum_fixed_costs -= welt->scale_with_month_length( info->get_fixed_cost() );
-		min_top_speed = min( min_top_speed, kmh_to_speed( v->get_desc()->get_topspeed() ) );
 		sum_gesamtweight = sum_weight;
 		calc_loading();
+		// power, running costs, top speed and electrification depend on which engines pull
+		recalc_traction( true );
 		freight_info_resort = true;
 		// Add good_catg_index:
 		if(v->get_cargo_max() != 0) {
@@ -1725,10 +1732,9 @@ vehicle_t *convoi_t::remove_vehikel_bei(uint16 i)
 
 			const vehicle_desc_t *info = v->get_desc();
 			sum_power -= info->get_power();
-			sum_gear_and_power -= info->get_power()*info->get_gear();
 			sum_weight -= info->get_weight();
-			sum_running_costs += info->get_running_cost();
 			sum_fixed_costs += welt->scale_with_month_length( info->get_fixed_cost() );
+			v->set_idle( false );
 		}
 		sum_gesamtweight = sum_weight;
 		calc_loading();
@@ -1739,8 +1745,8 @@ vehicle_t *convoi_t::remove_vehikel_bei(uint16 i)
 			set_erstes_letztes();
 		}
 
-		// calculate new minimum top speed
-		min_top_speed = calc_min_top_speed(fahr, anz_vehikel);
+		// power, running costs, top speed and electrification depend on which engines pull
+		recalc_traction( true );
 
 		// check for obsolete
 		if(has_obsolete) {
@@ -1752,16 +1758,6 @@ vehicle_t *convoi_t::remove_vehikel_bei(uint16 i)
 		}
 
 		recalc_catg_index();
-
-		// still requires electrifications?
-		if(is_electric) {
-			is_electric = false;
-			for(unsigned i=0; i<anz_vehikel; i++) {
-				if(fahr[i]->get_desc()->get_power()) {
-					is_electric |= fahr[i]->get_desc()->get_engine_type()==vehicle_desc_t::electric;
-				}
-			}
-		}
 	}
 	return v;
 }
@@ -2075,6 +2071,9 @@ void convoi_t::vorfahren()
 		v0->get_smoke(true);
 		v0->set_leading(true); // switches on signal checks to reserve the next route
 
+		// the vehicles were placed without hopping: check the catenary under the electric engines
+		recalc_traction( false );
+
 		// until all other are on the track
 		state = CAN_START;
 	}
@@ -2127,6 +2126,8 @@ void convoi_t::vorfahren()
 			}
 			fahr[0]->set_leading(true);
 		}
+		// the vehicles may have been placed without hopping: check the catenary under the electric engines
+		recalc_traction( false );
 		if (!at_dest) {
 			state = CAN_START;
 
@@ -2135,7 +2136,7 @@ void convoi_t::vorfahren()
 			if(  fahr[0]->can_enter_tile( restart_speed, 0 )  ) {
 				// can reserve new block => drive on
 				if(haltestelle_t::get_halt(k0,owner).is_bound()) {
-					fahr[0]->play_sound();
+					play_start_sound();
 				}
 				state = DRIVING;
 			}
@@ -2336,11 +2337,8 @@ void convoi_t::rdwr(loadsave_t *file)
 			// info
 			if(info) {
 				sum_power += info->get_power();
-				sum_gear_and_power += info->get_power()*info->get_gear();
 				sum_weight += info->get_weight();
-				sum_running_costs -= info->get_running_cost();
 				sum_fixed_costs -= welt->scale_with_month_length( info->get_fixed_cost() );
-				is_electric |= info->get_engine_type()==vehicle_desc_t::electric;
 				has_obsolete |= welt->use_timeline()  &&  info->is_retired( welt->get_timeline_year_month() );
 				// we do not add maintenance here, the fixed costs are booked as running costs
 			}
@@ -2417,8 +2415,10 @@ void convoi_t::rdwr(loadsave_t *file)
 		calc_loading();
 	}
 
-	// calculate new minimum top speed
-	min_top_speed = calc_min_top_speed(fahr, anz_vehikel);
+	if(  file->is_loading()  ) {
+		// power, running costs, top speed and electrification (the tiles are checked again in finish_rd)
+		recalc_traction( false );
+	}
 
 	// since sp_ist became obsolete, sp_soll is used modulo 65536
 	sp_soll &= 65535;
@@ -3137,8 +3137,144 @@ void convoi_t::calc_loading()
 }
 
 
+void convoi_t::calc_traction_sums(bool off_wire, bool both_under_wire, sint32 &gear_and_power, sint32 &top_speed, sint32 &running_costs) const
+{
+	gear_and_power = 0;
+	top_speed = SPEED_UNLIMITED;
+	running_costs = 0;
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		const vehicle_desc_t *desc = fahr[i]->get_desc();
+		if(  is_traction_active( desc, traction_mixed, off_wire, both_under_wire )  ) {
+			gear_and_power += desc->get_power()*desc->get_gear();
+			top_speed = min( top_speed, kmh_to_speed( desc->get_topspeed() ) );
+			running_costs -= desc->get_running_cost();
+		}
+	}
+}
+
+
+void convoi_t::recalc_traction(bool choose)
+{
+	bool has_electric = false;
+	bool has_other = false;
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		const vehicle_desc_t *desc = fahr[i]->get_desc();
+		if(  desc->get_power()  ) {
+			if(  desc->get_engine_type()==vehicle_desc_t::electric  ) {
+				has_electric = true;
+			}
+			else {
+				has_other = true;
+			}
+		}
+	}
+	is_electric = has_electric  &&  !has_other;
+	traction_mixed = has_electric  &&  has_other;
+
+	traction_off_wire = false;
+	if(  traction_mixed  ) {
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			const vehicle_desc_t *desc = fahr[i]->get_desc();
+			if(  desc->get_power()  &&  desc->get_engine_type()==vehicle_desc_t::electric  &&  !fahr[i]->update_on_wire()  ) {
+				traction_off_wire = true;
+			}
+		}
+		if(  choose  ) {
+			// the other engines pull under wires only if that gives a higher top speed with the current load
+			sint64 total_weight = 0;
+			for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+				total_weight += fahr[i]->get_total_weight();
+			}
+			sint32 power_electric, top_electric, power_both, top_both, costs;
+			calc_traction_sums( false, false, power_electric, top_electric, costs );
+			calc_traction_sums( false, true, power_both, top_both, costs );
+			traction_both_under_wire = total_weight > 0  &&
+				calc_max_speed( power_both, total_weight, top_both ) > calc_max_speed( power_electric, total_weight, top_electric );
+		}
+	}
+	else {
+		traction_both_under_wire = false;
+	}
+
+	if(  traction_mixed  ) {
+		// the limits in both modes, for route checks of tiles with and without catenary
+		sint32 power, costs;
+		calc_traction_sums( false, traction_both_under_wire, power, traction_top_speed_under_wire, costs );
+		calc_traction_sums( true, false, power, traction_top_speed_off_wire, costs );
+	}
+
+	const sint32 old_gear_and_power = sum_gear_and_power;
+	const sint32 old_top_speed = min_top_speed;
+	calc_traction_sums( traction_off_wire, traction_both_under_wire, sum_gear_and_power, min_top_speed, sum_running_costs );
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		fahr[i]->set_idle( !is_traction_active( fahr[i]->get_desc(), traction_mixed, traction_off_wire, traction_both_under_wire ) );
+	}
+	if(  old_gear_and_power != sum_gear_and_power  ||  old_top_speed != min_top_speed  ) {
+		recalc_speed_limit = true;
+		// other road vehicles judge overtaking by the speed this convoy reaches with the engines that pull now
+		if(  anz_vehikel > 0  &&  front()->get_overtaker()  ) {
+			sint64 total_weight = 0;
+			for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+				total_weight += fahr[i]->get_total_weight();
+			}
+			if(  total_weight > 0  ) {
+				max_power_speed = calc_max_speed( sum_gear_and_power, total_weight, min_top_speed );
+			}
+		}
+	}
+}
+
+
+uint32 convoi_t::get_active_power() const
+{
+	uint32 power = 0;
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		if(  !fahr[i]->is_idle()  ) {
+			power += fahr[i]->get_desc()->get_power();
+		}
+	}
+	return power;
+}
+
+
+sint32 convoi_t::calc_traction_max_speed(uint64 total_weight, bool off_wire) const
+{
+	sint32 power, top_speed, costs;
+	if(  !traction_mixed  ) {
+		calc_traction_sums( false, false, power, top_speed, costs );
+		return calc_max_speed( power, total_weight, top_speed );
+	}
+	if(  off_wire  ) {
+		calc_traction_sums( true, false, power, top_speed, costs );
+		return calc_max_speed( power, total_weight, top_speed );
+	}
+	calc_traction_sums( false, false, power, top_speed, costs );
+	const sint32 speed_electric = calc_max_speed( power, total_weight, top_speed );
+	calc_traction_sums( false, true, power, top_speed, costs );
+	return max( speed_electric, calc_max_speed( power, total_weight, top_speed ) );
+}
+
+
+void convoi_t::play_start_sound() const
+{
+	if(  !traction_mixed  ) {
+		fahr[0]->play_sound();
+		return;
+	}
+	for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+		if(  fahr[i]->get_desc()->get_power()  &&  !fahr[i]->is_idle()  ) {
+			fahr[i]->play_sound();
+			return;
+		}
+	}
+}
+
+
 void convoi_t::calc_speedbonus_kmh()
 {
+	// fork: choose the engines for the current load first, this also sets min_top_speed
+	recalc_traction( true );
+
 	// init with default
 	const sint32 cnv_min_top_kmh = speed_to_kmh( min_top_speed );
 	speedbonus_kmh = cnv_min_top_kmh;
@@ -3165,7 +3301,14 @@ void convoi_t::calc_speedbonus_kmh()
 		// very old vehicles have zero weight ...
 		if(  total_weight>0  ) {
 
-			speedbonus_kmh = speed_to_kmh( calc_max_speed(sum_gear_and_power, total_max_weight, min_top_speed) );
+			// fork: under wires with the better choice of engines; the average of the speed limits
+			// (sum_speed_limit) accounts for the slower sections off wires
+			speedbonus_kmh = speed_to_kmh( calc_traction_max_speed( total_max_weight, false ) );
+			if(  traction_mixed  ) {
+				// credited per tile in add_running_cost(), so a slow section off wires lowers the average
+				traction_power_speed_under_wire = calc_traction_max_speed( total_max_weight, false );
+				traction_power_speed_off_wire = calc_traction_max_speed( total_max_weight, true );
+			}
 
 			// convoi overtakers use current actual weight for achievable speed
 			if(  front()->get_overtaker()  ) {
