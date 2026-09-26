@@ -395,6 +395,9 @@ public:
 	/// fork: seats, standing and overcrowded places (4.5x the seats more)
 	uint16 get_overcrowded_max() const;
 
+	/// fork: how many passengers aboard sit, stand and are overcrowded (seats fill first)
+	void get_crowd_split(uint16 &seated, uint16 &standing, uint16 &overcrowded) const;
+
 	const char * get_cargo_mass() const;
 
 	/**

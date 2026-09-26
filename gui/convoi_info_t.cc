@@ -115,6 +115,8 @@ void convoi_info_t::init(convoihandle_t cnv)
 			add_component(&weight_label);
 			add_component(&filled_bar);
 			end_table();
+			crowd_label.set_visible(false);
+			add_component(&crowd_label);
 			add_table(2,1);
 			add_component(&target_label);
 			add_component(&route_bar);
@@ -298,6 +300,45 @@ void convoi_info_t::update_labels()
 	weight_label.buf().append( (cnv->get_sum_gesamtweight()-cnv->get_sum_weight())/1000.0, 1 );
 	weight_label.buf().append( "t)" );
 	weight_label.update();
+
+	// fork: passengers on seats, standing and overcrowded
+	uint32 seats = 0, seated = 0, standing = 0, standing_places = 0, overcrowded = 0, overcrowded_places = 0;
+	for(  uint8 i=0;  i<cnv->get_own_vehicle_count();  i++  ) {
+		const vehicle_t *v = cnv->get_vehikel(i);
+		if(  v->can_carry_crowd()  ) {
+			uint16 s, st, o;
+			v->get_crowd_split( s, st, o );
+			seats += v->get_cargo_max();
+			seated += s;
+			standing += st;
+			overcrowded += o;
+			standing_places += v->get_standing_max() - v->get_cargo_max();
+			overcrowded_places += v->get_overcrowded_max() - v->get_standing_max();
+		}
+	}
+	const bool show_crowd = seats > 0;
+	if(  show_crowd  ) {
+		const schedule_t *sch = cnv->get_schedule();
+		crowd_label.buf().printf( translator::translate("Seats %u/%u"), seated, seats );
+		if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
+			crowd_label.buf().printf( translator::translate(", standing %u/%u"), standing, standing_places );
+		}
+		else {
+			crowd_label.buf().append( translator::translate(", no standing") );
+		}
+		if(  overcrowded > 0  ||  !sch  ||  sch->allows_overcrowding()  ) {
+			crowd_label.buf().printf( translator::translate(", overcrowded %u/%u"), overcrowded, overcrowded_places );
+		}
+		else if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
+			crowd_label.buf().append( translator::translate(", no overcrowding") );
+		}
+	}
+	crowd_label.update();
+	if(  crowd_label.is_visible() != show_crowd  ) {
+		crowd_label.set_visible( show_crowd );
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
 
 	// next stop
 	target_label.buf().append(translator::translate("Fahrtziel"));

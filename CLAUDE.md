@@ -405,6 +405,11 @@ that hop: seats x1, standing x0.75, overcrowded x0.25, shared by everybody aboar
 dialog; no standing implies no overcrowding. Unchanged: the full-load minimum means seats, loading
 level can go past 100%, line capacity statistics count seats only, the planner ignores it.
 JSON export: `no_standing`, `no_overcrowding` per schedule.
+UI: the convoy window shows "Seats x/y, standing x/y, overcrowded x/y" (own vehicles only, "no
+standing"/"no overcrowding" when the schedule forbids it), the vehicle details give each vehicle's
+load as "350/163 passengers (163 standing, 24 overcrowded)" (`vehicle_t::get_crowd_split`), and a
+stop's waiting list heads passengers with ", N missed a full vehicle" and marks flagged packets
+"(missed)" except in the via-sum sort, which merges them (`freight_list_sorter.cc`).
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

@@ -770,6 +770,17 @@ uint16 vehicle_t::get_overcrowded_max() const
 }
 
 
+void vehicle_t::get_crowd_split(uint16 &seated, uint16 &standing, uint16 &overcrowded) const
+{
+	const uint16 seats = desc->get_capacity();
+	seated = total_freight < seats ? total_freight : seats;
+	const uint16 above = total_freight - seated;
+	const uint16 standing_places = get_standing_max() - seats;
+	standing = above < standing_places ? above : standing_places;
+	overcrowded = above - standing;
+}
+
+
 uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts, uint16 limit, bool only_missed)
 {
 	if(  !halt.is_bound()  ||  !halt->gibt_ab(desc->get_freight_type())  ) {

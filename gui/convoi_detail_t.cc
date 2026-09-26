@@ -33,6 +33,7 @@ class gui_vehicleinfo_t : public gui_aligned_container_t
 	cbuffer_t freight_info;
 	gui_label_buf_t label_resale, label_friction;
 	gui_label_minw_t label_power; // fork: keeps room for the idle mark
+	gui_label_minw_t label_cargo; // fork: keeps room for standing and overcrowded passengers
 	gui_textarea_t freight;
 
 public:
@@ -82,18 +83,36 @@ public:
 			// friction
 			add_component(&label_friction);
 			if(v->get_cargo_max() > 0) {
-				// freight type
-				goods_desc_t const& g    = *v->get_cargo_type();
-				char const*  const  name = translator::translate(g.get_catg() == 0 ? g.get_name() : g.get_catg_name());
-				gui_label_buf_t* l = new_component<gui_label_buf_t>();
-				l->buf().printf("%u/%u%s %s", v->get_total_cargo(), v->get_cargo_max(), translator::translate(v->get_cargo_mass()), name);
-				l->update();
+				// freight type and load, see update_labels(); room for the fullest load
+				cbuffer_t widest;
+				if(  v->can_carry_crowd()  ) {
+					print_cargo_load( widest, v->get_overcrowded_max(), v->get_standing_max() - v->get_cargo_max(), v->get_overcrowded_max() - v->get_standing_max() );
+				}
+				else {
+					print_cargo_load( widest, v->get_cargo_max(), 0, 0 );
+				}
+				label_cargo.set_min_width( proportional_string_width(widest) );
+				add_component(&label_cargo);
 				// freight
 				add_component(&freight);
 			}
 		}
 		end_table();
 		update_labels();
+	}
+
+	// fork: load and capacity, with the passengers standing or overcrowded beyond the seats
+	void print_cargo_load(cbuffer_t &buf, uint32 total, uint32 standing, uint32 overcrowded) const
+	{
+		goods_desc_t const& g    = *v->get_cargo_type();
+		char const*  const  name = translator::translate(g.get_catg() == 0 ? g.get_name() : g.get_catg_name());
+		buf.printf("%u/%u%s %s", total, v->get_cargo_max(), translator::translate(v->get_cargo_mass()), name);
+		if(  overcrowded > 0  ) {
+			buf.printf( translator::translate(" (%u standing, %u overcrowded)"), standing, overcrowded );
+		}
+		else if(  standing > 0  ) {
+			buf.printf( translator::translate(" (%u standing)"), standing );
+		}
 	}
 
 	void update_labels()
@@ -122,6 +141,12 @@ public:
 			label_power.update();
 		}
 		if(v->get_cargo_max() > 0) {
+			uint16 seated = v->get_total_cargo(), standing = 0, overcrowded = 0;
+			if(  v->can_carry_crowd()  ) {
+				v->get_crowd_split( seated, standing, overcrowded );
+			}
+			print_cargo_load( label_cargo.buf(), v->get_total_cargo(), standing, overcrowded );
+			label_cargo.update();
 			freight_info.clear();
 			v->get_cargo_info(freight_info);
 		}

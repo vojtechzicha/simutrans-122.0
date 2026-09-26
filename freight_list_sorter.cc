@@ -94,7 +94,7 @@ bool freight_list_sorter_t::compare_ware(ware_t const& w1, ware_t const& w2)
 
 
 
-void freight_list_sorter_t::add_ware_heading( cbuffer_t &buf, uint64 sum, uint32 max, const ware_t *ware, const char *what_doing )
+void freight_list_sorter_t::add_ware_heading( cbuffer_t &buf, uint64 sum, uint32 max, const ware_t *ware, const char *what_doing, uint64 missed )
 {
 	uint32 const max_display = ~0;
 
@@ -118,7 +118,12 @@ void freight_list_sorter_t::add_ware_heading( cbuffer_t &buf, uint64 sum, uint32
 	// special freight (catg == 0) needs own name
 	char const*  const  name = translator::translate(ware->get_catg() != 0 ? desc.get_catg_name() : desc.get_name());
 	char const*  const  what = translator::translate(what_doing);
-	buf.printf("%s %s %s\n", unit, name, what);
+	buf.printf("%s %s %s", unit, name, what);
+	if(  missed > 0  ) {
+		// fork: waiting passengers who missed a full vehicle may overcrowd the next one
+		buf.printf( translator::translate(", %u missed a full vehicle"), (uint32)missed );
+	}
+	buf.append("\n");
 }
 
 
@@ -202,10 +207,17 @@ void freight_list_sorter_t::sort_freight(vector_tpl<ware_t> const& warray, cbuff
 					}
 					sum += sumware.menge;
 				}
+				// fork: counted before the via sum merged flagged and unflagged packets
+				uint64 missed = 0;
+				FOR(vector_tpl<ware_t>, const& w, warray) {
+					if(  w.missed_connection  &&  w.menge > 0  &&  (last_ware_catg != -1 ? w.get_catg() == last_ware_catg : w.get_index() == last_goods_index)  ) {
+						missed += w.menge;
+					}
+				}
 
 				if(  full_list == NULL  ) {
 					// display all goods
-					add_ware_heading( buf, sum, 0, &ware, what_doing );
+					add_ware_heading( buf, sum, 0, &ware, what_doing, missed );
 				}
 				else {
 					// display goods from a list of freights
@@ -224,8 +236,13 @@ void freight_list_sorter_t::sort_freight(vector_tpl<ware_t> const& warray, cbuff
 
 			// detail amount
 			goods_desc_t const& desc = *ware.get_desc();
-			char const *const good_description_format = sortby == by_via_sum  &&  ware.is_goods_amount_maxed() ? "  >=%u%s %s > " : "  %u%s %s > ";
+			char const *const good_description_format = sortby == by_via_sum  &&  ware.is_goods_amount_maxed() ? "  >=%u%s %s" : "  %u%s %s";
 			buf.printf(good_description_format, ware.menge, translator::translate(desc.get_mass()), translator::translate(desc.get_name()));
+			if(  ware.missed_connection  &&  sortby != by_via_sum  ) {
+				// fork: missed a full vehicle (the via sum mixes them with the others)
+				buf.append( translator::translate(" (missed)") );
+			}
+			buf.append(" > ");
 
 			// the target name is not correct for the via sort
 			const bool is_factory_going = ( sortby!=by_via_sum  &&  ware.to_factory ); // exclude merged packets
