@@ -103,6 +103,9 @@ keys stable: the exporter and the viewer are the two halves of one format.
   regenerating or breaking every pak set; avoid unless the feature truly needs new pak data.
 - `sync_step()` runs every frame with exclusive map access and must stay cheap; slower work
   belongs in `step()`.
+- **`min()`/`max()` from `simtypes.h` take `int`.** The owner's main game has a tick counter past
+  2^31, so `max( 1u, welt->get_ticks() )` returns 1 there. Compare `uint32` ticks by hand, and
+  subtract ticks as `uint32` before widening (`(sint64)(now - since)`).
 
 ## Git
 
