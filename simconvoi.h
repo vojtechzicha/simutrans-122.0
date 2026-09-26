@@ -219,6 +219,27 @@ private:
 	bool no_load;
 
 	/**
+	 * Fork, rail: marked as Hold, the convoi may stop at stations it passes to let a passing train
+	 * go by (see rail_vehicle_t::is_choose_signal_clear); a line can set it for all its convois
+	 */
+	bool hold_marker;
+
+	/**
+	 * Fork, rail: on the way to a platform off the schedule to let a passing train go by; arriving
+	 * there is no stop of the schedule, the convoi only waits and then goes on to its next stop
+	 */
+	bool hold_divert;
+
+	/**
+	 * Fork, rail: waiting at a stop for this passing train to go by since passing_hold_since (ticks),
+	 * see rail_vehicle_t::is_held_for_passing_train(); passing_hold_released: done waiting at this
+	 * stop (time limit or a train stuck at the entry signal). Not saved.
+	 */
+	convoihandle_t passing_hold_for;
+	uint32 passing_hold_since;
+	bool passing_hold_released;
+
+	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
 	*/
 	bool freight_info_resort;
@@ -815,6 +836,21 @@ public:
 
 	// standing at a stop (loading, or finding its route before leaving): road traffic may pass it
 	bool is_standing() const { return state==LOADING  ||  state==ROUTING_1  ||  state==NO_ROUTE; }
+
+	// fork, rail: marked as Hold by itself or by its line
+	bool get_hold_marker() const { return hold_marker; }
+	void set_hold_marker(bool on) { hold_marker = on; }
+	bool is_hold_marked() const;
+	bool is_hold_divert() const { return hold_divert; }
+	void set_hold_divert(bool on) { hold_divert = on; }
+
+	// fork, rail: waiting at a stop for a passing train (see passing_hold_for)
+	convoihandle_t get_passing_hold_for() const { return passing_hold_for; }
+	uint32 get_passing_hold_since() const { return passing_hold_since; }
+	bool is_passing_hold_released() const { return passing_hold_released; }
+	void set_passing_hold(convoihandle_t for_cnv, uint32 since) { passing_hold_for = for_cnv; passing_hold_since = since; }
+	void release_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = true; }
+	void clear_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = false; }
 
 	/**
 	 * Passing a standing convoi (see convoi_t::is_standing()), whose first tile is route tile start_index.

@@ -19,6 +19,7 @@
 
 class convoi_t;
 class schedule_t;
+struct schedule_entry_t;
 class signal_t;
 class ware_t;
 class route_t;
@@ -525,12 +526,51 @@ private:
 	// invalid while no such search runs
 	koord3d detour_start, detour_target, detour_exit;
 
+	// during the search for a platform to let a passing train by (see reserve_hold_platform):
+	// 1 = not on the planned route between hold_avoid_from and hold_avoid_to, 2 = anywhere; 0 = no search
+	uint8 hold_search;
+	uint16 hold_avoid_from, hold_avoid_to;
+
+	// end of choose index on the route, if this train passes the choose area of the signal at
+	// start_block without stopping (no schedule waypoint in the area either); else INVALID_INDEX
+	uint16 get_passed_end_of_choose(uint16 start_block) const;
+
 	// end of choose index on the route, if this train passes the choose area of the signal
 	// at start_block without stopping and a train it may overtake blocks its way; else INVALID_INDEX
 	uint16 get_choose_detour_end(uint16 start_block) const;
 
+	// a free platform in the choose area to let a passing train by; true when the route was changed
+	bool reserve_hold_platform(uint16 start_block, uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing);
+
+	// gr is the end of a stop position of this halt for this train, coming from prev_gr
+	bool is_stop_position(const grund_t *gr, const grund_t *prev_gr, halthandle_t halt) const;
+
 	// searches and reserves a free way through the choose area; true when the route was changed
 	bool reserve_choose_detour(uint16 start_block, uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing);
+
+	// platform types (haltestelle_t::PAX|POST|WARE) a stop position must offer during a choose search, 0 = any
+	uint8 platform_needs;
+
+	// platform types this train needs at the stop of this schedule entry in this halt, 0 = any
+	uint8 get_platform_needs(const schedule_entry_t &entry, halthandle_t halt) const;
+
+	// the platform at this tile offers what platform_needs asks for
+	bool is_platform_suitable(const grund_t *gr) const;
+
+	// the stop position at the end of the planned route offers what platform_needs asks for
+	bool is_planned_platform_suitable() const;
+
+	/* A train that should pass this one in the choose area ending at end_of_choose on our route:
+	 * it runs through the area without stopping, enters it through a choose signal, and would reach
+	 * the end of choose within passing_hold_minutes (passenger trains wait for passenger trains only).
+	 * behind: when valid, it must still have to pass this tile (it is behind us).
+	 * stuck (only with a halt): some train waits at red at a choose signal into this halt or area,
+	 * nobody should wait then.
+	 */
+	convoihandle_t get_passing_train(uint32 end_of_choose, halthandle_t halt, koord3d behind, bool &stuck) const;
+
+	// at a stop: wait for a passing train to go by first; keeps the convoi's hold state
+	bool is_held_for_passing_train();
 
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;

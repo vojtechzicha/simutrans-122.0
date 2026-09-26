@@ -53,6 +53,7 @@ private:
 	button_t follow_button;
 	button_t go_home_button;
 	button_t no_load_button;
+	button_t hold_button; // fork, rail: Hold marker
 
 	gui_tab_panel_t switch_mode;
 	gui_aligned_container_t container_freight, container_stats, container_line, *container_top, container_details;

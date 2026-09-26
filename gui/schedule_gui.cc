@@ -65,6 +65,7 @@ public:
 			case schedule_entry_t::all_off:     return "A";
 			case schedule_entry_t::only_load:   return "L";
 			case schedule_entry_t::only_unload: return "U";
+			case schedule_entry_t::hold:        return "H";
 			default:                            return "";
 		}
 	}
@@ -76,6 +77,7 @@ public:
 			case schedule_entry_t::all_off:     return color_idx_to_rgb( COL_ORANGE );
 			case schedule_entry_t::only_load:   return color_idx_to_rgb( COL_DARK_GREEN );
 			case schedule_entry_t::only_unload: return color_idx_to_rgb( COL_DARK_BLUE );
+			case schedule_entry_t::hold:        return color_idx_to_rgb( COL_DARK_PURPLE );
 			default:                            return color_idx_to_rgb( COL_GREY3 );
 		}
 	}

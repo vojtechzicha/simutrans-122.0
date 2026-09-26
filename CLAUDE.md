@@ -141,7 +141,8 @@ Not done yet: the stop departure boards still estimate from arrival plus wait.
 Stop types (savegame 122.3, `schedule_entry_t::stop_type`): Regular, Terminal (everything off,
 then load; transfers allowed, nothing rides through), All off (everything off, no loading), Only
 load (no unloading, the planner never routes cargo to it), Only unload (no loading, the planner
-never routes cargo from it). The rules live in the helpers on `schedule_entry_t` (`loads`,
+never routes cargo from it), Hold (122.5: no loading or unloading, the planner ignores it, cargo
+rides through; a stop only to let passing trains overtake, see below). The rules live in the helpers on `schedule_entry_t` (`loads`,
 `unloads`, `rides_through`, `plans_arrival`, `plans_departure`); `haltestelle_t::rebuild_connections`
 applies them when it walks a schedule: a Terminal or All off entry blocks the walk, so no edges are
 added until the next entry of the home halt, which is what stops the planner from routing anyone
@@ -184,6 +185,43 @@ No save format change: after loading, the train re-reserves along the saved deto
 signal as the entry signal, end-of-choose sign after the exit switches where the tracks rejoin. Tested
 headless on pak64 (standing, running-stopping, running-through, both tracks taken, exit blocked,
 save/load mid-detour, waypoints) with a throwaway harness; re-verify in the Windows game.
+
+## Platform types, Hold and waiting for passing trains (fork feature, savegame 122.5)
+
+All rail only, in `vehicle/simvehicle.cc` unless noted.
+- Platform types: a train stopping in a choose area only takes platforms whose station building
+  enables what it carries (`get_platform_needs`: passengers or mail need PAX|POST, anything else WARE;
+  no capacity or a Hold stop = any; a station without any such platform on that track = any). Every
+  tile the train stands on must suit (`is_platform_suitable` in `is_stop_position`); an unsuitable
+  planned platform is searched away even when free (`is_planned_platform_suitable`).
+- Hold stop type (H badge): see Stop types. The train leaves right away unless it waits as below.
+- Waiting for passing trains: in `can_enter_tile` for CAN_START, a train at a halt inside a choose
+  area (an end-of-choose sign ahead on its route before any choose signal) waits while
+  `get_passing_train` finds a train that runs past that end-of-choose sign in the same direction,
+  entered the area through a choose signal, is not itself standing at a stop in the area, and would
+  reach the sign within `passing_hold_minutes` calendar minutes at its top speed (the departure
+  board's tiles<<20/speed estimate). Passenger or mail trains wait only for passenger or mail trains.
+  It stops waiting when that train is through, after `passing_hold_max_minutes` at the stop, or at once
+  when any train stands at red (speed 0) at a choose signal leading into this halt or through this
+  area (it could not get past, so waiting would only block it). The state lives in `convoi_t`
+  (`passing_hold_for/_since/_released`, not saved), the convoy window shows "Waiting for X to pass".
+  The departure slot of a timetable is taken before (end of loading), so a held train leaves late but
+  keeps its slot. Settings in simuconf.tab, saved with the game (defaults 5 and 20, needs the
+  calendar: without it `calendar_minutes_to_ticks` is 0 and nobody waits).
+- Hold marker (convoy and line, `convoi_t::hold_marker` / `simline_t::hold_marker`, tool commands
+  convoy `h` and line `h,id,0|1`, buttons in the convoy window and line management): at a choose
+  signal of an area it passes without stopping, a marked train whose passing train is coming
+  (same finder, which must still have our signal tile ahead) takes a free platform of any of our
+  halts before the end-of-choose sign, first off its planned way (`reserve_hold_platform`,
+  `hold_search` 1 then 2), and sets `convoi_t::hold_divert` (saved). Arriving there
+  (`ziel_erreicht`) is no schedule stop: it goes to ROUTING_1, gets a new route to its unchanged next
+  stop, and waits as above. `drive_to` clears `hold_divert`. No diversion while a schedule waypoint
+  is pending (the new route would skip it). It diverts only when a passing train is actually coming,
+  not at every station.
+Tested headless on pak64 with the throwaway harness (split platforms, Hold stop, local waits for an
+express, local ignores fast freight, freight waits for freight, both tracks held and the express stuck
+at red releases both, marked convoy and marked line divert, save/load mid-diversion, 20 minute limit,
+no hold outside a choose area, plus the earlier overtaking cases).
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

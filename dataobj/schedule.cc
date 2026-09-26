@@ -636,6 +636,7 @@ const char *schedule_entry_t::get_stop_type_name(uint8 stop_type)
 		case all_off:     return "All off";
 		case only_load:   return "Only load";
 		case only_unload: return "Only unload";
+		case hold:        return "Hold";
 		default:          return "Regular stop";
 	}
 }

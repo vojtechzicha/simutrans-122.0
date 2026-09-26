@@ -42,6 +42,7 @@
 #include "../obj/signal.h"
 #include "../obj/roadsign.h"
 #include "../obj/crossing.h"
+#include "../obj/gebaeude.h"
 #include "../obj/zeiger.h"
 
 #include "../gui/minimap.h"
@@ -2390,6 +2391,9 @@ void road_vehicle_t::set_convoi(convoi_t *c)
 rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : vehicle_t()
 {
 	detour_start = detour_target = detour_exit = koord3d::invalid;
+	platform_needs = 0;
+	hold_search = 0;
+	hold_avoid_from = hold_avoid_to = 0;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2436,6 +2440,9 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 {
 	cnv = cn;
 	detour_start = detour_target = detour_exit = koord3d::invalid;
+	platform_needs = 0;
+	hold_search = 0;
+	hold_avoid_from = hold_avoid_to = 0;
 }
 
 
@@ -2548,13 +2555,13 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 		}
 	}
 
-	if(  detour_target!=koord3d::invalid  ) {
-		// we are searching a way through a choose area (reserve_choose_detour):
+	if(  detour_target!=koord3d::invalid  ||  hold_search  ) {
+		// we are searching a way through a choose area (reserve_choose_detour) or a platform in it (reserve_hold_platform):
 		if(  bd->get_pos()==detour_start  ) {
 			return true;
 		}
 		// we cannot pass an end of choose area, only reach the one on our route
-		if(  sch->has_sign()  &&  bd->get_pos()!=detour_target  ) {
+		if(  sch->has_sign()  &&  (hold_search  ||  bd->get_pos()!=detour_target)  ) {
 			const roadsign_t* rs = bd->find<roadsign_t>();
 			if(  rs  &&  rs->get_desc()->get_wtyp()==get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA)  ) {
 				return false;
@@ -2625,32 +2632,56 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		const ribi_t::ribi ribi = ribi_type( prev_gr->get_pos(), gr->get_pos() );
 		return (sch1->get_ribi_maske() & ribi)==0;
 	}
+	if(  hold_search  ) {
+		// platform to let a passing train by: any of our stops (check_next_tile made sure the way is free)
+		const halthandle_t halt = haltestelle_t::get_halt( gr->get_pos(), get_owner() );
+		if(  !gr->is_halt()  ||  !halt.is_bound()  ) {
+			return false;
+		}
+		if(  hold_search==1  ) {
+			// first try to keep off the planned way, the passing train will want it
+			route_t const* const route = cnv->get_route();
+			for(  uint32 i=hold_avoid_from;  i<=hold_avoid_to  &&  i<route->get_count();  i++  ) {
+				if(  route->at(i)==gr->get_pos()  ) {
+					return false;
+				}
+			}
+		}
+		return is_stop_position( gr, prev_gr, halt );
+	}
 	// first check blocks, if we can go there
 	if(  sch1->can_reserve(cnv->self)  ) {
 		//  just check, if we reached a free stop position of this halt
-		if(  gr->is_halt()  &&  gr->get_halt()==target_halt  ) {
-			// now we must check the predecessor ...
-			if(  prev_gr!=NULL  ) {
-				const koord dir=gr->get_pos().get_2d()-prev_gr->get_pos().get_2d();
-				const ribi_t::ribi ribi = ribi_type(dir);
-				if(  gr->get_weg(get_waytype())->get_ribi_maske() & ribi  ) {
-					// signal/one way sign wrong direction
-					return false;
-				}
-				grund_t *to;
-				if(  !gr->get_neighbour(to,get_waytype(),ribi)  ||  !(to->get_halt()==target_halt)  ||  (to->get_weg(get_waytype())->get_ribi_maske() & ribi_type(dir))!=0  ) {
-					// end of stop: Is it long enough?
-					// end of stop could be also signal!
-					uint16 tiles = cnv->get_tile_length();
-					while(  tiles>1  ) {
-						if(  gr->get_weg(get_waytype())->get_ribi_maske() & ribi  ||  !gr->get_neighbour(to,get_waytype(),ribi_t::backward(ribi))  ||  !(to->get_halt()==target_halt)  ) {
-							return false;
-						}
-						gr = to;
-						tiles --;
+		return is_stop_position( gr, prev_gr, target_halt );
+	}
+	return false;
+}
+
+
+bool rail_vehicle_t::is_stop_position(const grund_t *gr, const grund_t *prev_gr, halthandle_t halt) const
+{
+	if(  gr->is_halt()  &&  gr->get_halt()==halt  &&  is_platform_suitable(gr)  ) {
+		// now we must check the predecessor ...
+		if(  prev_gr!=NULL  ) {
+			const koord dir=gr->get_pos().get_2d()-prev_gr->get_pos().get_2d();
+			const ribi_t::ribi ribi = ribi_type(dir);
+			if(  gr->get_weg(get_waytype())->get_ribi_maske() & ribi  ) {
+				// signal/one way sign wrong direction
+				return false;
+			}
+			grund_t *to;
+			if(  !gr->get_neighbour(to,get_waytype(),ribi)  ||  !(to->get_halt()==halt)  ||  (to->get_weg(get_waytype())->get_ribi_maske() & ribi_type(dir))!=0  ) {
+				// end of stop: Is it long enough?
+				// end of stop could be also signal!
+				uint16 tiles = cnv->get_tile_length();
+				while(  tiles>1  ) {
+					if(  gr->get_weg(get_waytype())->get_ribi_maske() & ribi  ||  !gr->get_neighbour(to,get_waytype(),ribi_t::backward(ribi))  ||  !(to->get_halt()==halt)  ||  !is_platform_suitable(to)  ) {
+						return false;
 					}
-					return true;
+					gr = to;
+					tiles --;
 				}
+				return true;
 			}
 		}
 	}
@@ -2800,6 +2831,24 @@ bool rail_vehicle_t::is_choose_signal_clear(signal_t *sig, const uint16 start_bl
 
 skip_choose:
 	if(  !choose_ok  ) {
+		// fork: a train marked as Hold steps aside into a free platform when a passing train comes
+		if(  cnv->is_hold_marked()  &&  cnv->get_schedule_target()==koord3d::invalid  ) {
+			// (a pending waypoint would be skipped by the new route from that platform)
+			const uint16 end_of_choose = get_passed_end_of_choose( start_block );
+			bool stuck;
+			if(  end_of_choose!=INVALID_INDEX  &&  get_passing_train( end_of_choose, halthandle_t(), cnv->get_route()->at(start_block), stuck ).is_bound()  ) {
+				if(  !cnv->is_waiting()  ) {
+					// the route search needs a step: come to the signal first
+					restart_speed = -1;
+					return false;
+				}
+				if(  reserve_hold_platform( start_block, end_of_choose, next_signal, next_crossing )  ) {
+					sig->set_state(  roadsign_t::gruen );
+					cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+					return true;
+				}
+			}
+		}
 		// just act as normal signal
 		if(  block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 0, true, false )  ) {
 			sig->set_state(  roadsign_t::gruen );
@@ -2827,7 +2876,8 @@ skip_choose:
 	}
 
 	target_halt = target->get_halt();
-	if(  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
+	platform_needs = get_platform_needs( cnv->get_schedule()->get_current_entry(), target_halt );
+	if(  !is_planned_platform_suitable()  ||  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
 		// no free route to target!
 		// note: any old reservations should be invalid after the block reserver call.
 		// => We can now start freshly all over
@@ -2869,7 +2919,256 @@ skip_choose:
 }
 
 
-uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
+// station flags (haltestelle_t::PAX, POST, WARE) of the platform building at this tile; all without one
+static uint8 get_platform_enables(const grund_t *gr)
+{
+	const gebaeude_t *gb = gr->find<gebaeude_t>();
+	const uint8 enables = gb ? gb->get_tile()->get_desc()->get_enabled() : 0;
+	return enables ? enables : (uint8)(haltestelle_t::PAX | haltestelle_t::POST | haltestelle_t::WARE);
+}
+
+
+uint8 rail_vehicle_t::get_platform_needs(const schedule_entry_t &entry, halthandle_t halt) const
+{
+	if(  entry.stop_type == schedule_entry_t::hold  ||  !halt.is_bound()  ) {
+		// nothing is loaded here: any platform will do
+		return 0;
+	}
+	// passengers and mail need a passenger platform, everything else a freight platform
+	uint8 needs = 0;
+	for(  uint8 i=0;  i<cnv->get_vehicle_count();  i++  ) {
+		const vehicle_t *v = cnv->get_vehikel(i);
+		if(  v->get_cargo_max() > 0  ) {
+			const goods_desc_t *cargo = v->get_cargo_type();
+			needs |= (cargo == goods_manager_t::passengers  ||  cargo == goods_manager_t::mail) ? (haltestelle_t::PAX | haltestelle_t::POST) : haltestelle_t::WARE;
+		}
+	}
+	if(  needs  ) {
+		// a station without such a platform on our track: take any rather than wait forever
+		FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
+			if(  tile.grund->get_weg( get_waytype() )  &&  (get_platform_enables( tile.grund ) & needs)  ) {
+				return needs;
+			}
+		}
+	}
+	return 0;
+}
+
+
+bool rail_vehicle_t::is_platform_suitable(const grund_t *gr) const
+{
+	return platform_needs == 0  ||  (get_platform_enables( gr ) & platform_needs) != 0;
+}
+
+
+bool rail_vehicle_t::is_planned_platform_suitable() const
+{
+	route_t const* const route = cnv->get_route();
+	uint16 tiles = cnv->get_tile_length();
+	for(  uint32 idx=route->get_count();  idx>0  &&  tiles>0;  idx--, tiles--  ) {
+		grund_t const* const gr = welt->lookup( route->at(idx-1) );
+		if(  gr==NULL  ||  gr->get_halt()!=target_halt  ) {
+			break;
+		}
+		if(  !is_platform_suitable( gr )  ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+// the convoi carries passengers or mail
+static bool carries_passengers(const convoi_t *c)
+{
+	for(  uint8 i=0;  i<c->get_vehicle_count();  i++  ) {
+		const vehicle_t *v = c->get_vehikel(i);
+		if(  v->get_cargo_max() > 0  &&  (v->get_cargo_type() == goods_manager_t::passengers  ||  v->get_cargo_type() == goods_manager_t::mail)  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+// the signal at this tile is a choose signal
+static bool has_choose_signal(const grund_t *gr, const weg_t *way)
+{
+	if(  way->has_signal()  ) {
+		signal_t const* const sig = gr->find<signal_t>(1);
+		return sig  &&  sig->get_desc()->is_choose_sign();
+	}
+	return false;
+}
+
+
+// the sign at this tile ends a choose area for this waytype
+static bool has_end_of_choose(const grund_t *gr, const weg_t *way)
+{
+	if(  way->has_sign()  ) {
+		roadsign_t const* const rs = gr->find<roadsign_t>(1);
+		return rs  &&  rs->get_desc()->get_wtyp()==way->get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA);
+	}
+	return false;
+}
+
+
+convoihandle_t rail_vehicle_t::get_passing_train(const uint32 end_of_choose, const halthandle_t halt, const koord3d behind, bool &stuck) const
+{
+	stuck = false;
+	const sint64 window = welt->calendar_minutes_to_ticks( welt->get_settings().get_passing_hold_minutes() );
+	route_t const* const route = cnv->get_route();
+	if(  window <= 0  ||  end_of_choose+1 >= route->get_count()  ) {
+		return convoihandle_t();
+	}
+	const koord3d eoc_pos = route->at( end_of_choose );
+	const koord3d eoc_next = route->at( end_of_choose+1 );
+	const bool we_carry_passengers = carries_passengers( cnv );
+
+	convoihandle_t passing;
+	sint64 passing_eta = window + 1;
+	FOR( vector_tpl<convoihandle_t>, const other, welt->convoys() ) {
+		if(  other == cnv->self  ||  other->get_vehicle_count()==0  ||  other->in_depot()  ) {
+			continue;
+		}
+		vehicle_t const* const front = other->front();
+		route_t const* const r = other->get_route();
+		if(  front->get_waytype() != get_waytype()  ||  r->empty()  ) {
+			continue;
+		}
+		// far away trains cannot matter: a route is never shorter than the distance
+		const sint64 speed = max( other->get_min_top_speed(), 1 );
+		const sint64 reach = max( (window * speed) >> 20, (sint64)256 );
+		if(  koord_distance( front->get_pos(), eoc_pos ) > reach  ) {
+			continue;
+		}
+		const uint32 from = max( front->get_route_index(), 1u ) - 1;
+
+		// waiting at red at a choose signal into this station (for a platform or a way through)?
+		const int st = other->get_state();
+		if(  halt.is_bound()  &&  (st==convoi_t::WAITING_FOR_CLEARANCE  ||  st==convoi_t::WAITING_FOR_CLEARANCE_ONE_MONTH  ||  st==convoi_t::WAITING_FOR_CLEARANCE_TWO_MONTHS)  &&  other->get_akt_speed()==0  ) {
+			const uint32 sig_idx = other->get_next_stop_index() - 1u;
+			grund_t const* const sig_gr = sig_idx < r->get_count() ? welt->lookup( r->at(sig_idx) ) : NULL;
+			weg_t const* const sig_way = sig_gr ? sig_gr->get_weg( get_waytype() ) : NULL;
+			if(  sig_way  &&  has_choose_signal( sig_gr, sig_way )  ) {
+				for(  uint32 i=sig_idx+1;  i<r->get_count();  i++  ) {
+					grund_t const* const gr = welt->lookup( r->at(i) );
+					weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+					if(  way==NULL  ) {
+						break;
+					}
+					if(  r->at(i)==eoc_pos  ||  gr->get_halt()==halt  ) {
+						stuck = true;
+						return convoihandle_t();
+					}
+					if(  has_end_of_choose( gr, way )  ) {
+						break;
+					}
+				}
+			}
+		}
+
+		if(  we_carry_passengers  &&  !carries_passengers( other.get_rep() )  ) {
+			continue;
+		}
+		// runs on past our end of choose in our direction, so it does not stop here
+		uint32 ix = INVALID_INDEX;
+		for(  uint32 i=from;  i+1 < r->get_count();  i++  ) {
+			if(  r->at(i)==eoc_pos  &&  r->at(i+1)==eoc_next  ) {
+				ix = i;
+				break;
+			}
+		}
+		if(  ix==INVALID_INDEX  ) {
+			continue;
+		}
+		// and enters the area through a choose signal, so it can get round us
+		uint32 choose_idx = INVALID_INDEX;
+		for(  uint32 i=ix;  i>0  &&  choose_idx==INVALID_INDEX;  i--  ) {
+			grund_t const* const gr = welt->lookup( r->at(i-1) );
+			weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+			if(  way==NULL  ||  has_end_of_choose( gr, way )  ) {
+				break;
+			}
+			if(  has_choose_signal( gr, way )  ) {
+				choose_idx = i-1;
+			}
+		}
+		if(  choose_idx==INVALID_INDEX  ) {
+			continue;
+		}
+		if(  behind!=koord3d::invalid  ) {
+			// it must still come by where we are
+			bool behind_us = false;
+			for(  uint32 i=from;  i<ix  &&  !behind_us;  i++  ) {
+				behind_us = r->at(i)==behind;
+			}
+			if(  !behind_us  ) {
+				continue;
+			}
+		}
+		if(  from > choose_idx  &&  (other->is_standing()  ||  st==convoi_t::CAN_START  ||  st==convoi_t::CAN_START_ONE_MONTH  ||  st==convoi_t::CAN_START_TWO_MONTHS)  ) {
+			// stands at a stop in this area itself: it is no passing train
+			continue;
+		}
+		const sint64 eta = ( (sint64)(ix - from) << (8+12) ) / speed;
+		if(  eta <= window  &&  eta < passing_eta  ) {
+			passing = other;
+			passing_eta = eta;
+		}
+	}
+	return passing;
+}
+
+
+bool rail_vehicle_t::is_held_for_passing_train()
+{
+	if(  cnv->is_passing_hold_released()  ) {
+		return false;
+	}
+	// only at a stop inside a choose area: its end of choose lies ahead of us before any choose signal
+	grund_t const* const here = welt->lookup( get_pos() );
+	const halthandle_t halt = here ? here->get_halt() : halthandle_t();
+	route_t const* const route = cnv->get_route();
+	uint32 end_of_choose = INVALID_INDEX;
+	for(  uint32 idx = max( route_index, 1u ) - 1;  halt.is_bound()  &&  end_of_choose==INVALID_INDEX  &&  idx+1 < route->get_count();  idx++  ) {
+		grund_t const* const gr = welt->lookup( route->at(idx) );
+		weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+		if(  way==NULL  ||  has_choose_signal( gr, way )  ) {
+			break;
+		}
+		if(  has_end_of_choose( gr, way )  ) {
+			end_of_choose = idx;
+		}
+	}
+	bool stuck = false;
+	const convoihandle_t passing = end_of_choose!=INVALID_INDEX ? get_passing_train( end_of_choose, halt, koord3d::invalid, stuck ) : convoihandle_t();
+	if(  stuck  ) {
+		// a train cannot get into the station: waiting would block it, so leave
+		cnv->release_passing_hold();
+		return false;
+	}
+	if(  !passing.is_bound()  ) {
+		cnv->set_passing_hold( convoihandle_t(), 0 );
+		return false;
+	}
+	const uint32 now = welt->get_ticks();
+	if(  !cnv->get_passing_hold_for().is_bound()  ) {
+		cnv->set_passing_hold( passing, now );
+	}
+	else if(  (sint64)(now - cnv->get_passing_hold_since()) > welt->calendar_minutes_to_ticks( welt->get_settings().get_passing_hold_max_minutes() )  ) {
+		// waited long enough at this stop
+		cnv->release_passing_hold();
+		return false;
+	}
+	else {
+		cnv->set_passing_hold( passing, cnv->get_passing_hold_since() );
+	}
+	return true;
+}
+
+
+uint16 rail_vehicle_t::get_passed_end_of_choose(const uint16 start_block) const
 {
 	route_t const* const route = cnv->get_route();
 	grund_t const* const target = welt->lookup( route->back() );
@@ -2909,6 +3208,17 @@ uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
 			}
 		}
 	}
+	return end_of_choose;
+}
+
+
+uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
+{
+	route_t const* const route = cnv->get_route();
+	const uint16 end_of_choose = get_passed_end_of_choose( start_block );
+	if(  end_of_choose==INVALID_INDEX  ) {
+		return INVALID_INDEX;
+	}
 
 	// who blocks our way through the area?
 	convoihandle_t blocker;
@@ -2938,6 +3248,42 @@ uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
 		}
 	}
 	return INVALID_INDEX;
+}
+
+
+bool rail_vehicle_t::reserve_hold_platform(const uint16 start_block, const uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing)
+{
+	route_t const* const route = cnv->get_route();
+
+	// search a free platform before the end of choose, first off the planned way, then anywhere
+	route_t target_rt;
+	bool found = false;
+	detour_start = route->at(start_block);
+	hold_avoid_from = start_block+1;
+	hold_avoid_to = end_of_choose;
+	const ribi_t::ribi start_dir = ribi_type( route->at(start_block), route->at(start_block+1) );
+	for(  uint8 pass=1;  !found  &&  pass<=2;  pass++  ) {
+		hold_search = pass;
+		found = target_rt.find_route( welt, detour_start, this, speed_to_kmh(cnv->get_min_top_speed()), start_dir, welt->get_settings().get_max_choose_route_steps() );
+	}
+	hold_search = 0;
+	detour_start = koord3d::invalid;
+	if(  !found  ) {
+		return false;
+	}
+
+	route_t new_route( *route );
+	new_route.remove_koord_from( start_block );
+	new_route.append( &target_rt );
+	if(  !block_reserver( &new_route, start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
+		return false;
+	}
+	route_t *const rt = cnv->access_route();
+	rt->clear();
+	rt->append( &new_route );
+	// arriving there is no stop of the schedule
+	cnv->set_hold_divert( true );
+	return true;
 }
 
 
@@ -3110,6 +3456,11 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 	assert(leading);
 	uint16 next_signal, next_crossing;
 	if(  cnv->get_state()==convoi_t::CAN_START  ||  cnv->get_state()==convoi_t::CAN_START_ONE_MONTH  ||  cnv->get_state()==convoi_t::CAN_START_TWO_MONTHS  ) {
+		// fork: a train that does not stop here may overtake us first
+		if(  is_held_for_passing_train()  ) {
+			restart_speed = 0;
+			return false;
+		}
 		// reserve first block at the start until the next signal
 		grund_t *gr_current = welt->lookup( get_pos() );
 		weg_t *w = gr_current ? gr_current->get_weg(get_waytype()) : NULL;

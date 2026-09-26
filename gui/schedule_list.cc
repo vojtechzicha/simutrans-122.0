@@ -280,6 +280,13 @@ schedule_list_gui_t::schedule_list_gui_t(player_t *player_) :
 	bt_withdraw_line.add_listener(this);
 	add_component(&bt_withdraw_line);
 
+	bt_hold_line.init(button_t::roundbox_state, "Hold",
+		scr_coord(RIGHT_COLUMN_OFFSET+D_BUTTON_WIDTH+D_H_SPACE, bt_y), scr_size(D_BUTTON_WIDTH, D_BUTTON_HEIGHT));
+	bt_hold_line.set_tooltip("Hold marker tooltip");
+	bt_hold_line.set_visible(false);
+	bt_hold_line.add_listener(this);
+	add_component(&bt_hold_line);
+
 	//CHART
 	chart.set_dimension(12, 1000);
 	chart.set_pos( scr_coord(RIGHT_COLUMN_OFFSET, D_MARGIN_TOP) );
@@ -392,6 +399,18 @@ bool schedule_list_gui_t::action_triggered( gui_action_creator_t *comp, value_t 
 			// since init always returns false, it is safe to delete immediately
 			delete tmp_tool;
 			depot_t::update_all_win();
+		}
+	}
+	else if(  comp == &bt_hold_line  ) {
+		bt_hold_line.pressed ^= 1;
+		if (  line.is_bound()  ) {
+			tool_t *tmp_tool = create_tool( TOOL_CHANGE_LINE | SIMPLE_TOOL );
+			cbuffer_t buf;
+			buf.printf( "h,%i,%i", line.get_id(), bt_hold_line.pressed );
+			tmp_tool->set_default_param(buf);
+			welt->set_tool( tmp_tool, player );
+			// since init always returns false, it is safe to delete immediately
+			delete tmp_tool;
 		}
 	}
 	else if(  comp == &bt_withdraw_line  ) {
@@ -515,6 +534,7 @@ void schedule_list_gui_t::draw(scr_coord pos, scr_size size)
 		bt_edit_line.enable( activate );
 		bt_new_line.enable( activate   &&  tabs.get_active_tab_index() > 0);
 		bt_withdraw_line.enable( activate );
+		bt_hold_line.enable( activate );
 	}
 
 	// if search string changed, update line selection
@@ -688,6 +708,7 @@ void schedule_list_gui_t::update_lineinfo(linehandle_t new_line)
 		bt_edit_line.enable();
 
 		bt_withdraw_line.pressed = new_line->get_withdraw();
+		bt_hold_line.pressed = new_line->get_hold_marker();
 
 		// fill haltestellen container with info of stops of the line
 		scrolly_haltestellen.clear_elements();
@@ -748,6 +769,9 @@ void schedule_list_gui_t::update_lineinfo(linehandle_t new_line)
 	}
 	line = new_line;
 	bt_withdraw_line.set_visible( line.is_bound() );
+	// the Hold marker is for trains only
+	const waytype_t line_wt = line.is_bound() ? line->get_schedule()->get_waytype() : invalid_wt;
+	bt_hold_line.set_visible( line_wt==track_wt  ||  line_wt==tram_wt  ||  line_wt==monorail_wt  ||  line_wt==maglev_wt  ||  line_wt==narrowgauge_wt );
 
 	reset_line_name();
 }

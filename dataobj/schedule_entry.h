@@ -26,6 +26,7 @@ public:
 		all_off     = 2, ///< everything off, no loading; nothing rides through
 		only_load   = 3, ///< no unloading; planner never routes cargo to here on this line
 		only_unload = 4, ///< no loading; planner never routes cargo from here on this line
+		hold        = 5, ///< stop to let passing trains overtake: no loading or unloading, planner ignores it, cargo rides through
 		max_stop_type
 	};
 
@@ -105,15 +106,15 @@ public:
 	uint8 stop_type;
 
 	/// the convoy loads cargo at this entry
-	bool loads() const { return stop_type != all_off  &&  stop_type != only_unload; }
+	bool loads() const { return stop_type != all_off  &&  stop_type != only_unload  &&  stop_type != hold; }
 	/// the convoy unloads cargo at this entry
-	bool unloads() const { return stop_type != only_load; }
+	bool unloads() const { return stop_type != only_load  &&  stop_type != hold; }
 	/// the convoy unloads everything, also cargo bound elsewhere
 	bool unloads_all() const { return stop_type == terminal  ||  stop_type == all_off; }
 	/// cargo aboard may stay aboard past this entry
 	bool rides_through() const { return stop_type != terminal  &&  stop_type != all_off; }
 	/// the planner may route cargo to this entry on this schedule
-	bool plans_arrival() const { return stop_type != only_load; }
+	bool plans_arrival() const { return stop_type != only_load  &&  stop_type != hold; }
 	/// the planner may route cargo from this entry on this schedule
 	bool plans_departure() const { return loads(); }
 

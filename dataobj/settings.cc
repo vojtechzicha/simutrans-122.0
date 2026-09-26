@@ -97,6 +97,8 @@ settings_t::settings_t() :
 	bits_per_month = 20;
 	minutes_per_month = 0;
 	calendar_seasons = true;
+	passing_hold_minutes = 5;
+	passing_hold_max_minutes = 20;
 
 	beginner_mode = false;
 	beginner_price_factor = 1500;
@@ -897,6 +899,11 @@ void settings_t::rdwr(loadsave_t *file)
 			file->rdwr_long(minutes_per_month);
 			file->rdwr_bool(calendar_seasons);
 		}
+		if(  file->is_version_atleast(122, 5)  ) {
+			// fork: trains wait at stops for passing trains
+			file->rdwr_short(passing_hold_minutes);
+			file->rdwr_short(passing_hold_max_minutes);
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1365,6 +1372,8 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	bits_per_month = contents.get_int( "bits_per_month", bits_per_month );
 	minutes_per_month = contents.get_int( "minutes_per_month", minutes_per_month );
 	calendar_seasons = contents.get_int( "calendar_seasons", calendar_seasons ) != 0;
+	passing_hold_minutes = contents.get_int( "passing_hold_minutes", passing_hold_minutes );
+	passing_hold_max_minutes = contents.get_int( "passing_hold_max_minutes", passing_hold_max_minutes );
 	use_timeline = contents.get_int( "use_timeline", use_timeline );
 	starting_year = contents.get_int( "starting_year", starting_year );
 	starting_month = contents.get_int( "starting_month", starting_month + 1 ) - 1;

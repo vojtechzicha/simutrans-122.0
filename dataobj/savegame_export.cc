@@ -419,6 +419,8 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_int( "bits_per_month", s.get_bits_per_month() );
 	w.kv_int( "minutes_per_month", s.get_minutes_per_month() );
 	w.kv_bool( "calendar_seasons", s.get_calendar_seasons() );
+	w.kv_int( "passing_hold_minutes", s.get_passing_hold_minutes() );
+	w.kv_int( "passing_hold_max_minutes", s.get_passing_hold_max_minutes() );
 	w.kv_int( "use_timeline", s.get_use_timeline() );
 	w.kv_bool( "freeplay", s.is_freeplay() );
 	w.kv_money( "starting_money", s.get_starting_money( s.get_starting_year() ) );
@@ -621,6 +623,7 @@ static void export_lines( json_writer_t &w, karte_t *welt )
 			w.kv_string( "type", export_linetype_name( line->get_linetype() ) );
 			w.kv_string( "state", export_line_state_name( welt, line ) );
 			w.kv_bool( "withdraw", line->get_withdraw() );
+			w.kv_bool( "hold_marker", line->get_hold_marker() );
 
 			w.array_key( "goods_categories" );
 			FOR( minivec_tpl<uint8>, const catg, line->get_goods_catg_index() ) {
@@ -951,6 +954,7 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		w.kv_int( "total_capacity", total_capacity );
 		w.kv_int( "total_loaded", total_loaded );
 		w.kv_bool( "has_obsolete_vehicles", cnv->has_obsolete_vehicles() );
+		w.kv_bool( "hold_marker", cnv->get_hold_marker() );
 
 		const koord3d depot = cnv->get_home_depot();
 		if(  depot == koord3d::invalid  ) {
