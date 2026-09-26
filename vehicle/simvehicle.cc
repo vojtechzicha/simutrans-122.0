@@ -2743,8 +2743,8 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		}
 		return is_stop_position( gr, prev_gr, halt );
 	}
-	// first check blocks, if we can go there
-	if(  sch1->can_reserve(cnv->self)  ) {
+	// first check blocks, if we can go there (fork: not a platform found not to lead on)
+	if(  sch1->can_reserve(cnv->self)  &&  !track_search_excluded.is_contained( gr->get_pos() )  ) {
 		//  just check, if we reached a free stop position of this halt
 		return is_stop_position( gr, prev_gr, target_halt );
 	}
@@ -3033,7 +3033,27 @@ skip_choose:
 		// now it we are in a step and can use the route search
 		route_t target_rt;
 		const int richtung = ribi_type(get_pos(), pos_next); // to avoid confusion at diagonals
-		if(  !target_rt.find_route( welt, cnv->get_route()->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), richtung, welt->get_settings().get_max_choose_route_steps() )  ) {
+		// fork: the platform must lead on to the next stop (platform signals leave the other side's tracks two-way)
+		schedule_t const* const schedule = cnv->get_schedule();
+		const koord3d next_stop = schedule  &&  !schedule->empty() ? schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos : koord3d::invalid;
+		uint32 planned_onward = 0xFFFFFFFFul; // measured when a platform is found
+		bool found = false;
+		track_search_excluded.clear();
+		// every rejected platform is excluded, so this ends after at most as many tries as platforms
+		for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+			if(  !target_rt.find_route( welt, cnv->get_route()->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), richtung, welt->get_settings().get_max_choose_route_steps() )  ) {
+				break;
+			}
+			if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+				planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
+			}
+			found = next_stop==koord3d::invalid  ||  leads_on_like_planned( target_rt.back(), next_stop, planned_onward );
+			if(  !found  ) {
+				track_search_excluded.append( target_rt.back() );
+			}
+		}
+		track_search_excluded.clear();
+		if(  !found  ) {
 			// nothing empty or not route with less than get_max_choose_route_steps() tiles
 			target_halt = halthandle_t();
 			sig->set_state(  roadsign_t::rot );
@@ -3206,13 +3226,13 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			// (where no platform is long enough, it stops sticking out as in the stock game)
 			planned_ok = false;
 		}
-		if(  planned_ok  &&  next_stop!=koord3d::invalid  ) {
-			// it must lead on to the next stop, like any other track
-			route_t on;
-			track_search = 3;
-			planned_ok = on.calc_route( welt, route->back(), next_stop, this, speed, 0 )!=route_t::no_route;
-			track_search = 0;
-		}
+	}
+	// the way on from the planned platform, also the measure for the others (measured when needed)
+	uint32 planned_onward = 0xFFFFFFFFul;
+	if(  planned_ok  &&  halt.is_bound()  &&  next_stop!=koord3d::invalid  ) {
+		// it must lead on to the next stop, like any other track
+		planned_onward = get_onward_length( route->back(), next_stop );
+		planned_ok = planned_onward>0;
 	}
 	if(  planned_ok  ) {
 		for(  uint32 i=start;  i<=planned_end;  i++  ) {
@@ -3238,8 +3258,10 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 		bool leads_on = false;
 		if(  ok  &&  candidate.get_count()>=2  ) {
 			if(  halt.is_bound()  ) {
-				route_t on;
-				leads_on = next_stop==koord3d::invalid  ||  on.calc_route( welt, candidate.back(), next_stop, this, speed, 0 )!=route_t::no_route;
+				if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+					planned_onward = get_onward_length( route->back(), next_stop );
+				}
+				leads_on = next_stop==koord3d::invalid  ||  leads_on_like_planned( candidate.back(), next_stop, planned_onward );
 			}
 			else {
 				route_t on;
@@ -3269,6 +3291,28 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	track_search = 0;
 	track_search_start = koord3d::invalid;
 	return found;
+}
+
+
+uint32 rail_vehicle_t::get_onward_length(koord3d from, koord3d next_stop)
+{
+	route_t on;
+	const uint8 old_search = track_search;
+	track_search = 3;
+	const bool ok = on.calc_route( welt, from, next_stop, this, speed_to_kmh( cnv->get_min_top_speed() ), 0 )!=route_t::no_route;
+	track_search = old_search;
+	return ok ? max( on.get_count(), 1u ) : 0;
+}
+
+
+bool rail_vehicle_t::leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length)
+{
+	const uint32 length = get_onward_length( from, next_stop );
+	if(  length==0  ) {
+		return false;
+	}
+	// as for a way through a station (find_station_track): at most half as long again, plus a few tiles
+	return planned_length==0  ||  length <= planned_length + planned_length/2 + 8;
 }
 
 

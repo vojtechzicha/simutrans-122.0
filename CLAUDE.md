@@ -352,6 +352,11 @@ with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `too
   `LT` of another station drops a stale one.
 - Choose signals: the walk also ends at an `LT` and at a `P` that applies before the stop; then a
   passing train takes any free track up to its `P` (through-choose) instead of the PR #1 detour.
+  A stopping train's choice (stock search and `find_station_track`) takes a platform other than
+  the planned one only if its way on to the next stop is at most 1.5x + 8 tiles of the planned
+  one's (`leads_on_like_planned`): `P` leaves tracks two-way, so without it a train could take the
+  other side's platform of a station with a crossover in one throat only and have to go back.
+  `P` at both ends of every track is the normal exit signal of double-track stations too (plan 3.7.1).
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
 - A 0.122.0 save writes `P` two-way (stock one-way signals would make the track one-way) and leaves
   out claims. Convoy window: "Waiting for the single track", "No free track at X", "Waiting to

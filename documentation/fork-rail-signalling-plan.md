@@ -101,7 +101,9 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
   starts at a signal applying to the train (for a train that turns in B, the `P` at the other end).
   The planned track is held to the same rules: it must lead on, and a platform shorter than the
   train is skipped when the station has one long enough (where none is, the train stops sticking
-  out, as in the stock game).
+  out, as in the stock game). For a stopping train, "leads on" also means not much further than
+  from the planned platform (at most 1.5x its way on to the next stop + 8 tiles): a platform on the
+  other side with no crossover after it only leads back through the throat it came from.
 - Which tracks a search can reach: Simutrans crossovers and switches can be run in every direction
   (a route may take any exit of a switch tile except straight back), so any train can reach any
   track through the crossovers. Among the free tracks that lead on, the cheapest path wins (planned
@@ -138,11 +140,34 @@ the `LT`.
 - The choose walk also ends at a `P` that applies to the train (in addition to `E` and another
   choose signal).
 - A stopping train reaches its halt before that `P`, so it chooses a platform as today, now with
-  the lead-on check (rule 3).
+  the lead-on check (rule 3, with the length bound of 3.4). This matters because `P` leaves the
+  tracks two-way: with stock one-way exit signals the other side's platforms were closed to the
+  train, with `P` they are reachable through the entry crossover.
 - A passing train whose walk ends at such a `P`: through-choose, i.e. any free track up to its `P`
   at the far end that leads on to the planned route, planned track first, length limit as 3.4.
   If the next block after that `P` is taken, the train waits at the `P`, inside the station.
   This replaces PR #1's detour wherever exits are `P`; the detour code stays for stock exits.
+
+### 3.7.1 `P` as the exit signal of every double-track station
+Replacing the stock exit signals of a double-track station with `P` is fine, and that is how
+Polom and Zabreh are drawn in 4.1 and 4.3:
+- Put a `P` at both ends of every platform track, each facing out of the station. With `P` only at
+  the end the stock signal was at, a train using the track the other way (other side's platform,
+  a train turning there) leaves without any exit signal.
+- Keep the choose signals at the entries, the `E` signs after the exits and the stock block
+  signals on the open line; those keep the main lines one-way.
+- `P` is a plain signal here (no `LT` behind it). Do not use it in place of a pre-signal,
+  priority or long-block exit signal: it has none of their behaviour.
+- The station tracks become two-way: a train turning at the station leaves the way it came, a
+  stopping train takes the other side's platform when its own are full and it can go on from
+  there (crossovers in both throats), and a passing train blocked on its own track takes any free
+  track to its `P` (through-choose). Unlike the PR #1 detour, through-choose does not ask why its
+  track is blocked, so a fast train may also get past a slow one that is still running through the
+  station, if it reaches its `P` first.
+- A station with a crossover in one throat only: a stopping train never takes a platform of the
+  other side, since it could not go on (lead-on check); it waits at the choose signal instead.
+- A downgraded save (`steam-fork.sh downgrade`) writes `P` as a two-way stock signal: the stock
+  game drives, but its choose logic and the lead-on check are gone.
 
 ### 3.8 Why it cannot lock, and the one limit
 A train only waits in front of a `P`, or at a halt inside a section nobody else can enter, and it
@@ -331,6 +356,11 @@ that builds the layouts in code (not committed):
 - `saveload`: saved while a train between the halts held a claim; after loading the claim and its
   reserved tiles are back and all trains keep running; a 0.122.0 save writes every platform signal
   two-way and has no claim.
+- `sides`: a double-track station with `P` at both ends of both tracks, the eastbound platform held
+  by a train that waits for a full load. With crossovers in both throats a stopping eastbound train
+  takes the westbound platform and goes on; with only the west crossover it waits at the choose
+  signal and takes its own platform once that is free (before the fix it took the westbound
+  platform and then stood at the `P` there, on the westbound main's track, until the blocker left).
 - `lock`: the capacity limit of 3.8, see there.
 
 Still to see in the Windows game with the pak128.cs objects:
