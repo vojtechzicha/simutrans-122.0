@@ -438,6 +438,11 @@ void convoi_info_t::draw(scr_coord pos, scr_size size)
 	// update button & labels
 	follow_button.pressed = (welt->get_viewport()->get_follow_convoi()==cnv);
 	update_labels();
+	if(  details->update_vehicles()  ) {
+		// fork: coupled or uncoupled, the vehicle list and its labels got new sizes
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
 
 	route_bar.set_base(cnv->get_route()->get_count()-1);
 	cnv_route_index = cnv->front()->get_route_index() - 1;

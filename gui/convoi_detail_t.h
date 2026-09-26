@@ -13,9 +13,11 @@
 #include "components/gui_label.h"
 #include "components/action_listener.h"
 #include "../convoihandle_t.h"
+#include "../tpl/vector_tpl.h"
 
 class scr_coord;
 class karte_ptr_t;
+class vehicle_t;
 
 /**
  * Convoi details component
@@ -37,6 +39,9 @@ private:
 	button_t sale_button;
 	button_t withdraw_button;
 
+	// fork: the vehicles listed; coupling changes a convoy's vehicles outside a depot
+	vector_tpl<const vehicle_t *> shown_vehicles;
+
 	static karte_ptr_t welt;
 public:
 	convoi_detail_t(convoihandle_t cnv = convoihandle_t());
@@ -45,6 +50,12 @@ public:
 	 * Initializes layout, @p cnv needs to be valid.
 	 */
 	void init(convoihandle_t cnv);
+
+	/**
+	 * Rebuilds the list when the convoy's vehicles changed (coupling, uncoupling).
+	 * @return true if it did, the window must then be laid out again
+	 */
+	bool update_vehicles();
 
 	void draw(scr_coord offset) OVERRIDE;
 

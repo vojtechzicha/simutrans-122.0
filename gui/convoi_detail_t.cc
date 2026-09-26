@@ -152,6 +152,11 @@ void convoi_detail_t::init(convoihandle_t cnv)
 {
 	this->cnv = cnv;
 
+	// fork: also called again when the vehicles changed
+	remove_all();
+	container.remove_all();
+	shown_vehicles.clear();
+
 	set_table_layout(1,0);
 
 
@@ -203,8 +208,23 @@ void convoi_detail_t::init(convoihandle_t cnv)
 		vehicle_t *v = cnv->get_vehikel(veh);
 		container.new_component<gui_vehicleinfo_t>(v, cnv_kmh);
 		container.new_component<gui_divider_t>();
+		shown_vehicles.append( v );
 	}
 	update_labels();
+}
+
+
+bool convoi_detail_t::update_vehicles()
+{
+	bool changed = shown_vehicles.get_count() != cnv->get_vehicle_count();
+	for(  uint32 i=0;  !changed  &&  i<shown_vehicles.get_count();  i++  ) {
+		changed = shown_vehicles[i] != cnv->get_vehikel(i);
+	}
+	if(  changed  ) {
+		// the rows hold vehicle pointers, which may belong to another convoy or be gone by now
+		init( cnv );
+	}
+	return changed;
 }
 
 
