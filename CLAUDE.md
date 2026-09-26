@@ -367,8 +367,21 @@ objects come from the pakset repo (`VZ-Signals-rail.pak`, built with the fork's 
   track one-way) and leaves out claims. Such a file is for the older exe only: loaded back into
   this build the `P` stay two-way and trains stick at them, so keep the 0.122.7 save. Convoy window: "Waiting for the single track", "No free track at X", "Waiting to
   enter the station". Export: optional `claim_boundary` on convoys.
-- Known limit: two stations of a section full of trains that all want that section lock (four
-  trains, 2+2 tracks); timetable or more tracks.
+- Last free track (no save change, plan 3.8): at a `P`, a train about to claim the last free track
+  of the next station X (`keeps_last_track`) first checks that some train at X could still leave
+  it afterwards, the newcomer included: it leaves without a single-track section, already holds
+  its claim elsewhere, or its next station (`get_section_after`, found through the station
+  boundaries) has a free track or is the one the newcomer leaves; one station further (two-step
+  look, `station_can_release` depth 1) the same for the trains there. Otherwise the `P` stays red
+  ("Keeping the last track at X free", `SECTION_WAIT_LAST_TRACK`). A station's tracks
+  (`get_station_tracks`) are its platform rows plus the plain track to the next switch; a track is
+  free when no tile is reserved, and a train counts as leaving only if it is alone on a track (short
+  trains share platforms). After 30 calendar minutes at the `P` (1/8 month without the calendar)
+  the look goes through all stations, so the rule never holds everyone up by itself.
+- Lock warning: a train waiting 30 minutes for a track (`check_section_lock`) checks the same way
+  whether the stations are really locked and posts one message naming them ("Trains are locked
+  up at ..."). What still locks: more trains than a group of stations can hold, e.g. trains coming
+  out of a depot inside a station; timetable, fewer trains or more tracks.
 
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 

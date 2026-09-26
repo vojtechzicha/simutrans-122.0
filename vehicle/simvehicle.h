@@ -645,6 +645,36 @@ private:
 	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
 	bool is_station_boundary_clear(uint16 next_block, sint32 &restart_speed);
 
+	/* fork: keeping stations of single-track lines from locking up. A station's tracks are its
+	 * platform rows plus the plain track on to the next switch (where its platform signals stand);
+	 * the trains at a station are those that reserve any of those tiles (standing, or claimed).
+	 */
+	struct section_check_t {
+		halthandle_t full;           // full after the claim in question (the newcomer is there)
+		halthandle_t freed;          // has one more free track (the newcomer leaves it)
+		convoihandle_t newcomer;
+		koord3d claimed;             // the newcomer's tile on the track it claims at full
+		vector_tpl<halthandle_t> visited;
+	};
+	// the next station c goes to from station at over a single-track section (entered through a
+	// station boundary); false when it leaves at without one, or it is not known
+	bool get_section_after(convoi_t *c, halthandle_t at, halthandle_t &next);
+	// some train at station s can leave it, looking depth stations further on
+	bool station_can_release(halthandle_t s, int depth, section_check_t &ck);
+	// the station of the train before its platform signal (the tracks behind it), if any
+	halthandle_t get_section_origin(uint16 next_block) const;
+	// taking the last free track of halt x (claimed_tile on it) could lock the stations up
+	bool keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block);
+	// the train has waited long for a track at x: tell the player once if the stations are locked
+	void check_section_lock(halthandle_t x, uint16 next_block);
+
+	// cache of get_section_after (on the leading vehicle, not saved)
+	halthandle_t section_after_at, section_after_next;
+	koord3d section_after_pos;
+	uint8 section_after_stop;
+	bool section_after_found;
+	uint32 section_after_tick;
+
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;
 

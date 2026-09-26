@@ -257,6 +257,9 @@ private:
 	// fork, rail: why the convoi waits at a platform signal or station boundary (not saved)
 	uint8 section_wait;
 	halthandle_t section_wait_halt;
+	// since this tick (0 = not waiting); warned once that the stations are locked
+	uint32 section_wait_since;
+	bool section_lock_warned;
 
 	/**
 	 * Fork, coupling (rail). A primary train carries the vehicles of the train that joined it at
@@ -1047,10 +1050,14 @@ public:
 	// true when route_via_claim would not change the route (no route search needed)
 	bool route_follows_claim(const route_t &r, uint32 from) const;
 
-	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY };
-	void set_section_wait(uint8 why, halthandle_t halt) { section_wait = why; section_wait_halt = halt; }
+	// SECTION_WAIT_LAST_TRACK: the last free track there is kept, taking it could lock the stations up
+	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK };
+	void set_section_wait(uint8 why, halthandle_t halt);
 	uint8 get_section_wait() const { return section_wait; }
 	halthandle_t get_section_wait_halt() const { return section_wait_halt; }
+	uint32 get_section_wait_since() const { return section_wait_since; }
+	bool is_section_lock_warned() const { return section_lock_warned; }
+	void set_section_lock_warned() { section_lock_warned = true; }
 
 	/**
 	 * Passing a standing convoi (see convoi_t::is_standing()), whose first tile is route tile start_index.

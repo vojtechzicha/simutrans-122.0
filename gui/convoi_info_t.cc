@@ -330,6 +330,9 @@ void convoi_info_t::update_labels()
 			case convoi_t::SECTION_WAIT_TRACK:
 				departure_label.buf().printf( translator::translate("No free track at %s"), halt.is_bound() ? halt->get_name() : "?" );
 				break;
+			case convoi_t::SECTION_WAIT_LAST_TRACK:
+				departure_label.buf().printf( translator::translate("Keeping the last track at %s free"), halt.is_bound() ? halt->get_name() : "?" );
+				break;
 			case convoi_t::SECTION_WAIT_ENTRY:
 				departure_label.buf().append( translator::translate("Waiting to enter the station") );
 				break;

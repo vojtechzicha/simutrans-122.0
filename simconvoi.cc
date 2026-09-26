@@ -150,6 +150,8 @@ void convoi_t::init(player_t *player)
 	claim_stops = false;
 	claim_stop = koord3d::invalid;
 	section_wait = SECTION_WAIT_NONE;
+	section_wait_since = 0;
+	section_lock_warned = false;
 	coupled_first = 0;
 	couple_wait_since = 0;
 	couple_hold_slot = -1;
@@ -320,6 +322,18 @@ void convoi_t::reserve_claim()
 			}
 		}
 	}
+}
+
+
+void convoi_t::set_section_wait(uint8 why, halthandle_t halt)
+{
+	if(  (why==SECTION_WAIT_NONE) != (section_wait==SECTION_WAIT_NONE)  ) {
+		// the wait at this signal starts or ends (the reason may change while waiting)
+		section_wait_since = why==SECTION_WAIT_NONE ? 0 : nonzero_ticks( welt->get_ticks() );
+		section_lock_warned = false;
+	}
+	section_wait = why;
+	section_wait_halt = halt;
 }
 
 

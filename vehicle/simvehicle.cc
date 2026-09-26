@@ -2461,6 +2461,10 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	section_after_pos = koord3d::invalid;
+	section_after_stop = 0;
+	section_after_found = false;
+	section_after_tick = 0;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2515,6 +2519,10 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	section_after_pos = koord3d::invalid;
+	section_after_stop = 0;
+	section_after_found = false;
+	section_after_tick = 0;
 }
 
 
@@ -3522,13 +3530,24 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			route_t path;
 			if(  !find_station_track( &leg_route, at, halt, needs, next_stop, path )  ) {
 				grund_t const* const end_gr = welt->lookup( leg_route.back() );
+				const halthandle_t full_halt = halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t());
 				sig->set_state( roadsign_t::rot );
-				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t()) );
+				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, full_halt );
+				check_section_lock( full_halt, next_block );
 				restart_speed = 0;
 				return false;
 			}
 			const uint16 track_start = get_track_start( path, get_waytype() );
 			if(  track_start>0  ) {
+				// the last free track there only if the trains there can still get away (3.8)
+				grund_t const* const track_gr = welt->lookup( path.at(track_start) );
+				const halthandle_t track_halt = track_gr ? track_gr->get_halt() : halthandle_t();
+				if(  keeps_last_track( track_halt, path.at(track_start), next_block )  ) {
+					sig->set_state( roadsign_t::rot );
+					cnv->set_section_wait( convoi_t::SECTION_WAIT_LAST_TRACK, track_halt );
+					restart_speed = 0;
+					return false;
+				}
 				cnv->set_claim( path, track_start, stops, schedule->entries[leg_entry].pos );
 			}
 			if(  leg==0  &&  track_start>0  ) {
@@ -3628,6 +3647,432 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 	cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
 	return true;
+}
+
+
+/* fork: keeping the stations of single-track lines from locking up, see
+ * documentation/fork-rail-signalling-plan.md (3.8). A train at a platform signal may take the last
+ * free track of the next station only if some train there could leave it again afterwards: its next
+ * station has a free track (or is the one we leave), or, one station further, a train there can go
+ * to a station with a free track.
+ */
+
+// the tracks of a station: its platform rows, each with the plain track on to the next switch or
+// station boundary (where its platform signals stand), at most 32 tiles past the platforms
+struct station_tracks_t {
+	vector_tpl<koord3d> tiles;
+	vector_tpl<uint16> track; // track number of each tile
+	uint16 count;
+};
+
+static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t &st)
+{
+	st.tiles.clear();
+	st.track.clear();
+	st.count = 0;
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	vector_tpl<koord3d> todo;
+	vector_tpl<uint8> todo_off; // tiles past the platform
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
+		if(  tile.grund->get_weg( wt )==NULL  ||  st.tiles.is_contained( tile.grund->get_pos() )  ) {
+			continue;
+		}
+		const uint16 t = st.count++;
+		st.tiles.append( tile.grund->get_pos() );
+		st.track.append( t );
+		todo.append( tile.grund->get_pos() );
+		todo_off.append( 0 );
+		while(  !todo.empty()  ) {
+			const koord3d pos = todo.pop_back();
+			const uint8 off = todo_off.pop_back();
+			grund_t const* const gr = world()->lookup( pos );
+			weg_t const* const way = gr ? gr->get_weg( wt ) : NULL;
+			if(  way==NULL  ) {
+				continue;
+			}
+			for(  int r=0;  r<4;  r++  ) {
+				grund_t *to;
+				if(  (way->get_ribi_unmasked() & ribi_t::nsew[r])==0  ||  !gr->get_neighbour( to, wt, ribi_t::nsew[r] )  ||  st.tiles.is_contained( to->get_pos() )  ) {
+					continue;
+				}
+				uint8 to_off = 0;
+				if(  to->get_halt()!=halt  ) {
+					weg_t const* const to_way = to->get_weg( wt );
+					if(  to_way==NULL  ||  ribi_t::is_threeway( to_way->get_ribi_unmasked() )  ||  rail_vehicle_t::get_station_boundary( to )  ||  off>=32  ) {
+						continue;
+					}
+					to_off = off + 1;
+				}
+				st.tiles.append( to->get_pos() );
+				st.track.append( t );
+				todo.append( to->get_pos() );
+				todo_off.append( to_off );
+			}
+		}
+	}
+}
+
+
+// tracks of the station with no tile reserved, not counting the one with tile except
+static uint16 count_free_tracks(const station_tracks_t &st, waytype_t wt, koord3d except)
+{
+	vector_tpl<bool> busy( st.count );
+	for(  uint16 t=0;  t<st.count;  t++  ) {
+		busy.append( false );
+	}
+	for(  uint32 i=0;  i<st.tiles.get_count();  i++  ) {
+		if(  st.tiles[i]==except  ) {
+			busy[ st.track[i] ] = true;
+			continue;
+		}
+		grund_t const* const gr = world()->lookup( st.tiles[i] );
+		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( wt ) : NULL;
+		if(  sch  &&  sch->is_reserved()  ) {
+			busy[ st.track[i] ] = true;
+		}
+	}
+	uint16 free_tracks = 0;
+	for(  uint16 t=0;  t<st.count;  t++  ) {
+		free_tracks += !busy[t];
+	}
+	return free_tracks;
+}
+
+
+static uint16 count_free_tracks(halthandle_t halt, waytype_t wt)
+{
+	station_tracks_t st;
+	get_station_tracks( halt, wt, st );
+	return count_free_tracks( st, wt, koord3d::invalid );
+}
+
+
+// long enough at a platform signal to look further (and to warn of a lock)
+static bool section_waited_long(const convoi_t *c)
+{
+	const uint32 since = c->get_section_wait_since();
+	if(  since==0  ) {
+		return false;
+	}
+	karte_t *const welt = world();
+	const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 3);
+	return (sint64)(uint32)(welt->get_ticks() - since) > limit;
+}
+
+
+bool rail_vehicle_t::get_section_after(convoi_t *c, halthandle_t at, halthandle_t &next)
+{
+	next = halthandle_t();
+	schedule_t const* const schedule = c->get_schedule();
+	if(  c->get_vehicle_count()==0  ||  schedule==NULL  ||  schedule->empty()  ||  c->front()->get_waytype()!=get_waytype()  ) {
+		return false;
+	}
+	rail_vehicle_t *const f = (rail_vehicle_t *)c->front();
+
+	const uint32 now = welt->get_ticks();
+	if(  f->section_after_tick!=0  &&  f->section_after_at==at  &&  f->section_after_pos==f->get_pos()  &&  f->section_after_stop==schedule->get_current_stop()
+		&&  (uint32)(now - f->section_after_tick) < (welt->ticks_per_world_month >> 4)  ) {
+		next = f->section_after_next;
+		return f->section_after_found;
+	}
+
+	// standing there (maybe short of the platform, in front of its platform signal), or on its way in?
+	station_tracks_t st;
+	get_station_tracks( at, get_waytype(), st );
+	bool is_there = false;
+	for(  uint8 i=0;  !is_there  &&  i<c->get_vehicle_count();  i++  ) {
+		is_there = st.tiles.is_contained( c->get_vehikel(i)->get_pos() );
+	}
+
+	// the route from the train on, then the next legs of its schedule
+	vector_tpl<koord3d> ahead;
+	route_t const* const r = c->get_route();
+	if(  !r->empty()  ) {
+		for(  uint32 i = f->get_route_index()>0 ? f->get_route_index()-1 : 0;  i<r->get_count();  i++  ) {
+			ahead.append( r->at(i) );
+		}
+	}
+	if(  ahead.empty()  ) {
+		ahead.append( f->get_pos() );
+	}
+	uint8 entry = schedule->get_current_stop();
+	{
+		// the route leads to the current entry; a train standing there goes on to the next one
+		const koord3d goal = schedule->entries[entry].pos;
+		const halthandle_t goal_halt = haltestelle_t::get_halt( goal, c->get_owner() );
+		if(  ahead.back()==goal  ||  (goal_halt.is_bound()  &&  haltestelle_t::get_halt( ahead.back(), c->get_owner() )==goal_halt)  ) {
+			entry = (entry+1) % schedule->get_count();
+		}
+	}
+
+	const sint32 speed = speed_to_kmh( c->get_min_top_speed() );
+	const uint8 old_search = f->track_search;
+	uint8 phase = is_there ? 1 : 0; // 0 on the way in, 1 in the station, 2 on the single-track line after it
+	bool found = false;
+	uint8 legs = 0;
+	for(  uint32 i=0;  ;  i++  ) {
+		if(  i+1 >= ahead.get_count()  ) {
+			// on with the next leg of the schedule
+			if(  legs >= schedule->get_count()  ||  ahead.get_count() > 16384  ) {
+				break;
+			}
+			legs++;
+			route_t leg;
+			f->track_search = 3;
+			const bool ok = leg.calc_route( welt, ahead.back(), schedule->entries[entry].pos, f, speed, 8888 )!=route_t::no_route;
+			f->track_search = old_search;
+			entry = (entry+1) % schedule->get_count();
+			if(  !ok  ||  leg.get_count()<2  ) {
+				break;
+			}
+			for(  uint32 k=1;  k<leg.get_count();  k++  ) {
+				ahead.append( leg.at(k) );
+			}
+		}
+		grund_t const* const gr = welt->lookup( ahead[i] );
+		if(  gr==NULL  ) {
+			break;
+		}
+		const ribi_t::ribi dir = ribi_type( ahead[i], ahead[i+1] );
+		roadsign_t const* const lt = get_station_boundary( gr );
+		if(  phase==0  ) {
+			if(  gr->get_halt()==at  ) {
+				phase = 1;
+			}
+		}
+		else if(  phase==1  ) {
+			if(  lt  &&  !lt->applies_to( dir )  ) {
+				// leaving through the station boundary
+				phase = 2;
+			}
+			else if(  lt  ||  (signal_applies( gr, dir )  &&  !st.tiles.is_contained( ahead[i] ))  ) {
+				// a signal after the station tracks (or another station) before any station boundary:
+				// no single-track section from here (signals on the station tracks may be passed on the way)
+				break;
+			}
+		}
+		else if(  lt  ) {
+			if(  lt->applies_to( dir )  ) {
+				// entering the next station: the halt of its first platform tile
+				for(  uint32 k=i+1;  k<ahead.get_count()  &&  k<i+64;  k++  ) {
+					grund_t const* const pgr = welt->lookup( ahead[k] );
+					if(  pgr  &&  pgr->get_halt().is_bound()  ) {
+						next = pgr->get_halt();
+						break;
+					}
+				}
+				found = next.is_bound();
+				break;
+			}
+		}
+		else if(  signal_applies( gr, dir )  ) {
+			// the line ends at a signal (joins a double track)
+			break;
+		}
+	}
+
+	f->section_after_at = at;
+	f->section_after_pos = f->get_pos();
+	f->section_after_stop = schedule->get_current_stop();
+	f->section_after_tick = now ? now : 1;
+	f->section_after_found = found;
+	f->section_after_next = next;
+	return found;
+}
+
+
+bool rail_vehicle_t::station_can_release(halthandle_t s, int depth, section_check_t &ck)
+{
+	station_tracks_t st;
+	get_station_tracks( s, get_waytype(), st );
+	// which train is on (or has reserved) which track; the newcomer on the track it claims
+	vector_tpl<convoihandle_t> occ_train;
+	vector_tpl<uint16> occ_track;
+	for(  uint32 i=0;  i<st.tiles.get_count();  i++  ) {
+		convoihandle_t c;
+		if(  st.tiles[i]==ck.claimed  &&  s==ck.full  ) {
+			c = ck.newcomer;
+		}
+		else {
+			grund_t const* const gr = welt->lookup( st.tiles[i] );
+			schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+			c = sch ? sch->get_reserved_convoi() : convoihandle_t();
+		}
+		if(  !c.is_bound()  ) {
+			continue;
+		}
+		bool known = false;
+		for(  uint32 k=0;  !known  &&  k<occ_train.get_count();  k++  ) {
+			known = occ_train[k]==c  &&  occ_track[k]==st.track[i];
+		}
+		if(  !known  ) {
+			occ_train.append( c );
+			occ_track.append( st.track[i] );
+		}
+	}
+	if(  occ_train.empty()  ) {
+		return true;
+	}
+	vector_tpl<convoihandle_t> done;
+	for(  uint32 k=0;  k<occ_train.get_count();  k++  ) {
+		const convoihandle_t c = occ_train[k];
+		if(  done.is_contained( c )  ) {
+			continue;
+		}
+		// only a train alone on a track frees one by leaving
+		bool alone = false;
+		for(  uint32 j=0;  !alone  &&  j<occ_train.get_count();  j++  ) {
+			if(  occ_train[j]==c  ) {
+				alone = true;
+				for(  uint32 m=0;  alone  &&  m<occ_train.get_count();  m++  ) {
+					alone = occ_track[m]!=occ_track[j]  ||  occ_train[m]==c;
+				}
+			}
+		}
+		done.append( c );
+		if(  !alone  ) {
+			continue;
+		}
+		if(  c!=ck.newcomer  ) {
+			// on its way out already: it has its track at the next station
+			bool is_there = false;
+			for(  uint8 v=0;  !is_there  &&  v<c->get_vehicle_count();  v++  ) {
+				is_there = st.tiles.is_contained( c->get_vehikel(v)->get_pos() );
+			}
+			bool claim_elsewhere = c->has_claim();
+			for(  uint32 i=0;  claim_elsewhere  &&  i<st.tiles.get_count();  i++  ) {
+				claim_elsewhere = !c->is_claimed_tile( st.tiles[i] );
+			}
+			if(  is_there  &&  claim_elsewhere  ) {
+				return true;
+			}
+		}
+		halthandle_t next;
+		const bool found = get_section_after( c.get_rep(), s, next );
+		if(  !found  ||  next==s  ||  next==ck.freed  ) {
+			// leaves without a single-track section (or we cannot tell), or to where a track gets free
+			return true;
+		}
+		if(  next!=ck.full  &&  count_free_tracks( next, get_waytype() )>0  ) {
+			return true;
+		}
+		if(  depth>0  &&  !ck.visited.is_contained( next )  ) {
+			ck.visited.append( next );
+			if(  station_can_release( next, depth-1, ck )  ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+halthandle_t rail_vehicle_t::get_section_origin(uint16 next_block) const
+{
+	route_t const* const route = cnv->get_route();
+	for(  uint32 i=min( (uint32)next_block, route->get_count() );  i>0;  i--  ) {
+		grund_t const* const gr = welt->lookup( route->at(i-1) );
+		if(  gr==NULL  ||  get_station_boundary( gr )  ||  next_block-i > 64  ) {
+			break;
+		}
+		if(  gr->get_halt().is_bound()  ) {
+			return gr->get_halt();
+		}
+	}
+	return halthandle_t();
+}
+
+
+bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block)
+{
+	if(  !x.is_bound()  ) {
+		return false;
+	}
+	station_tracks_t st;
+	get_station_tracks( x, get_waytype(), st );
+	if(  count_free_tracks( st, get_waytype(), claimed_tile )>0  ) {
+		return false;
+	}
+	section_check_t ck;
+	ck.full = x;
+	ck.freed = get_section_origin( next_block );
+	ck.newcomer = cnv->self;
+	ck.claimed = claimed_tile;
+	ck.visited.append( x );
+	if(  ck.freed==x  ) {
+		return false;
+	}
+	if(  ck.freed.is_bound()  ) {
+		// our track there gets free only if no other train stands on it or has it reserved
+		station_tracks_t ost;
+		get_station_tracks( ck.freed, get_waytype(), ost );
+		vector_tpl<uint16> ours;
+		for(  uint8 v=0;  v<cnv->get_vehicle_count();  v++  ) {
+			for(  uint32 i=0;  i<ost.tiles.get_count();  i++  ) {
+				if(  ost.tiles[i]==cnv->get_vehikel(v)->get_pos()  ) {
+					ours.append_unique( ost.track[i] );
+				}
+			}
+		}
+		bool shared = ours.empty();
+		for(  uint32 i=0;  !shared  &&  i<ost.tiles.get_count();  i++  ) {
+			if(  ours.is_contained( ost.track[i] )  ) {
+				grund_t const* const gr = welt->lookup( ost.tiles[i] );
+				schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+				shared = sch  &&  sch->is_reserved()  &&  sch->get_reserved_convoi()!=cnv->self;
+			}
+		}
+		if(  shared  ) {
+			ck.freed = halthandle_t();
+		}
+	}
+	// two stations ahead; after a long wait all of them, so this rule never holds everybody up by itself
+	return !station_can_release( x, section_waited_long( cnv ) ? 64 : 1, ck );
+}
+
+
+void rail_vehicle_t::check_section_lock(halthandle_t x, uint16 next_block)
+{
+	if(  !x.is_bound()  ||  cnv->is_section_lock_warned()  ||  !section_waited_long( cnv )  ) {
+		return;
+	}
+	cnv->set_section_lock_warned();
+	section_check_t ck;
+	ck.claimed = koord3d::invalid;
+	ck.visited.append( x );
+	if(  station_can_release( x, 64, ck )  ) {
+		// the trains there can leave: a wait, not a lock
+		return;
+	}
+	const halthandle_t origin = get_section_origin( next_block );
+	if(  origin.is_bound()  ) {
+		ck.visited.append_unique( origin );
+	}
+	// one message per lock: the other trains in it find the same stations
+	static vector_tpl<halthandle_t> warned_halts;
+	static uint32 warned_tick = 0;
+	if(  warned_tick!=0  &&  (uint32)(welt->get_ticks() - warned_tick) < welt->ticks_per_world_month  ) {
+		FOR( vector_tpl<halthandle_t>, const h, ck.visited ) {
+			if(  warned_halts.is_contained( h )  ) {
+				return;
+			}
+		}
+	}
+	warned_halts.clear();
+	cbuffer_t names;
+	FOR( vector_tpl<halthandle_t>, const h, ck.visited ) {
+		warned_halts.append( h );
+		if(  names.len()>0  ) {
+			names.append( ", " );
+		}
+		names.append( h->get_name() );
+	}
+	warned_tick = welt->get_ticks() ? welt->get_ticks() : 1;
+	cbuffer_t buf;
+	buf.printf( translator::translate("Trains are locked up at %s: these stations are full and every train there waits for a track at another of them."), names.get_str() );
+	welt->get_message()->add_message( buf, x->get_basis_pos(), message_t::warnings, PLAYER_FLAG|get_owner()->get_player_nr(), IMG_EMPTY );
 }
 
 

@@ -1581,6 +1581,10 @@ Waiting for %s to pass
 Waiting for %s to pass
 No free track at %s
 No free track at %s
+Keeping the last track at %s free
+Keeping the last track at %s free
+Trains are locked up at %s: these stations are full and every train there waits for a track at another of them.
+Trains are locked up at %s: these stations are full and every train there waits for a track at another of them.
 Waiting to enter the station
 Waiting to enter the station
 Waiting for the single track

@@ -172,13 +172,45 @@ Polom and Zabreh are drawn in 4.1 and 4.3:
 ### 3.8 Why it cannot lock, and the one limit
 A train only waits in front of a `P`, or at a halt inside a section nobody else can enter, and it
 enters a section only with a claimed track at the far end. So trains never meet head-on on the
-line and never arrive at a full station. The remaining lock is capacity: both stations of a
-section full of trains that all want that section (four trains for two 2-track stations). The
-timetable or one more track prevents it. The headless test reproduces it (scenario `lock`: four
-trains on a line whose termini and loop have two tracks each lock within minutes, all standing at
-`P` inside stations, none on the line). Possible later rule: a train may not take the last free
-track of a station when every other train there wants the section it came over and the station at
-the other end is full as well.
+line and never arrive at a full station. What remains is capacity: a group of stations all full of
+trains that each want a track at another station of the group (two 2-track stations with two
+trains each wanting across; a terminus, a loop and the trains at both wanting the loop). Without a
+further rule the headless tests lock within the first game hour (scenario `lock`, and a junction
+like Holubice: three single-track lines into a 3-track station).
+
+#### 3.8.1 Last free track
+Before a train at a `P` claims the last free track of station X, it checks that X could still let
+a train go afterwards (`keeps_last_track`, `station_can_release`). With the newcomer placed on
+the claimed track, X is fine if some train there:
+- leaves X without a single-track section (onto double track, or the look-ahead cannot tell),
+- already holds its claim at the next station (it is on its way out),
+- goes to a station with a free track, or to the station the newcomer leaves (its track gets
+  free, unless another train shares it),
+- or (the one step further) goes to a full station Y where some train can do one of the above.
+
+Only a train alone on a track counts, since a short train that shares a platform with another
+frees nothing by leaving. A train's next station is found by following its route and schedule
+legs out of X through the station boundary it passes from behind, to the next boundary it enters
+(`get_section_after`, cached on the leading vehicle).
+
+Otherwise the `P` stays red ("Keeping the last track at X free"). A refusal never takes a track
+away from anyone, but it can hold a train back when the way out is more than two stations deep;
+after 30 calendar minutes at the `P` the check looks through all stations, so the rule never
+causes a lock by itself.
+
+What it cannot prevent: more trains than the group of stations holds. Trains leaving a depot inside
+a station, for example, fill it without asking. For that case a train that has waited 30 minutes for
+a track checks whether its stations are really locked (the same search through all stations,
+without a newcomer) and posts one message naming them ("Trains are locked up at ...").
+
+Tested headless (throwaway harness, pak128.cs):
+- `lock` (terminus, halts, loop, terminus; four trains): runs 2 game days with 36 refusals; without
+  the rule it locks in the first hours.
+- `junction` (Holubice-like: 3-track junction, three 2-track termini, 4 lines, 6 railbuses), the
+  same with 7 railbuses, and with loco-hauled trains: 3 game days, 130 to 190 stops per train;
+  without the rule all three lock in the first hour.
+- More trains than tracks (two started from a depot inside a terminus): locks, one warning.
+- `line`, `zabreh`, `siding`, `couple`, `saveload`: unchanged.
 
 ### 3.9 End-of-choose `E` in mixed layouts
 - With `P` at every track end, `E` no longer ends the choice for passing trains: the `P` that
