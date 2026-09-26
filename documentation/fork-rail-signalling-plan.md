@@ -49,10 +49,12 @@ Notation used below:
 What goes where:
 - Every station track, at every station: `←P` at its west end, `P→` at its east end. Placed on
   the first plain tile after the platform, before the switch (or the last platform tile).
-- Double-track station: `C→`/`←C` before the entry switches (the block behind must hold the
-  longest train), `E` on the main track after the exit switches. Crossovers for turning trains
-  lie between `C` and the track fans.
-- Single-track station: `LT` outside each throat.
+- Double-track station: `C→`/`←C` on the main track before its first switch (the block behind
+  must hold the longest train), `E` on the main track after its last switch (branch junctions and
+  crossovers included). Between those and the platforms the mains are used in both directions,
+  so no stock signal may stand there (it would make the track one-way); only `P`.
+- Single-track station, and a single-track branch joining a double-track station: `LT` on the
+  single track just before the station's outermost switch.
 - Open double track: stock `S` block signals. Open single track: nothing.
 - Halts: nothing. Full Stop signals are no longer used on these lines.
 
@@ -80,7 +82,9 @@ Look ahead along the route and the following schedule stops, as long-block does 
 2. Every tile of the line up to B's `LT` must be free.
 3. Choose a track in B (3.4).
 4. Claim that track (3.5).
-5. Reserve the way to the first stop, or into the claimed track if there is no halt before it.
+5. Reserve the way to the first stop, or up to B's `LT` if there is no halt before it. B's
+   throat is not reserved yet: at a junction station like Zabreh other trains use it, and it
+   would be blocked for the whole trip.
 While the train is in the section, opposite and following trains are kept out because their own
 look-ahead must pass through this train or its reserved way; the line itself is not held beyond
 the current route.
@@ -101,7 +105,7 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
 
 ### 3.5 Claim
 - The claim is the chosen track's tiles (between its two `P`, or `P` and buffer), reserved for the
-  convoy. The throat in front is not claimed: on single track only this section's trains use it.
+  convoy. The throat in front is not claimed (3.6).
 - Stored on the convoy and saved (savegame 122.6), re-reserved after loading.
 - The route to the next stop in B, or through B, goes via the claimed track, not necessarily the
   one clicked in the schedule.
@@ -110,8 +114,12 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
 - Choose signals, PR #1 detours and Hold searches see claimed tiles as reserved.
 
 ### 3.6 At halts and on arrival
-After dwelling at a halt the train reserves up to its next signal that applies, which is inside
-its claimed track in B, through B's throat. It never stops at an `LT`.
+After dwelling at a halt the train reserves up to B's `LT` (or its next stop before it). At the
+`LT` it reserves from there into its claimed track (to its stop, or to the far `P` when it
+passes). If the throat is taken at that moment, it waits at the `LT`, like at the real
+lichobeznikova tabulka. That wait is always short: nobody ever stands in a throat (trains only
+stand at `C`, at `P` and beyond `E`), and a train that wants this section waits at its `P`
+without reserving anything, so no one holds the throat while waiting for this train.
 
 ### 3.7 Choose signal additions (double-track stations)
 - The choose walk also ends at a `P` that applies to the train (in addition to `E` and another
@@ -136,7 +144,7 @@ timetable or one more track prevents it.
   trains and the Hold marker, which need the point after the station where the local's and the
   passing train's routes merge.
 - Place `E` on each main track after the last switch of the station on that side, branch
-  junctions and crossovers included (Zabreh main 2: west of w2 and F). A train that leaves the
+  junctions and crossovers included (Zabreh main 2: west of the branch junction). A train that leaves the
   main line before `E` is never held (Olomouc → branch).
 - Never on single track: `E` applies to both directions. The section look-ahead and the `LT`
   search ignore `E`. Passing trains at single-track stations need no `E`: their track is chosen
@@ -154,33 +162,33 @@ timetable or one more track prevents it.
 
 ### 4.1 Polom (double track, 4 pax + 2 freight, most trains pass, some terminate)
 
+Same layout as Zabreh (4.3) without the branch:
+
 ```
- west (Prerov)                                                               east (Bohumin)
+                                     ┌── ←P ═══ pass 1 ════════ P→ ──┐
+to Přerov      ◄── ←S ── E ────┬─────┴── ←P ═══ pass 2 ════════ P→ ──┴───────┬──── ←C ── ←S ──◄ from Bohumín
+from Přerov    ──► S→ ── C→ ───┴──┬────┬── ←P ═══ pass 3 ════════ P→ ─────┬──┴──── E ── S→ ──► to Bohumín
+                                  │    └── ←P ═══ pass 4 ════════ P→ ──┬──┘
+                                  └──┬──── ←P ═══ freight 1 ═════ P→ ──┤
+                                     └──── ←P ═══ freight 2 ═════ P→ ──┘
 
- main 2 (←)
- ── ←S ── E ──[w2]──┬── ←P ═══ 2 pax     ═══════════════ P→ ──┬──[b1]───── ←C ── ←S ──
-                    ├── ←P ═══ 4 pax     ═══════════════ P→ ──┤
-                    └── ←P ═══ 6 freight ═══════════════ P→ ──┘
- main 1 (→)
- ── S→ ── C→ ─[w1]──┬── ←P ═══ 1 pax     ═══════════════ P→ ──┬──[b2]───── E ─── S→ ──
-                    ├── ←P ═══ 3 pax     ═══════════════ P→ ──┤
-                    └── ←P ═══ 5 freight ═══════════════ P→ ──┘
-
- crossover W: w1 → w2 heading west (main 1 → main 2), w1 a little east of w2
- crossover B: b1 → b2 heading east (main 2 → main 1), b1 a little west of b2
+ west crossover: main 2 → main 1 heading east (= main 1 → main 2 heading west)
+ east crossover: main 2 → main 1 heading west (= main 1 → main 2 heading east)
+ optional: a second east crossover main 2 → main 1 heading east, so pass 1/2 can leave to Bohumín
 ```
 
-| Train | Path |
-|---|---|
-| Passing east | `C→` walk meets `P→` of the planned track (1): takes it, or any free track through (3.7); waits at `P→` if the block beyond `E` is taken |
-| Stopping local east | `C→` chooses 3 (schedule) or a free platform; PR #1: waits at `P→` for an express that will pass `E` |
-| Terminating from the west | `C→` chooses 1/3/5 (lead-on: back west via W), stops, reverses; `←P` acts normal: w1 → w2 → `E` → `←S`; PR #1 waits for westbound expresses |
-| Terminating from the east | `←C` chooses 2/4/6, reverses, `P→`: b1 → b2 → `E` → `S→` |
-| Slow freight marked Hold | steps onto a free track when a faster train comes (PR #1) |
+| Train | In | Can use | Out |
+|---|---|---|---|
+| Přerov → Bohumín, stop or pass | `C→` | 3, 4, freight (pass: through-choose) | `P→` normal → `E` |
+| Bohumín → Přerov, stop or pass | `←C` | 1, 2; 3, 4, freight via the east crossover when full | `←P` normal (3/4 via the west crossover) → `E` |
+| Terminates from Přerov | `C→` | 3, 4 | reverse, `←P` normal → west crossover → main 2 |
+| Terminates from Bohumín | `←C` | 3, 4 (1, 2 only with the optional crossover) | reverse, `P→` normal → main 1 |
+| Slow freight marked Hold | | steps onto a free track when a faster train comes (PR #1) | |
 
-Schedules: locals click tracks 3/4 so passing trains keep 1/2. Reachability (3.4): `C→` trains
-reach only 1/3/5 and `←C` trains only 2/4/6, because at w1 and b2 (b1) the crossover legs join
-from behind.
+Locals click pass 3 (eastbound) or pass 1 (westbound) in the schedule so passing trains keep the
+straight tracks. `C→` cannot reach pass 1/2: at the west crossover its leg joins main 1 from
+behind. The lead-on check keeps terminating Bohumín trains off pass 1/2 unless the optional
+crossover exists.
 
 ### 4.2 Mnichovo Hradiste (single track, 3 pax + 2 freight, any train may terminate)
 
@@ -201,51 +209,51 @@ from behind.
 | Terminates at MH | claims e.g. 3, stops, reverses, `←P` on 3: section back to Bakov |
 | Freight | stopping: 4/5 by platform type; passing: any free through track |
 
-### 4.3 Zabreh na Morave (double track + branch to Postrelmov on the west side)
+### 4.3 Zabreh na Morave (double track + branch to Postrelmov joining on the west side)
+
+The owner's layout: the branch joins main 2 west of the station, crossovers in both throats.
 
 ```
- west (Ceska Trebova)                                                                 east (Olomouc)
+from/to Postřelmov ── LT→ ──┐
+                            │        ┌── ←P ═══ pass 1 ════════ P→ ──┐
+to Č.Třebová   ◄── ←S ── E ─┴──┬─────┴── ←P ═══ pass 2 ════════ P→ ──┴───────┬──── ←C ── ←S ──◄ from Olomouc
+from Č.Třebová ──► S→ ── C→ ───┴──┬────┬── ←P ═══ pass 3 ════════ P→ ─────┬──┴──── E ── S→ ──► to Olomouc
+                                  │    └── ←P ═══ pass 4 ════════ P→ ──┬──┘
+                                  └──┬──── ←P ═══ freight 1 ═════ P→ ──┤
+                                     └──── ←P ═══ freight 2 ═════ P→ ──┘
 
- main 2 (←)
- ── ←S ── E ──[w2]──[F]──┬── ←P ═══ 2 pax     ════════════ P→ ──┬──[b1]──── ←C ── ←S ──
-                         ├── ←P ═══ 4 pax     ════════════ P→ ──┤
-                         └── ←P ═══ 6 freight ════════════ P→ ──┘
- main 1 (→)
- ── S→ ── C→ ──[J]──[w1]─┬── ←P ═══ 1 pax     ════════════ P→ ──┬──[b2]──── E ─── S→ ──
-                         ├── ←P ═══ 3 pax     ════════════ P→ ──┤
-                         ├── ←P ═══ 5 freight ════════════ P→ ──┤
-                         └── ←P ═══ 7 freight ════════════ P→ ──┘
- branch from Postrelmov
- ── LT→ ──[K]──┬──────── to J (joins main 1 heading east)
-               └──────── flyover over main 1 ──── to F (joins main 2 heading east)
-
- crossover W: w1 → w2 heading west (main 1 → main 2), w1 a little east of w2
- crossover B: b1 → b2 heading east (main 2 → main 1), b1 a little west of b2
- main 2 west throat, west to east: ←S, E, w2, F, track fan (E west of every switch)
- main 1 west throat, west to east: C→, J, w1, track fan; east throat: fan, b2, E, S→
+ branch junction: on main 2, west of the west crossover; E west of the junction
+ west crossover: main 2 → main 1 heading east (= main 1 → main 2 heading west)
+ east crossover: main 2 → main 1 heading west (= main 1 → main 2 heading east)
+ optional: a second east crossover main 2 → main 1 heading east, so pass 1/2 can leave to Olomouc
+ main 2 between the junction and pass 1/2, and main 1 between the crossovers and pass 3/4, are
+ used both ways: no stock signals there
 ```
 
-Reachability (3.4): eastbound main-line trains reach only 1/3/5/7 (at J and w1 the other legs
-join from behind), westbound main-line trains only 2/4/6 (at b1 likewise), branch trains all
-seven (1/3/5/7 through J, 2/4/6 over the flyover). A plain crossover from main 2 to main 1 in
-place of the flyover would also work, but eastbound trains could then run through it onto
-2/4/6 when 1/3/5/7 are full (crossing main 2 twice).
+Reachability: `C→` trains reach pass 3, 4 and freight; `←C` trains reach pass 1, 2 and, through
+the east crossover, pass 3, 4 and freight; branch trains reach everything (pass 1/2 along main 2,
+the rest through the west crossover).
 
-| # | Train | In | Track | Out |
-|---|---|---|---|---|
-| 1 | Ceska Trebova → Olomouc, stop or pass | `C→` | 1/3/5/7 (pass: through-choose) | `P→` normal → `E` |
-| 2 | Olomouc → Ceska Trebova, stop or pass | `←C` | 2/4/6 | `←P` normal → F, w2 straight → `E` |
-| 3 | From the west, terminates | `C→` | 1/3/5/7 | reverse, `←P` normal → W → main 2 → `E` |
-| 4 | From the east, terminates | `←C` | 2/4/6 | reverse, `P→` normal → B → main 1 → `E` |
-| 5 | Olomouc → branch, stop or pass | `←C` (stop: platform, pass: through-choose) | 2/4/6 | `←P` section → F → flyover → K → `LT→` |
-| 6 | Ceska Trebova → branch (stops, reverses) | `C→` | 1/3/5/7 | reverse, `←P` section → w1 straight → J → `LT→` |
-| 7 | Branch → Olomouc, stop or pass | claim from the branch | 1/3/5/7 via J | `P→` normal → `E` |
-| 8 | Branch → Ceska Trebova (stops, reverses) | claim | 1/3/5/7 or 2/4/6 | reverse, `←P` normal (1/3/5/7 via W) |
-| 9 | Branch terminates | claim | any | reverse, `←P` section (1/3/5/7 via J, 2/4/6 via the flyover) |
+| Train | In | Can use | Out |
+|---|---|---|---|
+| Č.Třebová → Olomouc, stop or pass | `C→` | 3, 4, freight | `P→` normal → `E` |
+| Olomouc → Č.Třebová, stop or pass | `←C` | 1, 2 (3, 4, freight when full) | `←P` normal → junction straight → `E` |
+| Terminates from Č.Třebová | `C→` | 3, 4 | reverse, `←P` normal → west crossover → main 2 |
+| Terminates from Olomouc | `←C` | 3, 4 (1, 2 with the optional crossover) | reverse, `P→` normal → main 1 |
+| Olomouc → branch, stop or pass | `←C` | 1, 2 (3, 4 when full) | `←P` section → main 2 → junction → `LT→` |
+| Č.Třebová → branch | `C→` | 3, 4 | stop, reverse, `←P` section → west crossover → junction |
+| Branch → Olomouc, stop or pass | claim at Postřelmov, enters at `LT→` | 3, 4, freight (1, 2 with the optional crossover) | `P→` normal → `E` |
+| Branch → Č.Třebová | claim | any | stop, reverse, `←P` normal → `E` |
+| Branch terminates | claim | any | stop, reverse, `←P` section |
 
-Only trains between Ceska Trebova and the branch reverse. A passing Olomouc → branch train that
-finds the branch taken waits at the `←P` of its track, inside Zabreh. PR #1 waiting applies to
-rows 1–4 and 7, not to trains going to the branch (they leave the main line before `E`).
+- Only trains between Č.Třebová and the branch reverse; Olomouc–branch trains run through, with
+  or without a stop.
+- A branch train enters at `LT→` only when the junction, main 2 and the west crossover are free
+  into its claimed track (3.6); it never stands on main 2.
+- A westbound train that wants the branch waits at its `←P` until the branch section and a
+  Postřelmov track are free; it never stands in the throat.
+- PR #1 waiting works for trains joining a main line before `E`; trains to the branch leave
+  before `E` and are not held.
 
 ### 4.4 Branch Postrelmov – Zabreh
 
@@ -288,8 +296,8 @@ rows 1–4 and 7, not to trains going to the branch (they leave the main line be
 2. No fallback for trains that enter a single line without passing a `P` (depot on the line,
    junction without `P`): depots belong in stations.
 3. Main-line trains may use the tracks the branch uses at Zabreh; only the schedule click steers.
-4. Zabreh's Olomouc–branch connection is a flyover (or a flat crossing if the pakset has
-   rail-rail crossings), so both main-line sides stay separate (4.3).
+4. Zabreh and Polom use the owner's layout (4.1, 4.3); the optional second east crossover is
+   up to the owner.
 5. Later: several trains following in one direction (direction lock per section, block signals);
    a local at a single-track station waiting for a faster train (the `LT` gives the area PR #1
    needed `E` for).
@@ -299,6 +307,7 @@ rows 1–4 and 7, not to trains going to the branch (they leave the main line be
 - Single-track line: two stations (3 and 2 tracks), two halts between, a bay; crossing, passing,
   terminating, freight platform types; the two-halts head-on case must not lock.
 - Nakladiste in both variants.
-- Zabreh layout: moves 1–9 of 4.3; eastbound trains never reach 2/4/6. Polom: terminating both ways.
+- Zabreh layout: every row of 4.3; `C→` trains never reach pass 1/2; a branch train waits at
+  `LT→` while a main-line train crosses the throat. Polom: every row of 4.1.
 - A branch train at Postrelmov or a halt is not held for a main-line express at Zabreh (3.9).
 - Save/load with a claim, schedule change releases a claim, downgrade save opens in stock.
