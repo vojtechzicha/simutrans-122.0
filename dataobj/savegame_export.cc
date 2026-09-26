@@ -939,6 +939,8 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 				w.kv_null( "max_speed" );
 				w.kv_null( "power" );
 			}
+			// fork, mixed traction: engine hauled without pulling right now
+			w.kv_bool( "idle", v->is_idle() );
 			w.end_object();
 		}
 		w.end_array();
@@ -946,6 +948,13 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		// min_top_speed is in internal speed units, the dialogs show it as km/h
 		w.kv_int( "max_speed", speed_to_kmh( cnv->get_min_top_speed() ) );
 		w.kv_int( "sum_power", cnv->get_sum_power() );
+		// fork, mixed traction (electric and other engines): which engines pull now, null otherwise
+		if(  cnv->has_mixed_traction()  ) {
+			w.kv_string( "traction", cnv->is_traction_off_wire() ? "off_wire" : (cnv->get_traction_both_under_wire() ? "under_wire_all" : "under_wire_electric") );
+		}
+		else {
+			w.kv_null( "traction" );
+		}
 		w.kv_int( "loading_level", cnv->get_loading_level() );
 		w.kv_int( "loading_limit", cnv->get_loading_limit() );
 		w.kv_int( "total_capacity", total_capacity );

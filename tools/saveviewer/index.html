@@ -309,6 +309,8 @@ function typeBadge(t) {
   return '<span class="badge" style="color:var(--t-' + known + ');background:color-mix(in srgb, var(--t-' +
          known + ') calc(var(--badge-alpha) * 100%), transparent)">' + esc(titleOf(t)) + "</span>";
 }
+var TRACTION_TEXT = { under_wire_electric: "under wires, electric only", under_wire_all: "under wires, all engines",
+  off_wire: "off wires" };
 var BAD_STATES = { loss: 1, no_convoys: 1, nothing_moved: 1, missing_scheduled_slots: 1 };
 var WARN_STATES = { overcrowded: 1, obsolete: 1, no_route: 1, self_destruct: 1 };
 function stateBadge(s) {
@@ -1141,6 +1143,7 @@ function viewConvoyDetail(host, id) {
     "<dt>Home depot</dt><dd>" + fmtPos(c.home_depot) + "</dd>" +
     "<dt>Vehicles</dt><dd>" + fmtInt(num(c.vehicle_count, arr(c.vehicles).length)) + "</dd>" +
     "<dt>Max speed</dt><dd>" + fmtInt(c.max_speed) + "</dd>" +
+    (c.traction ? "<dt>Traction</dt><dd>" + esc(TRACTION_TEXT[c.traction] || c.traction) + "</dd>" : "") +
     "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +
       (num(c.loading_limit) > 0 ? ' <span class="dim">(waits for ' + num(c.loading_limit) + "%)</span>" : "") + "</dd>" +
     "<dt>Loaded</dt><dd>" + fmtInt(c.total_loaded) + " of " + fmtInt(c.total_capacity) + "</dd>" +
@@ -1162,7 +1165,10 @@ function viewConvoyDetail(host, id) {
     { key: "speed", label: "Max speed", num: true, value: function (v) { return num(v.max_speed); },
       html: function (v) { return fmtInt(v.max_speed); } },
     { key: "power", label: "Power", num: true, value: function (v) { return num(v.power); },
-      html: function (v) { return num(v.power) ? fmtInt(v.power) : '<span class="faint">0</span>'; } }
+      html: function (v) {
+        if (!num(v.power)) return '<span class="faint">0</span>';
+        return fmtInt(v.power) + (v.idle ? ' <span class="dim">(idle)</span>' : "");
+      } }
   ], arr(c.vehicles), { short: true, onSort: false, emptyText: "No vehicle list in this export." });
 
   heading(host, "Schedule");

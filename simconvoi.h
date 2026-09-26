@@ -226,8 +226,18 @@ private:
 	// true, if at least one vehicle of a convoi is obsolete
 	bool has_obsolete;
 
-	// true, if there is at least one engine that requires catenary
+	// true, if all engines require catenary (fork: an electric engine together with another engine does not)
 	bool is_electric;
+
+	/**
+	 * Fork, mixed traction: the convoy has electric engines and other engines (diesel, steam, ...).
+	 * The electric ones pull only under wires, the others off wires, and under wires only when that
+	 * gives a higher loaded top speed (traction_both_under_wire, chosen at departure).
+	 * An idle engine adds neither power, running cost nor its top speed limit. Not saved.
+	 */
+	bool traction_mixed;
+	bool traction_off_wire;        ///< at least one electric engine is on a tile without catenary
+	bool traction_both_under_wire; ///< under wires the other engines pull too
 
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
@@ -235,7 +245,7 @@ private:
 	uint8 freight_info_order;
 
 	/*
-	 * caches the running costs
+	 * caches the running costs (fork: only of the vehicles that are not idle engines)
 	 */
 	sint32 sum_running_costs;
 	sint32 sum_fixed_costs;
@@ -408,6 +418,41 @@ public:
 
 	/* true, if electrification needed for this convoi */
 	bool needs_electrification() const { return is_electric; }
+
+	/// fork: true, if the convoy has electric and other engines (mixed traction)
+	bool has_mixed_traction() const { return traction_mixed; }
+
+	/// fork: true, if electric engines of this convoy are pulling now (for the electricity toll)
+	bool draws_electricity() const { return is_electric  ||  (traction_mixed  &&  !traction_off_wire); }
+
+	/// fork, mixed traction: true, if the other engines pull under wires as well
+	bool get_traction_both_under_wire() const { return traction_both_under_wire; }
+
+	/// fork, mixed traction: true, if an electric engine is off wires, so only the other engines pull
+	bool is_traction_off_wire() const { return traction_off_wire; }
+
+	/**
+	 * Fork: recalculates which engines pull (power, running costs, top speed) from the tiles of the
+	 * electric engines. With @p choose also decides whether the other engines pull under wires,
+	 * from the current weight. Called when the convoy changes, departs, and when an electric engine
+	 * of a mixed traction convoy enters or leaves catenary.
+	 */
+	void recalc_traction(bool choose);
+
+	/**
+	 * Fork: the power (times gear) and the top speed of the engines that pull in a mode, plus the
+	 * unpowered vehicles. For a convoy without mixed traction everything counts in every mode.
+	 */
+	void calc_traction_sums(bool off_wire, bool both_under_wire, sint32 &gear_and_power, sint32 &top_speed, sint32 &running_costs) const;
+
+	/**
+	 * Fork: top speed at @p total_weight under wires (the better choice of engines) or off wires.
+	 * Same as calc_max_speed() with all engines for a convoy without mixed traction.
+	 */
+	sint32 calc_traction_max_speed(uint64 total_weight, bool off_wire) const;
+
+	/// fork: plays the sound of the first engine that pulls (stock: of the front vehicle)
+	void play_start_sound() const;
 
 	/**
 	* set line

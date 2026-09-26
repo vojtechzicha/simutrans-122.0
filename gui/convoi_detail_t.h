@@ -30,7 +30,8 @@ private:
 	gui_aligned_container_t container;
 	gui_scrollpane_t scrolly;
 
-	gui_label_buf_t label_power, label_odometer, label_resale, label_length, label_speed;
+	gui_label_minw_t label_power; // fork: keeps room for the longest traction text
+	gui_label_buf_t label_odometer, label_resale, label_length, label_speed;
 
 	convoihandle_t cnv;
 	button_t sale_button;

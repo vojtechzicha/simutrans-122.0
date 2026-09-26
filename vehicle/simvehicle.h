@@ -247,6 +247,8 @@ protected:
 	bool smoke:1;
 	bool check_for_finish:1; // true, if on the last tile
 	bool has_driven:1;
+	bool idle:1;    // fork, mixed traction: engine hauled without pulling (no power, cost, smoke, sound)
+	bool on_wire:1; // fork: the tile has catenary (tracked only for electric engines of mixed traction convoys)
 
 	bool check_next_tile(const grund_t* ) const OVERRIDE {return false;}
 
@@ -287,6 +289,13 @@ public:
 	sint32 get_purchase_time() const {return purchase_time;}
 
 	void get_smoke(bool yesno ) { smoke = yesno;}
+
+	/// fork, mixed traction: set by the convoy when this engine does not pull
+	void set_idle(bool yesno) { idle = yesno; }
+	bool is_idle() const { return idle; }
+
+	/// fork: reads whether the current tile has catenary and remembers it
+	bool update_on_wire();
 
 	virtual bool calc_route(koord3d start, koord3d ziel, sint32 max_speed, route_t* route);
 	uint16 get_route_index() const {return route_index;}
