@@ -2389,6 +2389,7 @@ void road_vehicle_t::set_convoi(convoi_t *c)
 /* from now on rail vehicles (and other vehicles using blocks) */
 rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : vehicle_t()
 {
+	detour_start = detour_target = detour_exit = koord3d::invalid;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2434,6 +2435,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	vehicle_t(pos, desc, player)
 {
 	cnv = cn;
+	detour_start = detour_target = detour_exit = koord3d::invalid;
 }
 
 
@@ -2546,6 +2548,22 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 		}
 	}
 
+	if(  detour_target!=koord3d::invalid  ) {
+		// we are searching a way through a choose area (reserve_choose_detour):
+		if(  bd->get_pos()==detour_start  ) {
+			return true;
+		}
+		// we cannot pass an end of choose area, only reach the one on our route
+		if(  sch->has_sign()  &&  bd->get_pos()!=detour_target  ) {
+			const roadsign_t* rs = bd->find<roadsign_t>();
+			if(  rs  &&  rs->get_desc()->get_wtyp()==get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA)  ) {
+				return false;
+			}
+		}
+		// only free track, not even our own
+		return !sch->is_reserved();
+	}
+
 	if(  target_halt.is_bound()  &&  cnv->is_waiting()  ) {
 		// we are searching a stop here:
 		// ok, we can go where we already are ...
@@ -2598,6 +2616,15 @@ int rail_vehicle_t::get_cost(const grund_t *gr, const weg_t *w, const sint32 max
 bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 {
 	const schiene_t * sch1 = (const schiene_t *) gr->get_weg(get_waytype());
+	if(  detour_target!=koord3d::invalid  ) {
+		// way through a choose area: back on the planned route at the end of choose tile,
+		// driving on in the planned direction (check_next_tile made sure it is free)
+		if(  gr->get_pos()!=detour_target  ||  prev_gr==NULL  ||  prev_gr->get_pos()==detour_exit  ) {
+			return false;
+		}
+		const ribi_t::ribi ribi = ribi_type( prev_gr->get_pos(), gr->get_pos() );
+		return (sch1->get_ribi_maske() & ribi)==0;
+	}
 	// first check blocks, if we can go there
 	if(  sch1->can_reserve(cnv->self)  ) {
 		//  just check, if we reached a free stop position of this halt
@@ -2779,6 +2806,20 @@ skip_choose:
 			cnv->set_next_stop_index( min( next_crossing, next_signal ) );
 			return true;
 		}
+		// not free => a train passing the choose area may overtake on another track
+		const uint16 end_of_choose = get_choose_detour_end( start_block );
+		if(  end_of_choose!=INVALID_INDEX  ) {
+			if(  !cnv->is_waiting()  ) {
+				// the route search needs a step: come to the signal first
+				restart_speed = -1;
+				return false;
+			}
+			if(  reserve_choose_detour( start_block, end_of_choose, next_signal, next_crossing )  ) {
+				sig->set_state(  roadsign_t::gruen );
+				cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+				return true;
+			}
+		}
 		// not free => wait here if directly in front
 		sig->set_state(  roadsign_t::rot );
 		restart_speed = 0;
@@ -2824,6 +2865,133 @@ skip_choose:
 	}
 	sig->set_state(  roadsign_t::gruen );
 	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+	return true;
+}
+
+
+uint16 rail_vehicle_t::get_choose_detour_end(const uint16 start_block) const
+{
+	route_t const* const route = cnv->get_route();
+	grund_t const* const target = welt->lookup( route->back() );
+	const halthandle_t route_halt = target ? target->get_halt() : halthandle_t();
+
+	// find the end of choose sign; no detour when we stop in the area or meet another choose signal
+	uint16 end_of_choose = INVALID_INDEX;
+	for(  uint32 idx=start_block+1;  end_of_choose==INVALID_INDEX  &&  idx+1<route->get_count();  idx++  ) {
+		grund_t const* const gr = welt->lookup( route->at(idx) );
+		weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+		if(  way==NULL  ||  (route_halt.is_bound()  &&  gr->get_halt()==route_halt)  ) {
+			return INVALID_INDEX;
+		}
+		if(  way->has_sign()  ) {
+			roadsign_t const* const rs = gr->find<roadsign_t>(1);
+			if(  rs  &&  rs->get_desc()->get_wtyp()==get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA)  ) {
+				end_of_choose = idx;
+			}
+		}
+		if(  way->has_signal()  ) {
+			signal_t const* const sig = gr->find<signal_t>(1);
+			if(  sig  &&  sig->get_desc()->is_choose_sign()  ) {
+				return INVALID_INDEX;
+			}
+		}
+	}
+	if(  end_of_choose==INVALID_INDEX  ) {
+		return INVALID_INDEX;
+	}
+
+	// a waypoint of the schedule in the area must not be skipped
+	schedule_t const* const schedule = cnv->get_schedule();
+	for(  uint32 idx=start_block+1;  schedule  &&  idx<=end_of_choose;  idx++  ) {
+		for(  uint8 i=0;  i<schedule->get_count();  i++  ) {
+			if(  schedule->entries[i].pos==route->at(idx)  &&  cnv->is_waypoint( route->at(idx) )  ) {
+				return INVALID_INDEX;
+			}
+		}
+	}
+
+	// who blocks our way through the area?
+	convoihandle_t blocker;
+	for(  uint32 idx=start_block+1;  idx<=end_of_choose  &&  !blocker.is_bound();  idx++  ) {
+		schiene_t const* const sch = obj_cast<schiene_t>( welt->lookup( route->at(idx) )->get_weg( get_waytype() ) );
+		if(  sch  &&  !sch->can_reserve( cnv->self )  ) {
+			blocker = sch->get_reserved_convoi();
+		}
+	}
+	if(  !blocker.is_bound()  ) {
+		// our way through the area is free, something after it blocks
+		return INVALID_INDEX;
+	}
+	if(  blocker->is_standing()  ||  blocker->is_waiting()  ) {
+		return end_of_choose;
+	}
+
+	// a running train is only overtaken when it stops at a station in this area
+	route_t const* const blocker_route = blocker->get_route();
+	grund_t const* const blocker_target = blocker_route->empty() ? NULL : welt->lookup( blocker_route->back() );
+	const halthandle_t blocker_halt = blocker_target ? blocker_target->get_halt() : halthandle_t();
+	if(  blocker_halt.is_bound()  ) {
+		for(  uint32 idx=start_block+1;  idx<=end_of_choose;  idx++  ) {
+			if(  welt->lookup( route->at(idx) )->get_halt()==blocker_halt  ) {
+				return end_of_choose;
+			}
+		}
+	}
+	return INVALID_INDEX;
+}
+
+
+bool rail_vehicle_t::reserve_choose_detour(const uint16 start_block, const uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing)
+{
+	route_t const* const route = cnv->get_route();
+
+	// search a free way from the signal to the end of choose tile
+	route_t detour;
+	detour_start = route->at(start_block);
+	detour_target = route->at(end_of_choose);
+	detour_exit = route->at(end_of_choose+1);
+	const ribi_t::ribi start_dir = ribi_type( route->at(start_block), route->at(start_block+1) );
+	const bool found = detour.find_route( welt, detour_start, this, speed_to_kmh(cnv->get_min_top_speed()), start_dir, welt->get_settings().get_max_choose_route_steps() );
+	detour_start = detour_target = detour_exit = koord3d::invalid;
+	if(  !found  ) {
+		return false;
+	}
+
+	// not much longer than the planned way, else it is no overtaking but a trip elsewhere
+	const uint32 planned = end_of_choose - start_block;
+	if(  detour.get_count()-1 > planned + planned/2 + 4  ) {
+		return false;
+	}
+
+	// planned route with the detour in place of the way through the area
+	route_t new_route( *route );
+	new_route.remove_koord_from( start_block );
+	new_route.append( &detour );
+	const uint32 detour_end = new_route.get_count()-1;
+	for(  uint32 i=end_of_choose+1;  i<route->get_count();  i++  ) {
+		new_route.append( route->at(i) );
+	}
+	if(  new_route.get_count() >= INVALID_INDEX  ) {
+		return false;
+	}
+
+	// reserve through all signals up to the end of choose, then up to the next signal as usual;
+	// the block reserver frees everything again if a tile is taken
+	int signals = 0;
+	for(  uint32 i=start_block+1;  i<=detour_end;  i++  ) {
+		grund_t const* const gr = welt->lookup( new_route.at(i) );
+		weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+		if(  way  &&  way->has_signal()  ) {
+			signals ++;
+		}
+	}
+	if(  !block_reserver( &new_route, start_block+1, next_signal, next_crossing, signals, true, false )  ) {
+		return false;
+	}
+
+	route_t *const rt = cnv->access_route();
+	rt->clear();
+	rt->append( &new_route );
 	return true;
 }
 

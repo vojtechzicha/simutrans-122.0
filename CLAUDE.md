@@ -165,6 +165,26 @@ search for a free stop tile beyond standing convoys (`road_vehicle_t::choose_pas
 `is_target`), then fall back to the stock nearest free tile. Moving overtaking is unchanged. Not saved:
 a game loaded mid-pass finishes it like a stock overtake.
 
+## Overtaking at choose signals (fork feature)
+
+Stock rail choose signal: a train whose next stop lies in the choose area picks a free platform; a train
+that meets an end-of-choose sign (or a second choose signal) before its stop treats it as a plain signal.
+The fork adds one case to the second: when the plain reservation fails, the train is not stopping in the
+area and it meets an end-of-choose sign first (`rail_vehicle_t::get_choose_detour_end`), it may take any
+free track through the area to that sign, if the train in its way is standing (`is_standing()` or
+`is_waiting()`) or running but stopping at a station on its path through the area. A running train that
+does not stop there is never overtaken. `reserve_choose_detour` searches from the signal tile over
+unreserved track only (`detour_*` members switch `check_next_tile`/`is_target` into that mode), must
+reach the end-of-choose tile from the planned side, at most 1.5x the planned length + 4 tiles. It then
+reserves the detour through all its signals plus the block after the sign in one `block_reserver` call,
+and only on success swaps it into the route (rest of the route unchanged); otherwise the signal stays
+red. A schedule waypoint inside the area disables it, one beyond does not. The search runs in `step()`,
+so a train approaching the signal brakes for it and pauses there for one step (`restart_speed = -1` keeps its speed).
+No save format change: after loading, the train re-reserves along the saved detour route. Layout: choose
+signal as the entry signal, end-of-choose sign after the exit switches where the tracks rejoin. Tested
+headless on pak64 (standing, running-stopping, running-through, both tracks taken, exit blocked,
+save/load mid-detour, waypoints) with a throwaway harness; re-verify in the Windows game.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

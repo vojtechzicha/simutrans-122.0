@@ -519,6 +519,19 @@ public:
  */
 class rail_vehicle_t : public vehicle_t
 {
+private:
+	// during the search for a detour through a choose area (see reserve_choose_detour):
+	// start tile, end of choose tile to reach and the tile after it on the planned route;
+	// invalid while no such search runs
+	koord3d detour_start, detour_target, detour_exit;
+
+	// end of choose index on the route, if this train passes the choose area of the signal
+	// at start_block without stopping and a train it may overtake blocks its way; else INVALID_INDEX
+	uint16 get_choose_detour_end(uint16 start_block) const;
+
+	// searches and reserves a free way through the choose area; true when the route was changed
+	bool reserve_choose_detour(uint16 start_block, uint16 end_of_choose, uint16 &next_signal, uint16 &next_crossing);
+
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;
 
