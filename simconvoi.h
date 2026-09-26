@@ -520,6 +520,10 @@ public:
 	/// tick of the arrival at the current stop (valid while loading)
 	uint32 get_arrived_time() const { return arrived_time; }
 
+	/// fork: true if this convoy arrived before other; the same tick goes by convoy number, so two
+	/// convoys never both come first (saves before the fix load all waiting convoys with one tick)
+	bool arrived_before(const convoi_t *other) const;
+
 	/**
 	 * loading rules satisfied: the minimum load is reached, the maximum waiting time is over,
 	 * or the convoy must not load at all. Without a timetable this is the departure condition.

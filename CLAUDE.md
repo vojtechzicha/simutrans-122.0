@@ -135,7 +135,10 @@ maximum wait, unchanged) and a slot is open that no other convoy of the line use
 (`simline_t::take_departure_slot`, `last_departure_slot` saved with the line; a schedule edit
 keeps it, and the missed couplings, for the entries that stayed: `keep_slots_across_edit` matches
 old and new entries as the longest run of the same stops in order, and resets an entry whose
-interval or offsets changed); among ready convoys the earliest arrival goes first. Convoys without a line and
+interval or offsets changed); among ready convoys the earliest arrival goes first
+(`convoi_t::arrived_before`, the same tick goes by convoy number). Fork saves keep `arrived_time`
+also at stops without a waiting time (stock wrote a dummy there, so every train waiting at such a
+stop came back with one tick); a slot already in `last_departure_slot` is never booked twice. Convoys without a line and
 convoys with `no_load` ignore the timetable. The schedule dialog shows the two inputs only with the
 calendar on and greys them out for line-less convoys; the entry list appends "(every N min, +M)".
 A convoy that arrived after another convoy of its line at the same entry only unloads until

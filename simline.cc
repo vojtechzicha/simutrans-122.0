@@ -336,7 +336,7 @@ uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
 		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
 			continue;
 		}
-		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  ) {
+		if(  other->arrived_before( cnv.get_rep() )  ) {
 			count ++;
 		}
 	}
@@ -417,7 +417,7 @@ bool simline_t::can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const
 		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
 			continue;
 		}
-		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  &&  other->is_ready_to_depart()  ) {
+		if(  other->arrived_before( cnv.get_rep() )  &&  other->is_ready_to_depart()  ) {
 			return false;
 		}
 	}
@@ -481,7 +481,7 @@ bool simline_t::get_late_departure_slot(convoihandle_t cnv, sint64 inherited, si
 		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
 			continue;
 		}
-		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  &&  other->is_ready_to_depart()  ) {
+		if(  other->arrived_before( cnv.get_rep() )  &&  other->is_ready_to_depart()  ) {
 			slot = -1;
 			return true;
 		}

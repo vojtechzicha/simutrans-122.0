@@ -159,6 +159,9 @@ public:
 	/// Timetable (fork): like take_departure_slot, but only tells the slot without booking it
 	bool can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const;
 
+	/// Timetable (fork): true if a train of this line left from that entry in that slot already
+	bool is_departure_slot_used(uint8 entry, sint64 slot) const { return entry < last_departure_slot.get_count()  &&  last_departure_slot[entry] == slot; }
+
 	/// Timetable (fork): marks the slot as used at this schedule entry
 	void book_departure_slot(uint8 entry, sint64 slot);
 

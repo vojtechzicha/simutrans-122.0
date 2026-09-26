@@ -2964,7 +2964,9 @@ void convoi_t::rdwr(loadsave_t *file)
 	// waiting time left ...
 	if(file->is_version_atleast(99, 17)) {
 		if(file->is_saving()) {
-			if(  has_schedule  &&  schedule->get_current_entry().has_waiting_time()  ) {
+			if(  has_schedule  &&  (schedule->get_current_entry().has_waiting_time()  ||  file->is_version_atleast(122, 1))  ) {
+				// fork: always, so the arrival order (timetable, coupling) survives loading; the loader
+				// below (also stock 122.0) turns it back into arrived_time, wrapped around if negative
 				uint32 diff_ticks = arrived_time + schedule->get_current_entry().get_waiting_ticks() - welt->get_ticks();
 				file->rdwr_long(diff_ticks);
 			}
@@ -3691,6 +3693,15 @@ station_tile_search_ready: ;
 		}
 	}
 
+	if(  depart  &&  timetabled  &&  slot >= 0  &&  line->is_departure_slot_used( schedule->get_current_stop(), slot )  ) {
+		// timetable (fork): one train per slot, however we came by this one
+		depart = false;
+		if(  couple_hold_slot == slot  ) {
+			// taken while we waited for our partner: the next free one
+			couple_hold_slot = -1;
+		}
+	}
+
 	if(  depart  ) {
 
 		if(  withdraw  &&  (loading_level == 0  ||  goods_catg_index.empty())  ) {
@@ -3756,6 +3767,20 @@ station_tile_search_ready: ;
 
 	// at least wait the minimum time for loading
 	wait_lock = time;
+}
+
+
+bool convoi_t::arrived_before(const convoi_t *other) const
+{
+	const sint32 diff = (sint32)(arrived_time - other->arrived_time);
+	if(  diff != 0  ) {
+		return diff < 0;
+	}
+	if(  self.get_id() != other->self.get_id()  ) {
+		return self.get_id() < other->self.get_id();
+	}
+	// the same convoy (or both unbound): compare where they live, never both first
+	return this < other;
 }
 
 
@@ -5100,7 +5125,7 @@ convoihandle_t convoi_t::find_partner_at(halthandle_t halt, bool &standing) cons
 		}
 		if(  o->state==LOADING  ) {
 			// standing there: the one that came first
-			if(  !best.is_bound()  ||  (sint32)(o->arrived_time - best->arrived_time) < 0  ) {
+			if(  !best.is_bound()  ||  o->arrived_before( best.get_rep() )  ) {
 				best = other;
 			}
 		}
