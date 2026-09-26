@@ -175,7 +175,8 @@ the current load (`traction_both_under_wire`, chosen in `recalc_traction(true)` 
 `calc_speedbonus_kmh`, i.e. at start and at every departure). An idle engine adds no power, no
 running cost, no top speed limit, no smoke (`vehicle_t::idle`) and no start sound
 (`play_start_sound`); its fixed cost stays. `convoi_t::recalc_traction` sets `sum_gear_and_power`,
-`min_top_speed`, `sum_running_costs` and `is_electric` for the current mode; `vehicle_t::hop` calls
+`min_top_speed`, `sum_running_costs`, `is_electric` and (road convoys) the overtaking speed
+`max_power_speed` for the current mode; `vehicle_t::hop` calls
 it when an electric engine of a mixed convoy enters or leaves catenary (`on_wire`). The bonus speed
 assumes the better choice under wires; the per-tile average of speed limits covers the rest.
 Nothing is saved: the mode is rebuilt on load. The depot offers electric vehicles in a depot without

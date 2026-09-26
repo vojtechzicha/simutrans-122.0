@@ -3166,6 +3166,16 @@ void convoi_t::recalc_traction(bool choose)
 	}
 	if(  old_gear_and_power != sum_gear_and_power  ||  old_top_speed != min_top_speed  ) {
 		recalc_speed_limit = true;
+		// other road vehicles judge overtaking by the speed this convoy reaches with the engines that pull now
+		if(  anz_vehikel > 0  &&  front()->get_overtaker()  ) {
+			sint64 total_weight = 0;
+			for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+				total_weight += fahr[i]->get_total_weight();
+			}
+			if(  total_weight > 0  ) {
+				max_power_speed = calc_max_speed( sum_gear_and_power, total_weight, min_top_speed );
+			}
+		}
 	}
 }
 
