@@ -94,6 +94,10 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
   planned length + 4 tiles (as the PR #1 detour).
 - Either way the track must lead on (rule 3): from its end there is a way to the next stop that
   starts at a signal applying to the train (for a train that turns in B, the `P` at the other end).
+- Which tracks a search can reach is set by the track itself: it follows switches only the way a
+  train can run them and never reverses, so a crossover opens tracks only in the direction it
+  faces. Among the free tracks that lead on, the cheapest path wins, so a train stays on its own
+  side while a track there is free.
 
 ### 3.5 Claim
 - The claim is the chosen track's tiles (between its two `P`, or `P` and buffer), reserved for the
@@ -126,6 +130,26 @@ line and never arrive at a full station. The remaining lock is capacity: both st
 section full of trains that all want that section (four trains for two 2-track stations). The
 timetable or one more track prevents it.
 
+### 3.9 End-of-choose `E` in mixed layouts
+- With `P` at every track end, `E` no longer ends the choice for passing trains: the `P` that
+  applies comes first. `E` stays only at double-track stations, for PR #1's waiting for passing
+  trains and the Hold marker, which need the point after the station where the local's and the
+  passing train's routes merge.
+- Place `E` on each main track after the last switch of the station on that side, branch
+  junctions and crossovers included (Zabreh main 2: west of w2 and F). A train that leaves the
+  main line before `E` is never held (Olomouc → branch).
+- Never on single track: `E` applies to both directions. The section look-ahead and the `LT`
+  search ignore `E`. Passing trains at single-track stations need no `E`: their track is chosen
+  by the section logic (3.4). Waiting for a faster train at a single-track station, when added,
+  will use the station's far `LT` in the role `E` has on double track.
+- PR #1 change: the hold walk (`is_held_for_passing_train`) follows the whole route to the next
+  stop, so in mixed layouts it can find a far `E`: a branch train at Postrelmov or at a halt,
+  going to Olomouc, would see Zabreh's `E` and wait for a main-line express. Bound the walk: it
+  stops at any `LT` and at the first signal that applies after the train's own exit signal.
+- PR #1 option: also count trains that enter the station through its `LT` with a claim as
+  passing trains (today only trains that entered through a choose signal count), so a local at
+  Zabreh waits for a branch express to Olomouc too.
+
 ## 4. Stations
 
 ### 4.1 Polom (double track, 4 pax + 2 freight, most trains pass, some terminate)
@@ -154,7 +178,9 @@ timetable or one more track prevents it.
 | Terminating from the east | `←C` chooses 2/4/6, reverses, `P→`: b1 → b2 → `E` → `S→` |
 | Slow freight marked Hold | steps onto a free track when a faster train comes (PR #1) |
 
-Schedules: locals click tracks 3/4 so passing trains keep 1/2.
+Schedules: locals click tracks 3/4 so passing trains keep 1/2. Reachability (3.4): `C→` trains
+reach only 1/3/5 and `←C` trains only 2/4/6, because at w1 and b2 (b1) the crossover legs join
+from behind.
 
 ### 4.2 Mnichovo Hradiste (single track, 3 pax + 2 freight, any train may terminate)
 
@@ -175,61 +201,66 @@ Schedules: locals click tracks 3/4 so passing trains keep 1/2.
 | Terminates at MH | claims e.g. 3, stops, reverses, `←P` on 3: section back to Bakov |
 | Freight | stopping: 4/5 by platform type; passing: any free through track |
 
-### 4.3 Zabreh na Morave (double track + branch to Postrelmov on the east side)
+### 4.3 Zabreh na Morave (double track + branch to Postrelmov on the west side)
 
 ```
- west (Ceska Trebova)                                                                  east (Olomouc)
+ west (Ceska Trebova)                                                                 east (Olomouc)
 
  main 2 (←)
- ── ←S ── E ──[w2]──┬── ←P ═══ 2 pax     ═════════════ P→ ──┬──[b1]──────[a2]──[J]── ←C ── ←S ──
-                    ├── ←P ═══ 4 pax     ═════════════ P→ ──┤                   │
-                    └── ←P ═══ 6 freight ═════════════ P→ ──┘                   └── ←LT ──── branch
+ ── ←S ── E ──[w2]──[F]──┬── ←P ═══ 2 pax     ════════════ P→ ──┬──[b1]──── ←C ── ←S ──
+                         ├── ←P ═══ 4 pax     ════════════ P→ ──┤
+                         └── ←P ═══ 6 freight ════════════ P→ ──┘
  main 1 (→)
- ── S→ ── C→ ─[w1]──┬── ←P ═══ 1 pax     ═════════════ P→ ──┬───[b2]──[a1]──── E ── S→ ──
-                    ├── ←P ═══ 3 pax     ═════════════ P→ ──┤
-                    ├── ←P ═══ 5 freight ═════════════ P→ ──┤
-                    └── ←P ═══ 7 freight ═════════════ P→ ──┘
+ ── S→ ── C→ ──[J]──[w1]─┬── ←P ═══ 1 pax     ════════════ P→ ──┬──[b2]──── E ─── S→ ──
+                         ├── ←P ═══ 3 pax     ════════════ P→ ──┤
+                         ├── ←P ═══ 5 freight ════════════ P→ ──┤
+                         └── ←P ═══ 7 freight ════════════ P→ ──┘
+ branch from Postrelmov
+ ── LT→ ──[K]──┬──────── to J (joins main 1 heading east)
+               └──────── flyover over main 1 ──── to F (joins main 2 heading east)
 
- crossover W: w1 → w2 heading west (main 1 → main 2)
- crossover B: b1 → b2 heading east (main 2 → main 1)
- crossover A: a1 → a2 heading east (main 1 → main 2)
- order west to east in the east throat: b1, b2, a1, a2, J, then ←C on main 2 and E on main 1
- J: branch junction on main 2, west of ←C
+ crossover W: w1 → w2 heading west (main 1 → main 2), w1 a little east of w2
+ crossover B: b1 → b2 heading east (main 2 → main 1), b1 a little west of b2
+ main 2 west throat, west to east: ←S, E, w2, F, track fan (E west of every switch)
+ main 1 west throat, west to east: C→, J, w1, track fan; east throat: fan, b2, E, S→
 ```
 
-Eastbound trains can reach tracks 1/3/5/7; westbound trains and branch trains reach all seven
-(1/3/5/7 through crossover A backwards). Planned-first keeps them on their own side normally.
+Reachability (3.4): eastbound main-line trains reach only 1/3/5/7 (at J and w1 the other legs
+join from behind), westbound main-line trains only 2/4/6 (at b1 likewise), branch trains all
+seven (1/3/5/7 through J, 2/4/6 over the flyover). A plain crossover from main 2 to main 1 in
+place of the flyover would also work, but eastbound trains could then run through it onto
+2/4/6 when 1/3/5/7 are full (crossing main 2 twice).
 
 | # | Train | In | Track | Out |
 |---|---|---|---|---|
-| 1 | Ceska Trebova → Olomouc, stop or pass | `C→` | 1/3/5/7 (pass: through-choose) | `P→` normal → b2, a1 straight → `E` |
-| 2 | Olomouc → Ceska Trebova, stop or pass | `←C` | 2/4/6 (1/3/5/7 via A when full) | `←P` normal (from 1/3/5/7 via W) |
-| 3 | From west, terminates, back west | `C→` | 1/3/5/7 | reverse, `←P` normal → W |
-| 4 | From east, terminates, back east | `←C` | 2/4/6 | reverse, `P→` normal → B |
-| 5 | Ceska Trebova → branch, stopping | `C→` chooses 1/3/5/7 (lead-on via A) | | `P→` section → a1 → a2 → J → `←LT` |
-| 6 | Ceska Trebova → branch, not stopping | `C→` walk meets `P→`: through-choose 1/3/5/7 | | `P→` section; waits there if the branch is taken |
-| 7 | Olomouc → branch (must stop, reverses) | `←C` | 2/4/6 | reverse, `P→` section → J → `←LT` |
-| 8 | Branch terminates | section claim from `←LT` | any of 1–7 | reverse, `P→` section (from 1/3/5/7 via A) |
-| 9 | Branch → Ceska Trebova, stop or pass | section claim | stop: platform, pass: through track | `←P` normal (from 1/3/5/7 via W) |
-| 10 | Branch → Olomouc (must stop, reverses) | section claim | platform | reverse, `P→` normal (from 2/4/6 via B) → `E` |
+| 1 | Ceska Trebova → Olomouc, stop or pass | `C→` | 1/3/5/7 (pass: through-choose) | `P→` normal → `E` |
+| 2 | Olomouc → Ceska Trebova, stop or pass | `←C` | 2/4/6 | `←P` normal → F, w2 straight → `E` |
+| 3 | From the west, terminates | `C→` | 1/3/5/7 | reverse, `←P` normal → W → main 2 → `E` |
+| 4 | From the east, terminates | `←C` | 2/4/6 | reverse, `P→` normal → B → main 1 → `E` |
+| 5 | Olomouc → branch, stop or pass | `←C` (stop: platform, pass: through-choose) | 2/4/6 | `←P` section → F → flyover → K → `LT→` |
+| 6 | Ceska Trebova → branch (stops, reverses) | `C→` | 1/3/5/7 | reverse, `←P` section → w1 straight → J → `LT→` |
+| 7 | Branch → Olomouc, stop or pass | claim from the branch | 1/3/5/7 via J | `P→` normal → `E` |
+| 8 | Branch → Ceska Trebova (stops, reverses) | claim | 1/3/5/7 or 2/4/6 | reverse, `←P` normal (1/3/5/7 via W) |
+| 9 | Branch terminates | claim | any | reverse, `←P` section (1/3/5/7 via J, 2/4/6 via the flyover) |
 
-Trains between Olomouc and the branch have to stop and reverse at Zabreh; there is no direct
-connection. PR #1 waiting works for trains joining main 1 before `E` (rows 1, 4, 10), not for
-trains going to the branch (their route leaves before `E`).
+Only trains between Ceska Trebova and the branch reverse. A passing Olomouc → branch train that
+finds the branch taken waits at the `←P` of its track, inside Zabreh. PR #1 waiting applies to
+rows 1–4 and 7, not to trains going to the branch (they leave the main line before `E`).
 
-### 4.4 Branch Zabreh – Postrelmov
+### 4.4 Branch Postrelmov – Zabreh
 
 ```
- Zabreh                                                                                  Sumperk
- ... ←LT ────═ halt A ═──────┬──────═ halt B ═────── LT→ ─┬── ←P ═══ 1 pax ═════ P→ ──┬── ←LT ─── ...
-                             │                            └── ←P ═══ 2 pax ═════ P→ ──┘
-                             └─ nakladiste                        Postrelmov
+ Sumperk                                                                                      Zabreh
+ ... LT→ ─┬── ←P ═══ 1 pax ═════ P→ ──┬── ←LT ──────═ halt B ═──────┬──────═ halt A ═────── LT→ ──[K] ...
+          └── ←P ═══ 2 pax ═════ P→ ──┘                             │
+                   Postrelmov                                        └─ nakladiste
 ```
 
-- Halts: nothing, any number.
-- Postrelmov as the end of the line: `LT→` only, tracks end in buffers `▌`, `←P` at their west ends.
+- Halts: nothing, any number. No `E` anywhere on the branch.
+- Postrelmov as the end of the line: `←LT` only, tracks start at buffers `▌` on the west,
+  `P→` at their east ends.
 - Nakladiste, two options:
-  - plain stop, no objects: a freight train serving it holds Zabreh–Postrelmov while loading;
+  - plain stop, no objects: a freight train serving it holds Postrelmov–Zabreh while loading;
   - own station: `LT` on the siding track just after the switch facing into the siding, `P` at the
     switch end of the siding platform facing out. The train waits there without holding the line.
     A one-track station, so the capacity limit of 3.8 applies to it.
@@ -248,6 +279,7 @@ trains going to the branch (their route leaves before `E`).
 7. Downgrade (`-saveversion 0.122.0`): write `P` as a two-way plain signal so the stock game still
    runs (without the protection).
 8. `tools/windows/steam-fork.sh`: build makeobj and the add-on pak.
+8a. PR #1 hold walk bounded at `LT` and at the first signal after the own exit signal (3.9).
 9. CLAUDE.md: the design.
 
 ## 6. Decisions (defaults until the owner says otherwise)
@@ -256,7 +288,9 @@ trains going to the branch (their route leaves before `E`).
 2. No fallback for trains that enter a single line without passing a `P` (depot on the line,
    junction without `P`): depots belong in stations.
 3. Main-line trains may use the tracks the branch uses at Zabreh; only the schedule click steers.
-4. Later: several trains following in one direction (direction lock per section, block signals);
+4. Zabreh's Olomouc–branch connection is a flyover (or a flat crossing if the pakset has
+   rail-rail crossings), so both main-line sides stay separate (4.3).
+5. Later: several trains following in one direction (direction lock per section, block signals);
    a local at a single-track station waiting for a faster train (the `LT` gives the area PR #1
    needed `E` for).
 
@@ -265,5 +299,6 @@ trains going to the branch (their route leaves before `E`).
 - Single-track line: two stations (3 and 2 tracks), two halts between, a bay; crossing, passing,
   terminating, freight platform types; the two-halts head-on case must not lock.
 - Nakladiste in both variants.
-- Zabreh layout: moves 1–10 of 4.3. Polom: terminating both ways.
+- Zabreh layout: moves 1–9 of 4.3; eastbound trains never reach 2/4/6. Polom: terminating both ways.
+- A branch train at Postrelmov or a halt is not held for a main-line express at Zabreh (3.9).
 - Save/load with a claim, schedule change releases a claim, downgrade save opens in stock.
