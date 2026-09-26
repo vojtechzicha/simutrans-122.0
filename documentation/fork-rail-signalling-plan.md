@@ -363,11 +363,19 @@ that builds the layouts in code (not committed):
   platform and then stood at the `P` there, on the westbound main's track, until the blocker left).
 - `lock`: the capacity limit of 3.8, see there.
 
-Still to see in the Windows game with the pak128.cs objects:
+Seen in the Windows game (2026-09-26, merged with coupling and mixed traction, savegame 122.7,
+pak128.cs with the owner's `VZ-Signals-rail.pak`), with a headless harness on Windows plus the GUI:
 
-- Placing the objects with the tool (one click one-way, a second click turns the direction), their
-  images, and the convoy window texts.
-- Nakladiste in both variants, freight platform types on a single-track station.
-- PR #1 waiting at Zabreh with the calendar on, and a branch train at Postrelmov or a halt not
-  being held for a main-line express at Zabreh (3.9).
-- A downgraded save in the stock exe.
+- `line`, `lock` and a `zabreh` layout (double track, choose signals, branch, halt, terminus; eight
+  train types including freight on freight tracks) behave as above over two game months. The PR #1
+  wait still happens at Zabreh, and branch trains are never held for main-line trains.
+- Nakladiste in both variants (plain stop; own station with `LT`/`P`), and freight platform types
+  on a single-track station: freight trains use only the freight tracks.
+- Coupling through `P`/`LT` sections: a pair couples, runs one section as one train (claims for
+  the pair's length), splits at the junction station and the joined train takes its own section.
+- Save and load in the middle of a section restores the claim and its tiles. A 0.122.6 downgrade
+  loads in the previous fork exe and a 0.122.0 one in the stock exe, `P` written two-way.
+- The tool places both objects one-way and a second click turns them; the track stays two-way.
+  Images, toolbar icons and the convoy text "Waiting for the single track" seen on screen.
+- In a test layout, a station's tracks must lie on adjacent rows so their platforms form one halt;
+  two one-track halts side by side give the train nothing to choose.

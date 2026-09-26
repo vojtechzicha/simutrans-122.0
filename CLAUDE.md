@@ -329,7 +329,11 @@ coupled, uncoupling and waiting, downgrade, deleting either train, depot entry. 
 Design, station layouts and test results: `documentation/fork-rail-signalling-plan.md`. Two new pak
 objects (roadsign flags `PLATFORM_SIGNAL`, `STATION_BOUNDARY`; makeobj keys `is_platformsignal=1`
 with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `tools/fork-signals`,
-`steam-fork.sh signals FILE.dat` builds pak128 ones into the pakset folder):
+`steam-fork.sh signals FILE.dat` builds pak128 ones into the pakset folder). The owner's pak128.cs
+objects come from the pakset repo (`VZ-Signals-rail.pak`, built with the fork's makeobj): `P` as
+`VZ-Signals-D3-P` and `VZ-Signals-D1-{New,Old,Dwarf}-P`, `LT` as `VZ-Signals-D3-LT` and
+`VZ-Signals-D1-{New,Old,Dwarf}-LT`; a `P` has 8 images (16 with a wired set), an `LT` exactly 4
+(more would make it a traffic light):
 - Platform signal `P`: one-way exit signal at each end of a station track. It applies only to trains
   leaving in its direction (`roadsign_t::applies_to`) and sets no ribi mask, so the track stays
   two-way. Rail code asks `rail_vehicle_t::is_stop_point` (a signal that applies, or a station
@@ -358,8 +362,10 @@ with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `too
   other side's platform of a station with a crossover in one throat only and have to go back.
   `P` at both ends of every track is the normal exit signal of double-track stations too (plan 3.7.1).
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
-- A 0.122.0 save writes `P` two-way (stock one-way signals would make the track one-way) and leaves
-  out claims. Convoy window: "Waiting for the single track", "No free track at X", "Waiting to
+- A save for an older version (0.122.6 for the previous fork build, 0.122.0 for the stock game)
+  writes `P` two-way (older builds treat it as a plain signal, and a one-way one would make the
+  track one-way) and leaves out claims. Such a file is for the older exe only: loaded back into
+  this build the `P` stay two-way and trains stick at them, so keep the 0.122.7 save. Convoy window: "Waiting for the single track", "No free track at X", "Waiting to
   enter the station". Export: optional `claim_boundary` on convoys.
 - Known limit: two stations of a section full of trains that all want that section lock (four
   trains, 2+2 tracks); timetable or more tracks.
