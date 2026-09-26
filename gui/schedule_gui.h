@@ -71,6 +71,7 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	/// coupling (fork, rail): at this stop a train of this line joins a train of the chosen line
 	gui_label_t lb_couple, lb_couple_wait;
 	gui_combobox_t couple_selector;
+	gui_aligned_container_t *couple_table; // holds couple_selector, whose position is relative to it
 	gui_numberinput_t numimp_couple_wait;
 	uint32 couple_line_count;        // lines in couple_selector, to notice new or deleted lines
 	void init_couple_selector();

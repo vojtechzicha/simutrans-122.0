@@ -383,6 +383,7 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 {
 	schedule = NULL;
 	player   = NULL;
+	couple_table = NULL;
 	if (schedule_) {
 		init(schedule_, player_, cnv_);
 	}
@@ -419,6 +420,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		old_line = new_line = cnv->get_line();
 	}
 	old_line_count = 0;
+	couple_table = NULL;
 
 	stats->player = player;
 	stats->schedule = schedule;
@@ -535,7 +537,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 
 	if(  schedule->allows_hold()  ) {
 		// coupling: a train of this line joins a train of that line here
-		add_table(2,2);
+		couple_table = add_table(2,2);
 		{
 			add_component(&lb_couple);
 			init_couple_selector();
@@ -811,7 +813,9 @@ void schedule_gui_t::update_selection()
  */
 bool schedule_gui_t::infowin_event(const event_t *ev)
 {
-	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  &&  !couple_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  )  {
+	// couple_selector sits in its own table, so its position is relative to that table
+	const scr_coord couple_off = couple_table ? couple_table->get_pos() : scr_coord(0,0);
+	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  &&  !couple_selector.getroffen(ev->cx-couple_off.x, ev->cy-D_TITLEBAR_HEIGHT-couple_off.y)  )  {
 
 		// close combo box; we must do it ourselves, since the box does not receive outside events ...
 		line_selector.close_box();
