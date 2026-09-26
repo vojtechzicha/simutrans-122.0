@@ -143,6 +143,8 @@ void convoi_t::init(player_t *player)
 	couple_hold_slot = -1;
 	running_late = false;
 	late_slot = -1;
+	uncouple_since = 0;
+	uncouple_warned = false;
 	wait_lock = 0;
 	arrived_time = 0;
 
@@ -3371,6 +3373,14 @@ station_tile_search_ready: ;
 			}
 			else {
 				missed_partner = true;
+				// both stood here all along but could not get together: tell the player
+				bool standing;
+				const convoihandle_t partner = find_partner_at( halt, standing );
+				if(  partner.is_bound()  &&  standing  ) {
+					cbuffer_t buf;
+					buf.printf( translator::translate("%s and %s could not couple at %s (no free track behind the first train). They run separately."), get_name(), partner->get_name(), halt->get_name() );
+					welt->get_message()->add_message( buf, get_pos().get_2d(), message_t::warnings, PLAYER_FLAG|get_owner()->get_player_nr(), IMG_EMPTY );
+				}
 			}
 		}
 	}
@@ -4939,8 +4949,22 @@ void convoi_t::step_uncoupling()
 		all_ours = false;
 	}
 	if(  !all_ours  ) {
+		// the platform stays taken: warn once, the player may have to clear it
+		if(  uncouple_since==0  ) {
+			uncouple_since = max( 1u, welt->get_ticks() );
+		}
+		const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 3);
+		if(  !uncouple_warned  &&  (sint64)(welt->get_ticks() - uncouple_since) > limit  ) {
+			uncouple_warned = true;
+			const halthandle_t halt = haltestelle_t::get_halt( uncouple_span.back(), owner );
+			cbuffer_t buf;
+			buf.printf( translator::translate("%s cannot continue after uncoupling at %s: its platform is still occupied."), get_name(), halt.is_bound() ? halt->get_name() : uncouple_span.back().get_str() );
+			welt->get_message()->add_message( buf, uncouple_span.back().get_2d(), message_t::warnings, PLAYER_FLAG|get_owner()->get_player_nr(), IMG_EMPTY );
+		}
 		return;
 	}
+	uncouple_since = 0;
+	uncouple_warned = false;
 
 	// appear at the rear end of the tiles, facing as the whole train did
 	route.clear();

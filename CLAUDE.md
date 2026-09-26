@@ -270,6 +270,11 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   joining train's vehicles move to the track behind the primary, the way the primary came in
   (`couple`, needs those tiles free of other trains and long enough); otherwise they keep waiting.
   Not realistic, but it keeps a missed platform from breaking the pair.
+- Every wait is bounded (max wait at the stop; red at a choose signal only while the partner's route
+  already leads into the stop), so a pair that cannot get together runs separately. Two warnings in
+  the message window: both stood at the stop but could not couple (no free track behind the
+  primary), and a train that cannot reappear after uncoupling for 30 calendar minutes (1/8 month
+  without the calendar) because its platform stays occupied (`uncouple_since`, not saved).
 - Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
   become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
   primary's direction (`lay_out_on_route`, the stock reversal code), all tiles reserved for the

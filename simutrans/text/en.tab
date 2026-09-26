@@ -1617,3 +1617,7 @@ Not allowed!\nThis train is coupled to another\ntrain. Change its line's\nschedu
 Not allowed!\nThis train is coupled to another\ntrain. Change its line's\nschedule instead.
 Not allowed while coupled to another train
 Not allowed while coupled to another train
+%s and %s could not couple at %s (no free track behind the first train). They run separately.
+%s and %s could not couple at %s (no free track behind the first train). They run separately.
+%s cannot continue after uncoupling at %s: its platform is still occupied.
+%s cannot continue after uncoupling at %s: its platform is still occupied.

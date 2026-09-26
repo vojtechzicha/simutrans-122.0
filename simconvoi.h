@@ -270,6 +270,10 @@ private:
 	bool running_late;
 	sint64 late_slot;
 
+	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
+	uint32 uncouple_since;
+	bool uncouple_warned;
+
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
 	*/
