@@ -735,8 +735,18 @@ void convoi_t::add_running_cost( const weg_t *weg )
 		c->jahresgewinn += coupled_costs;
 		c->book( coupled_costs, CONVOI_OPERATIONS );
 		c->book( coupled_costs, CONVOI_PROFIT );
+		c->book( 1, CONVOI_DISTANCE );
 		c->total_distance_traveled ++;
 		get_owner()->book_running_costs( coupled_costs, get_schedule()->get_waytype() );
+		if(  weg  &&  weg->get_owner()!=get_owner()  &&  weg->get_owner()!=NULL  ) {
+			// its share of the toll on a foreign way that depends on running costs
+			// (the maintenance share is paid once, by us, for the whole train)
+			const sint32 toll = -(coupled_costs*welt->get_settings().get_way_toll_runningcost_percentage())/100l;
+			weg->get_owner()->book_toll_received( toll, get_schedule()->get_waytype() );
+			get_owner()->book_toll_paid( -toll, get_schedule()->get_waytype() );
+			c->book( -toll, CONVOI_WAYTOLL );
+			c->book( -toll, CONVOI_PROFIT );
+		}
 		// the rest is ours
 		const sint32 all_costs = sum_running_costs;
 		sum_running_costs -= coupled_costs;
@@ -3311,6 +3321,10 @@ station_tile_search_ready: ;
 		}
 	}
 	loading_limit = schedule->get_current_entry().minimum_loading;
+	if(  joined  ) {
+		// fork, coupling: the joined train's loading rules hold the whole train as well
+		joined->loading_limit = joined->schedule->get_current_entry().minimum_loading;
+	}
 
 	// update statistics of average speed
 	if(  distance_since_last_stop  ) {
@@ -3330,7 +3344,7 @@ station_tile_search_ready: ;
 	}
 
 	// loading is finished => maybe drive on
-	bool depart = is_ready_to_depart();
+	bool depart = is_ready_to_depart()  &&  (joined==NULL  ||  joined->is_ready_to_depart());
 	const bool timetabled = !no_load  &&  line.is_bound()  &&  schedule->get_current_entry().has_timetable()  &&  welt->has_calendar();
 	sint64 slot = -1;
 	if(  depart  &&  timetabled  ) {
@@ -3432,6 +3446,9 @@ station_tile_search_ready: ;
 		schedule->advance();
 		state = ROUTING_1;
 		loading_limit = 0;
+		if(  coupled_convoi.is_bound()  ) {
+			coupled_convoi->loading_limit = 0;
+		}
 	}
 
 	INT_CHECK( "convoi_t::hat_gehalten" );
@@ -3467,6 +3484,16 @@ bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
 			return false;
 		}
 		ready_at = max( now, welt->get_calendar_minutes_at( arrived_time + entry.get_waiting_ticks() ) );
+		latest = true;
+	}
+	if(  is_coupled_primary()  &&  !coupled_convoi->is_ready_to_depart()  ) {
+		// fork, coupling: the joined train's loading rules hold us too
+		const convoi_t *c = coupled_convoi.get_rep();
+		const schedule_entry_t &c_entry = c->schedule->get_current_entry();
+		if(  !c_entry.has_waiting_time()  ) {
+			return false;
+		}
+		ready_at = max( ready_at, welt->get_calendar_minutes_at( c->arrived_time + c_entry.get_waiting_ticks() ) );
 		latest = true;
 	}
 	if(  couple_wait_since  ) {
@@ -4519,6 +4546,10 @@ bool convoi_t::can_couple_here(const convoi_t *P, const convoi_t *C)
 		return false;
 	}
 	if(  P->anz_vehikel==0  ||  C->anz_vehikel==0  ||  P->schedule==NULL  ||  C->schedule==NULL  ||  P->schedule->empty()  ||  C->schedule->empty()  ) {
+		return false;
+	}
+	if(  (uint32)P->anz_vehikel + C->anz_vehikel > 255  ) {
+		// the vehicle count of a convoi is a uint8
 		return false;
 	}
 	if(  !dynamic_cast<rail_vehicle_t *>(P->fahr[0])  ||  !dynamic_cast<rail_vehicle_t *>(C->fahr[0])  ||  P->fahr[0]->get_waytype()!=C->fahr[0]->get_waytype()  ) {
