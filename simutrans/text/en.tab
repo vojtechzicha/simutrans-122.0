@@ -1579,6 +1579,12 @@ Hold marker tooltip
 Let passing trains overtake: at the choose signal of a station not in the schedule the train steps into a free platform when a passing train comes, and waits there for it.
 Waiting for %s to pass
 Waiting for %s to pass
+No free track at %s
+No free track at %s
+Waiting to enter the station
+Waiting to enter the station
+Waiting for the single track
+Waiting for the single track
 no boarding
 no boarding
 Stop type tooltip

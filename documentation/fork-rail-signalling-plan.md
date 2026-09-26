@@ -1,8 +1,8 @@
-# Rail signalling plan: stations, single track and choice (fork, planned)
+# Rail signalling: stations, single track and choice (fork)
 
-Status: design only, nothing implemented yet. Builds on PR #1 (overtaking at choose signals,
-platform types, Hold stop, waiting for passing trains, Hold marker, savegame 122.5).
-Everything below is derived from reading the code; nothing of it has run yet.
+Status: implemented (savegame 122.6) on top of PR #1 (overtaking at choose signals, platform types,
+Hold stop, waiting for passing trains, Hold marker, savegame 122.5), tested headless on pak64 with
+placeholder objects (section 7). Not yet seen in the Windows game with pak128.cs objects.
 
 ## 1. Problem and principles
 
@@ -98,14 +98,17 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
   planned length + 4 tiles (as the PR #1 detour).
 - Either way the track must lead on (rule 3): from its end there is a way to the next stop that
   starts at a signal applying to the train (for a train that turns in B, the `P` at the other end).
-- Which tracks a search can reach is set by the track itself: it follows switches only the way a
-  train can run them and never reverses, so a crossover opens tracks only in the direction it
-  faces. Among the free tracks that lead on, the cheapest path wins, so a train stays on its own
-  side while a track there is free.
+- Which tracks a search can reach: Simutrans crossovers and switches can be run in every direction
+  (a route may take any exit of a switch tile except straight back), so any train can reach any
+  track through the crossovers. Among the free tracks that lead on, the cheapest path wins (planned
+  track first), so a train stays on its own side while a track there is free and crosses over only
+  when its side is full, like a dispatcher would (owner's decision).
 
 ### 3.5 Claim
-- The claim is the chosen track's tiles (between its two `P`, or `P` and buffer), reserved for the
-  convoy. The throat in front is not claimed (3.6).
+- The claim is the platform part of the chosen track (from its first platform tile after the last
+  switch to the stop, or to the `P` at its far end), reserved for the convoy. The throat in front
+  is not claimed (3.6). A path that ends on a track without platform (e.g. a branch train running
+  on to the main line) claims nothing.
 - Stored on the convoy and saved (savegame 122.6), re-reserved after loading.
 - The route to the next stop in B, or through B, goes via the claimed track, not necessarily the
   one clicked in the schedule.
@@ -120,6 +123,9 @@ passes). If the throat is taken at that moment, it waits at the `LT`, like at th
 lichobeznikova tabulka. That wait is always short: nobody ever stands in a throat (trains only
 stand at `C`, at `P` and beyond `E`), and a train that wants this section waits at its `P`
 without reserving anything, so no one holds the throat while waiting for this train.
+A train that reaches an `LT` without a claim (it entered the line some other way, e.g. from a
+depot on the line or an old save) chooses and claims a track there; if none is free it waits at
+the `LT`.
 
 ### 3.7 Choose signal additions (double-track stations)
 - The choose walk also ends at a `P` that applies to the train (in addition to `E` and another
@@ -136,7 +142,11 @@ A train only waits in front of a `P`, or at a halt inside a section nobody else 
 enters a section only with a claimed track at the far end. So trains never meet head-on on the
 line and never arrive at a full station. The remaining lock is capacity: both stations of a
 section full of trains that all want that section (four trains for two 2-track stations). The
-timetable or one more track prevents it.
+timetable or one more track prevents it. The headless test reproduces it (scenario `lock`: four
+trains on a line whose termini and loop have two tracks each lock within minutes, all standing at
+`P` inside stations, none on the line). Possible later rule: a train may not take the last free
+track of a station when every other train there wants the section it came over and the station at
+the other end is full as well.
 
 ### 3.9 End-of-choose `E` in mixed layouts
 - With `P` at every track end, `E` no longer ends the choice for passing trains: the `P` that
@@ -172,23 +182,20 @@ from Přerov    ──► S→ ── C→ ───┴──┬────┬�
                                   └──┬──── ←P ═══ freight 1 ═════ P→ ──┤
                                      └──── ←P ═══ freight 2 ═════ P→ ──┘
 
- west crossover: main 2 → main 1 heading east (= main 1 → main 2 heading west)
- east crossover: main 2 → main 1 heading west (= main 1 → main 2 heading east)
- optional: a second east crossover main 2 → main 1 heading east, so pass 1/2 can leave to Bohumín
+ crossovers at the west and east throat (Simutrans crossovers work in every direction)
 ```
 
 | Train | In | Can use | Out |
 |---|---|---|---|
 | Přerov → Bohumín, stop or pass | `C→` | 3, 4, freight (pass: through-choose) | `P→` normal → `E` |
 | Bohumín → Přerov, stop or pass | `←C` | 1, 2; 3, 4, freight via the east crossover when full | `←P` normal (3/4 via the west crossover) → `E` |
-| Terminates from Přerov | `C→` | 3, 4 | reverse, `←P` normal → west crossover → main 2 |
-| Terminates from Bohumín | `←C` | 3, 4 (1, 2 only with the optional crossover) | reverse, `P→` normal → main 1 |
+| Terminates from Přerov | `C→` | 3, 4 (1, 2 when full) | reverse, `←P` normal (3/4 via the west crossover) → main 2 |
+| Terminates from Bohumín | `←C` | 1, 2 (3, 4 when full) | reverse, `P→` normal (1/2 via the east crossover) → main 1 |
 | Slow freight marked Hold | | steps onto a free track when a faster train comes (PR #1) | |
 
 Locals click pass 3 (eastbound) or pass 1 (westbound) in the schedule so passing trains keep the
-straight tracks. `C→` cannot reach pass 1/2: at the west crossover its leg joins main 1 from
-behind. The lead-on check keeps terminating Bohumín trains off pass 1/2 unless the optional
-crossover exists.
+straight tracks. The column "Can use" lists the cheapest tracks first; any track is possible
+through the crossovers when those are full.
 
 ### 4.2 Mnichovo Hradiste (single track, 3 pax + 2 freight, any train may terminate)
 
@@ -223,26 +230,24 @@ from Č.Třebová ──► S→ ── C→ ───┴──┬────�
                                      └──── ←P ═══ freight 2 ═════ P→ ──┘
 
  branch junction: on main 2, west of the west crossover; E west of the junction
- west crossover: main 2 → main 1 heading east (= main 1 → main 2 heading west)
- east crossover: main 2 → main 1 heading west (= main 1 → main 2 heading east)
- optional: a second east crossover main 2 → main 1 heading east, so pass 1/2 can leave to Olomouc
+ crossovers at the west and east throat (Simutrans crossovers work in every direction)
  main 2 between the junction and pass 1/2, and main 1 between the crossovers and pass 3/4, are
  used both ways: no stock signals there
 ```
 
-Reachability: `C→` trains reach pass 3, 4 and freight; `←C` trains reach pass 1, 2 and, through
-the east crossover, pass 3, 4 and freight; branch trains reach everything (pass 1/2 along main 2,
-the rest through the west crossover).
+Reachability: every train can reach every track through the crossovers; the cheapest are listed
+first. `C→` trains prefer pass 3, 4 and freight, `←C` trains pass 1, 2; branch trains reach pass
+1/2 along main 2 and the rest through the west crossover.
 
 | Train | In | Can use | Out |
 |---|---|---|---|
 | Č.Třebová → Olomouc, stop or pass | `C→` | 3, 4, freight | `P→` normal → `E` |
 | Olomouc → Č.Třebová, stop or pass | `←C` | 1, 2 (3, 4, freight when full) | `←P` normal → junction straight → `E` |
 | Terminates from Č.Třebová | `C→` | 3, 4 | reverse, `←P` normal → west crossover → main 2 |
-| Terminates from Olomouc | `←C` | 3, 4 (1, 2 with the optional crossover) | reverse, `P→` normal → main 1 |
+| Terminates from Olomouc | `←C` | 1, 2 (3, 4 when full) | reverse, `P→` normal (1/2 via the east crossover) → main 1 |
 | Olomouc → branch, stop or pass | `←C` | 1, 2 (3, 4 when full) | `←P` section → main 2 → junction → `LT→` |
 | Č.Třebová → branch | `C→` | 3, 4 | stop, reverse, `←P` section → west crossover → junction |
-| Branch → Olomouc, stop or pass | claim at Postřelmov, enters at `LT→` | 3, 4, freight (1, 2 with the optional crossover) | `P→` normal → `E` |
+| Branch → Olomouc, stop or pass | claim at Postřelmov, enters at `LT→` | 1, 2, 3, 4 | `P→` normal (1/2 via the east crossover) → `E` |
 | Branch → Č.Třebová | claim | any | stop, reverse, `←P` normal → `E` |
 | Branch terminates | claim | any | stop, reverse, `←P` section |
 
@@ -293,21 +298,39 @@ the rest through the west crossover).
 ## 6. Decisions (defaults until the owner says otherwise)
 
 1. Claim the track only, not the throat.
-2. No fallback for trains that enter a single line without passing a `P` (depot on the line,
-   junction without `P`): depots belong in stations.
+2. Trains that enter a single line without passing a `P` (depot on the line, junction without
+   `P`, old saves) choose and claim a track at the station boundary (3.6); depots still belong in
+   stations, since a train waiting at an `LT` stands on the line.
 3. Main-line trains may use the tracks the branch uses at Zabreh; only the schedule click steers.
-4. Zabreh and Polom use the owner's layout (4.1, 4.3); the optional second east crossover is
-   up to the owner.
+4. Zabreh and Polom use the owner's layout (4.1, 4.3). Trains may use the other side's tracks
+   when their own are full (owner's decision).
 5. Later: several trains following in one direction (direction lock per section, block signals);
    a local at a single-track station waiting for a faster train (the `LT` gives the area PR #1
    needed `E` for).
 
-## 7. Test plan (headless pak64 harness, then Windows)
+## 7. Tests
 
-- Single-track line: two stations (3 and 2 tracks), two halts between, a bay; crossing, passing,
-  terminating, freight platform types; the two-halts head-on case must not lock.
-- Nakladiste in both variants.
-- Zabreh layout: every row of 4.3; `C→` trains never reach pass 1/2; a branch train waits at
-  `LT→` while a main-line train crosses the throat. Polom: every row of 4.1.
-- A branch train at Postrelmov or a halt is not held for a main-line express at Zabreh (3.9).
-- Save/load with a claim, schedule change releases a claim, downgrade save opens in stock.
+Done headless on pak64 with placeholder objects (`tools/fork-signals`) and a throwaway harness
+that builds the layouts in code (not committed):
+- `line`: terminus A (2 tracks) – halt – halt – loop B (2 tracks) – terminus C (2 tracks), a local
+  stopping everywhere, an express A–C passing B, a shuttle terminating at B. All keep running; no
+  train ever stood longer than a few seconds outside a station track. Claims are taken at every
+  departure onto the line.
+- `zabreh`: the layout of 4.3 with termini at both ends: express and local on the main line, a train
+  terminating at Zabreh from Olomouc, a branch shuttle terminating at Zabreh, branch–Olomouc,
+  Ceska Trebova–branch (reverses) and Olomouc–branch without stopping at Zabreh. All keep running;
+  the only waits off station tracks were at main-line signals and up to 13 s at the branch `LT`
+  while a main-line train crossed the throat.
+- `saveload`: saved while a train between the halts held a claim; after loading the claim and its
+  reserved tiles are back and all trains keep running; a 0.122.0 save writes every platform signal
+  two-way and has no claim.
+- `lock`: the capacity limit of 3.8, see there.
+
+Still to see in the Windows game with the pak128.cs objects:
+
+- Placing the objects with the tool (one click one-way, a second click turns the direction), their
+  images, and the convoy window texts.
+- Nakladiste in both variants, freight platform types on a single-track station.
+- PR #1 waiting at Zabreh with the calendar on, and a branch train at Postrelmov or a halt not
+  being held for a main-line express at Zabreh (3.9).
+- A downgraded save in the stock exe.

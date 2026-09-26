@@ -1,0 +1,33 @@
+# Placeholder objects for the fork's platform signal and station boundary (pak64).
+# Build with the fork's makeobj:  makeobj pak64 ./ fork_signals_pak64.dat
+# Tile order: platform signal red N,S,W,E then green N,S,W,E; station boundary N,S,W,E.
+Obj=roadsign
+Name=PlatformSignal
+waytype=track
+is_signal=1
+is_platformsignal=1
+cost=500
+intro_year=1850
+Image[0]=platform_signal.0.0
+Image[1]=platform_signal.0.1
+Image[2]=platform_signal.0.2
+Image[3]=platform_signal.0.3
+Image[4]=platform_signal.0.4
+Image[5]=platform_signal.0.5
+Image[6]=platform_signal.0.6
+Image[7]=platform_signal.0.7
+cursor=platform_signal.0.4
+icon=platform_signal.0.4
+---
+Obj=roadsign
+Name=StationBoundary
+waytype=track
+station_boundary=1
+cost=100
+intro_year=1850
+Image[0]=station_boundary.0.0
+Image[1]=station_boundary.0.1
+Image[2]=station_boundary.0.2
+Image[3]=station_boundary.0.3
+cursor=station_boundary.0.0
+icon=station_boundary.0.0

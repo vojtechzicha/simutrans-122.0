@@ -49,6 +49,12 @@ public:
 	 */
 	ribi_t::ribi get_dir() const { return dir; }
 
+	/**
+	 * fork: true when this sign or signal applies to a vehicle leaving its tile in direction exit_dir
+	 * (a one-way sign applies to the direction it lets through, a two-way sign to both)
+	 */
+	bool applies_to(ribi_t::ribi exit_dir) const { return (exit_dir & calc_mask()) == 0; }
+
 	/*
 	* sets ribi mask of the sign
 	* Caution: it will modify way ribis directly unless in preview mode!

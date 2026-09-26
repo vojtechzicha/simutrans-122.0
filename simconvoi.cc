@@ -127,6 +127,9 @@ void convoi_t::init(player_t *player)
 	hold_divert = false;
 	passing_hold_since = 0;
 	passing_hold_released = false;
+	claim_first = 0;
+	claim_stops = false;
+	section_wait = SECTION_WAIT_NONE;
 	wait_lock = 0;
 	arrived_time = 0;
 
@@ -248,6 +251,141 @@ bool convoi_t::is_waypoint( koord3d ziel ) const
 		// so we are on a taxiway/runway here ...
 	}
 	return !haltestelle_t::get_halt(ziel,get_owner()).is_bound();
+}
+
+
+bool convoi_t::is_claimed_tile(koord3d pos) const
+{
+	for(  uint32 i=claim_first;  i<claim_path.get_count();  i++  ) {
+		if(  claim_path[i]==pos  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+void convoi_t::set_claim(const route_t &path, uint16 first, bool stops)
+{
+	release_claim( true );
+	for(  uint32 i=0;  i<path.get_count();  i++  ) {
+		claim_path.append( path.at(i) );
+	}
+	claim_first = first;
+	claim_stops = stops;
+	reserve_claim();
+}
+
+
+void convoi_t::reserve_claim()
+{
+	if(  anz_vehikel==0  ) {
+		return;
+	}
+	const waytype_t wt = front()->get_waytype();
+	for(  uint32 i=claim_first;  i<claim_path.get_count();  i++  ) {
+		if(  grund_t *gr = welt->lookup( claim_path[i] )  ) {
+			if(  schiene_t *sch = (schiene_t *)gr->get_weg( wt )  ) {
+				const koord3d from = claim_path[ i>0 ? i-1 : i ];
+				const koord3d to = claim_path[ i+1<claim_path.get_count() ? i+1 : i ];
+				sch->reserve( self, ribi_type( from, to ) );
+			}
+		}
+	}
+}
+
+
+void convoi_t::release_claim(bool unreserve)
+{
+	if(  unreserve  &&  anz_vehikel>0  ) {
+		const waytype_t wt = front()->get_waytype();
+		for(  uint32 i=claim_first;  i<claim_path.get_count();  i++  ) {
+			bool under_us = false;
+			for(  uint8 v=0;  v<anz_vehikel  &&  !under_us;  v++  ) {
+				under_us = fahr[v]->get_pos()==claim_path[i];
+			}
+			if(  under_us  ) {
+				continue;
+			}
+			if(  grund_t *gr = welt->lookup( claim_path[i] )  ) {
+				if(  schiene_t *sch = (schiene_t *)gr->get_weg( wt )  ) {
+					sch->unreserve( self );
+				}
+			}
+		}
+	}
+	claim_path.clear();
+	claim_first = 0;
+	claim_stops = false;
+}
+
+
+bool convoi_t::route_follows_claim(const route_t &r, uint32 from) const
+{
+	if(  claim_path.get_count() < 2  ) {
+		return true;
+	}
+	uint32 j = from;
+	while(  j<r.get_count()  &&  r.at(j)!=claim_path[0]  ) {
+		j++;
+	}
+	if(  j>=r.get_count()  ) {
+		return true;
+	}
+	for(  uint32 k=1;  k<claim_path.get_count();  k++  ) {
+		if(  j+k>=r.get_count()  ||  r.at(j+k)!=claim_path[k]  ) {
+			return false;
+		}
+	}
+	return !claim_stops  ||  j+claim_path.get_count()==r.get_count();
+}
+
+
+sint8 convoi_t::route_via_claim(route_t &r, uint32 from)
+{
+	if(  claim_path.get_count() < 2  ||  anz_vehikel==0  ) {
+		return 0;
+	}
+	uint32 j = from;
+	while(  j<r.get_count()  &&  r.at(j)!=claim_path[0]  ) {
+		j++;
+	}
+	if(  j>=r.get_count()  ) {
+		// not that far yet (a halt before the station)
+		return 0;
+	}
+	// already on the claimed track (and, when passing, on from its end)?
+	bool same = true;
+	for(  uint32 k=1;  same  &&  k<claim_path.get_count();  k++  ) {
+		same = j+k<r.get_count()  &&  r.at(j+k)==claim_path[k];
+	}
+	if(  same  &&  (!claim_stops  ||  j+claim_path.get_count()==r.get_count())  ) {
+		return 1;
+	}
+	route_t nr;
+	for(  uint32 i=0;  i<=j;  i++  ) {
+		nr.append( r.at(i) );
+	}
+	for(  uint32 k=1;  k<claim_path.get_count();  k++  ) {
+		nr.append( claim_path[k] );
+	}
+	if(  !claim_stops  ) {
+		// passing: from the platform signal on to the end of the route
+		route_t cont;
+		if(  !cont.calc_route( welt, claim_path.back(), r.back(), fahr[0], speed_to_kmh(min_top_speed), 8888 )  ||  cont.get_count()<2  ) {
+			return -1;
+		}
+		if(  cont.at(1)==claim_path[claim_path.get_count()-2]  ) {
+			// that way turns back through the track
+			return -1;
+		}
+		for(  uint32 k=1;  k<cont.get_count();  k++  ) {
+			nr.append( cont.at(k) );
+		}
+	}
+	r.clear();
+	r.append( &nr );
+	return 1;
 }
 
 
@@ -527,6 +665,9 @@ DBG_MESSAGE("convoi_t::finish_rd()","next_stop_index=%d", next_stop_index );
 	if(  !line.is_bound()  ) {
 		register_stops();
 	}
+
+	// fork: the track claimed at the next station of a single-track section
+	reserve_claim();
 
 	calc_speedbonus_kmh();
 }
@@ -1149,6 +1290,14 @@ bool convoi_t::drive_to()
 			}
 
 			schedule->set_current_stop(current_stop);
+			if(  route_ok  &&  has_claim()  ) {
+				// fork: the new route may have been reserved over the claimed tiles and freed them
+				reserve_claim();
+			}
+			if(  route_ok  &&  has_claim()  &&  route_via_claim( route, 0 ) < 0  ) {
+				// fork: the claimed track does not lead on to this stop
+				release_claim( true );
+			}
 			if(  route_ok  ) {
 				vorfahren();
 				return true;
@@ -1486,6 +1635,7 @@ void convoi_t::betrete_depot(depot_t *dep)
 {
 	// first remove reservation, if train is still on track
 	unreserve_route();
+	release_claim( true );
 
 	// remove vehicles from world data structure
 	for(unsigned i=0; i<anz_vehikel; i++) {
@@ -2601,6 +2751,24 @@ void convoi_t::rdwr(loadsave_t *file)
 		file->rdwr_bool( hold_divert );
 	}
 
+	if(  file->is_version_atleast(122, 6)  ) {
+		// fork: track claimed at the next station of a single-track section
+		uint16 count = claim_path.get_count();
+		file->rdwr_short( count );
+		if(  file->is_loading()  ) {
+			claim_path.clear();
+		}
+		for(  uint16 i=0;  i<count;  i++  ) {
+			koord3d k = file->is_saving() ? claim_path[i] : koord3d::invalid;
+			k.rdwr( file );
+			if(  file->is_loading()  ) {
+				claim_path.append( k );
+			}
+		}
+		file->rdwr_short( claim_first );
+		file->rdwr_bool( claim_stops );
+	}
+
 	if(  file->is_loading()  ) {
 		reserve_route();
 		recalc_catg_index();
@@ -3221,6 +3389,8 @@ void convoi_t::self_destruct()
  */
 void convoi_t::destroy()
 {
+	release_claim( true );
+
 	// can be only done here, with a valid convoihandle ...
 	if(fahr[0]) {
 		fahr[0]->set_convoi(NULL);

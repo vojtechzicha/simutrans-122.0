@@ -227,6 +227,39 @@ express, local ignores fast freight, freight waits for freight, both tracks held
 at red releases both, marked convoy and marked line divert, save/load mid-diversion, 20 minute limit,
 no hold outside a choose area, plus the earlier overtaking cases).
 
+## Platform signals and station boundaries (fork feature, savegame 122.6)
+
+Design, station layouts and test results: `documentation/fork-rail-signalling-plan.md`. Two new pak
+objects (roadsign flags `PLATFORM_SIGNAL`, `STATION_BOUNDARY`; makeobj keys `is_platformsignal=1`
+with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `tools/fork-signals`,
+`steam-fork.sh signals FILE.dat` builds pak128 ones into the pakset folder):
+- Platform signal `P`: one-way exit signal at each end of a station track. It applies only to trains
+  leaving in its direction (`roadsign_t::applies_to`) and sets no ribi mask, so the track stays
+  two-way. Rail code asks `rail_vehicle_t::is_stop_point` (a signal that applies, or a station
+  boundary entered) wherever stock code asked `has_signal()`: `block_reserver`, `can_enter_tile`,
+  the PR #1 detour signal count. A `P` acts as a normal signal unless the train leaves the station
+  through an `LT` before any other signal: then `is_platform_signal_clear` follows the route and the
+  next schedule legs (halts without signals included) to the `LT` of the next station, checks all
+  those tiles free, picks a track there with `find_station_track` (stopping: a stop position of the
+  right platform type that leads on to the next stop; passing: a free track up to a `P` from which
+  the route goes on; planned track first; searches never pass a signal that applies) and claims it.
+- Station boundary `LT`: sign outside the outermost switch where a single-track line enters a
+  station, facing entering trains. A train reserves only up to it; at the `LT`
+  (`is_station_boundary_clear`) it reserves the throat into its claimed track, or waits there
+  briefly. Without a claim it chooses a track there.
+- Claim (`convoi_t::claim_path`, `claim_first`, `claim_stops`, saved 122.6, reserved again in
+  `finish_rd`): the path from the `LT` through the chosen track; only its platform tiles are
+  reserved. `drive_to` routes through it (`route_via_claim`), `leave_tile` keeps it on a track the
+  train is leaving, depot/destroy release it, a `P` or `LT` of another station drops a stale one.
+- Choose signals: the walk also ends at an `LT` and at a `P` that applies before the stop; then a
+  passing train takes any free track up to its `P` (through-choose) instead of the PR #1 detour.
+  The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
+- A 0.122.0 save writes `P` two-way (stock one-way signals would make the track one-way) and leaves
+  out claims. Convoy window: "Waiting for the single track", "No free track at X", "Waiting to
+  enter the station". Export: optional `claim_boundary` on convoys.
+- Known limit: two stations of a section full of trains that all want that section lock (four
+  trains, 2+2 tracks); timetable or more tracks.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

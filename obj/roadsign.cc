@@ -136,7 +136,8 @@ void roadsign_t::set_dir(ribi_t::ribi dir)
 		if(desc->is_single_way()  ||  desc->is_signal_type()) {
 			// set mask, if it is a single way ...
 			weg->count_sign();
-			weg->set_ribi_maske(calc_mask());
+			// fork: a platform signal applies to one direction only, but never makes the track one-way
+			weg->set_ribi_maske( desc->is_platform_signal() ? (ribi_t::ribi)ribi_t::none : calc_mask() );
 DBG_MESSAGE("roadsign_t::set_dir()","ribi %i",dir);
 		}
 	}
@@ -552,6 +553,14 @@ void roadsign_t::rdwr(loadsave_t *file)
 	file->rdwr_byte(dummy);
 	state = dummy;
 	dummy = dir;
+	if(  file->is_saving()  &&  desc->is_platform_signal()  &&  file->is_version_less(122, 6)  ) {
+		// fork: for the stock game a one-way signal makes the track one-way, so write it two-way
+		if(  const grund_t *gr = welt->lookup(get_pos())  ) {
+			if(  const weg_t *weg = gr->get_weg(desc->get_wtyp()!=tram_wt ? desc->get_wtyp() : track_wt)  ) {
+				dummy = weg->get_ribi_unmasked();
+			}
+		}
+	}
 	file->rdwr_byte(dummy);
 	dir = dummy;
 	if(file->is_version_less(89, 0)) {

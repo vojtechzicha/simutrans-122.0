@@ -44,7 +44,9 @@ public:
 		ONLY_BACKIMAGE        = 1U << 5,
 		SIGN_LONGBLOCK_SIGNAL = 1U << 6,
 		END_OF_CHOOSE_AREA    = 1U << 7,
-		SIGN_PRIORITY_SIGNAL  = 1U << 8
+		SIGN_PRIORITY_SIGNAL  = 1U << 8,
+		PLATFORM_SIGNAL       = 1U << 9,  // fork: exit signal of a station track (with SIGN_SIGNAL)
+		STATION_BOUNDARY      = 1U << 10  // fork: sign where a single-track line enters a station
 	};
 
 	image_id get_image_id(ribi_t::dir dir) const
@@ -74,6 +76,7 @@ public:
 		SIGN_PRE_SIGNAL |
 		SIGN_PRIORITY_SIGNAL |
 		SIGN_LONGBLOCK_SIGNAL |
+		PLATFORM_SIGNAL |
 		CHOOSE_SIGN)) == SIGN_SIGNAL; }
 
 	//  return true for presignal
@@ -86,6 +89,12 @@ public:
 	bool is_longblock_signal() const { return (flags & SIGN_LONGBLOCK_SIGNAL) != 0; }
 
 	bool is_end_choose_signal() const { return (flags & END_OF_CHOOSE_AREA) != 0; }
+
+	// fork: one-way exit signal of a station track; it never makes the track one-way
+	bool is_platform_signal() const { return (flags & PLATFORM_SIGNAL) != 0; }
+
+	// fork: where a single-track line enters a station (lichobeznikova tabulka)
+	bool is_station_boundary() const { return (flags & STATION_BOUNDARY) != 0; }
 
 	bool is_signal_type() const
 	{

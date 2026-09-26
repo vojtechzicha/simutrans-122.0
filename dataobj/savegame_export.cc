@@ -955,6 +955,10 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		w.kv_int( "total_loaded", total_loaded );
 		w.kv_bool( "has_obsolete_vehicles", cnv->has_obsolete_vehicles() );
 		w.kv_bool( "hold_marker", cnv->get_hold_marker() );
+		if(  cnv->has_claim()  ) {
+			// fork: station boundary of the track claimed at the next station of a single-track section
+			w.kv_string( "claim_boundary", cnv->get_claim_boundary().get_str() );
+		}
 
 		const koord3d depot = cnv->get_home_depot();
 		if(  depot == koord3d::invalid  ) {
