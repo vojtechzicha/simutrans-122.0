@@ -21,6 +21,7 @@ class convoi_t;
 class schedule_t;
 struct schedule_entry_t;
 class signal_t;
+class roadsign_t;
 class ware_t;
 class route_t;
 
@@ -597,6 +598,43 @@ private:
 	// at a stop: wait for a passing train to go by first; keeps the convoi's hold state
 	bool is_held_for_passing_train();
 
+	/* fork: platform signals and station boundaries (see documentation/fork-rail-signalling-plan.md)
+	 * track_search: 0 = none, 1 = a stop position of track_search_halt, 2 = a signal that applies at the
+	 * end of a track, 3 = any track (way on after a choice); only free tiles in modes 1 and 2
+	 */
+	uint8 track_search;
+	halthandle_t track_search_halt;
+	koord3d track_search_start;
+	// is_target found a signal that applies but is no target: do not search on from there
+	mutable bool track_search_block;
+
+	// the signal on this tile applies to a train leaving it in direction dir
+	bool signal_applies(const grund_t *gr, ribi_t::ribi dir) const;
+
+	// a signal that applies, or a station boundary entered here: a train must be cleared to go on
+	bool is_stop_point(const route_t *route, uint32 index) const;
+
+	// a free track in the station ahead, searched from route index start (a station boundary or a
+	// choose signal): a stop position of halt (with needs, leading on to next_stop if valid), or with
+	// no halt a track up to a signal that applies at its end from which the way leads on to
+	// route->back(); path runs from route->at(start) to the stop end or to that signal
+	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path);
+
+	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none
+	uint32 get_onward_length(koord3d from, koord3d next_stop);
+
+	// a platform other than the planned one: the way on from it to next_stop exists and is not much
+	// longer than planned_length (from the planned platform, 0 = unknown); a platform on the other side
+	// with no crossover after it would only lead back
+	bool leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length);
+
+	// path (from find_station_track, starting at route index start) in place of the route from there on;
+	// when the train passes (!stops), on from the end of path to the end of the route
+	bool route_through(route_t *route, uint32 start, const route_t &path, bool stops);
+
+	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
+	bool is_station_boundary_clear(uint16 next_block, sint32 &restart_speed);
+
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;
 
@@ -609,6 +647,9 @@ protected:
 	bool is_choose_signal_clear(signal_t *sig, uint16 start_index, sint32 &restart_speed);
 
 public:
+	// fork: the station boundary sign (lichobeznikova tabulka) on this tile, if any
+	static const roadsign_t *get_station_boundary(const grund_t *gr);
+
 	waytype_t get_waytype() const OVERRIDE { return track_wt; }
 
 	// since we might need to un-reserve previously used blocks, we must do this before calculation a new route

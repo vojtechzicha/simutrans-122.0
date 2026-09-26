@@ -4928,7 +4928,7 @@ void tool_build_roadsign_t::mark_tiles( player_t *player, const koord3d &start, 
 	}
 	dummy_rs->set_flag(obj_t::not_on_map);
 
-	bool single_ribi = desc->is_signal_type() || desc->is_single_way() || desc->is_choose_sign();
+	bool single_ribi = desc->is_signal_type() || desc->is_single_way() || desc->is_choose_sign() || desc->is_station_boundary();
 	for(  uint16 i = 0;  i < route.get_count();  i++  ) {
 		grund_t* gr = welt->lookup( route.at(i) );
 
@@ -5094,9 +5094,14 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					if(  !player_t::check_owner( rs->get_owner(), player )  ) {
 						return "Das Feld gehoert\neinem anderen Spieler\n";
 					}
-					// signals have three options
+					// signals have three options (fork: platform signals only the two one-way ones)
 					ribi_t::ribi sig_dir = rs->get_dir();
 					uint8 i = 0;
+					if(  desc->is_platform_signal()  &&  ribi_t::is_single(sig_dir)  &&  ribi_t::is_twoway(dir)  ) {
+						dir &= ~sig_dir;
+						rs->set_dir(dir);
+						return NULL;
+					}
 					if (!ribi_t::is_twoway(sig_dir)) {
 						// inverse first dir
 						for (; i < 4; i++) {
@@ -5116,6 +5121,15 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					rs->set_dir(dir);
 				}
 				else {
+					if(  desc->is_platform_signal()  ) {
+						// fork: platform signals are one-way only
+						for(  int i=0;  i<4;  i++  ) {
+							if(  (dir & ribi_t::nsew[i]) != 0  ) {
+								dir = ribi_t::nsew[i];
+								break;
+							}
+						}
+					}
 					// add a new signal at position zero!
 					rs = new signal_t(player, gr->get_pos(), dir, desc);
 					DBG_MESSAGE("tool_roadsign()", "new signal, dir is %i", dir);
@@ -5130,7 +5144,7 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 						return "Das Feld gehoert\neinem anderen Spieler\n";
 					}
 					// reverse only if single way sign
-					if (desc->is_single_way() || desc->is_choose_sign()) {
+					if (desc->is_single_way() || desc->is_choose_sign() || desc->is_station_boundary()) {
 						dir = ~rs->get_dir() & weg->get_ribi_unmasked();
 						rs->set_dir(dir);
 						DBG_MESSAGE("tool_roadsign()", "reverse ribi %i", dir);
@@ -5139,7 +5153,7 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 				else {
 					// add a new roadsign at position zero!
 					// if single way, we need to reduce the allowed ribi to one
-					if (desc->is_single_way() || desc->is_choose_sign()) {
+					if (desc->is_single_way() || desc->is_choose_sign() || desc->is_station_boundary()) {
 						for(  int i=0;  i<4;  i++  ) {
 							if ((dir & ribi_t::nsew[i]) != 0) {
 								dir = ribi_t::nsew[i];

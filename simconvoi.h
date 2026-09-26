@@ -243,6 +243,22 @@ private:
 	bool passing_hold_released;
 
 	/**
+	 * Fork, rail: the track claimed at the next station of a single-track section, see
+	 * rail_vehicle_t::is_platform_signal_clear(). claim_path runs from the station boundary through
+	 * the claimed track, to the stop (claim_stops) or to the platform signal at its far end; its tiles
+	 * from claim_first on are reserved for this convoi. Empty: no claim. Saved (122.7).
+	 */
+	vector_tpl<koord3d> claim_path;
+	uint16 claim_first;
+	bool claim_stops;
+	// the schedule stop whose way enters that station (the claim is out of date without it)
+	koord3d claim_stop;
+
+	// fork, rail: why the convoi waits at a platform signal or station boundary (not saved)
+	uint8 section_wait;
+	halthandle_t section_wait_halt;
+
+	/**
 	 * Fork, coupling (rail). A primary train carries the vehicles of the train that joined it at
 	 * the end of fahr, from index coupled_first on, and coupled_convoi is that train. The joined
 	 * train is in state COUPLED: its fahr points to the same vehicles (they belong to the primary
@@ -1013,6 +1029,28 @@ public:
 	void set_passing_hold(convoihandle_t for_cnv, uint32 since) { passing_hold_for = for_cnv; passing_hold_since = since; }
 	void release_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = true; }
 	void clear_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = false; }
+
+	// fork, rail: track claimed at the next station of a single-track section (see claim_path)
+	bool has_claim() const { return !claim_path.empty(); }
+	koord3d get_claim_boundary() const { return claim_path.empty() ? koord3d::invalid : claim_path[0]; }
+	bool is_claimed_tile(koord3d pos) const;
+	// path: from the station boundary through the track; reserves its tiles from first on;
+	// for_stop: the schedule stop whose way enters that station
+	void set_claim(const route_t &path, uint16 first, bool stops, koord3d for_stop);
+	// unreserve: free the claimed tiles (not those under this convoi)
+	void release_claim(bool unreserve);
+	// reserves the claimed tiles again (after loading)
+	void reserve_claim();
+	// the route from index from on goes through the claimed track (and on to its end when passing):
+	// 1 done, 0 the route does not reach the station boundary, -1 the claimed track does not lead on
+	sint8 route_via_claim(route_t &r, uint32 from);
+	// true when route_via_claim would not change the route (no route search needed)
+	bool route_follows_claim(const route_t &r, uint32 from) const;
+
+	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY };
+	void set_section_wait(uint8 why, halthandle_t halt) { section_wait = why; section_wait_halt = halt; }
+	uint8 get_section_wait() const { return section_wait; }
+	halthandle_t get_section_wait_halt() const { return section_wait_halt; }
 
 	/**
 	 * Passing a standing convoi (see convoi_t::is_standing()), whose first tile is route tile start_index.

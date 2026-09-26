@@ -17,6 +17,10 @@
 #                                                  the stock game; default OUT is NAME-122.0.sve
 #   tools/windows/steam-fork.sh export NAME OUT.json
 #                                                  JSON dump of a save (tools/saveviewer)
+#   tools/windows/steam-fork.sh signals FILE.dat [SIZE]
+#                                                  build the fork's makeobj and compile FILE.dat (the
+#                                                  platform signal and station boundary, see
+#                                                  tools/fork-signals) into the pakset folder; SIZE 128
 #
 # Override the locations with STEAM_DIR, SIM_USER_DIR and PAKSET in the environment.
 
@@ -30,6 +34,7 @@ MSYS_BASH="${MSYS_BASH:-/c/msys64/usr/bin/bash.exe}"
 JOBS="${JOBS:-20}"
 
 BUILT="$REPO/build/default/sim.exe"
+MAKEOBJ="$REPO/build/default/makeobj/makeobj.exe"
 STEAM_EXE="$STEAM_DIR/simutrans.exe"
 STOCK_EXE="$STEAM_DIR/simutrans-stock.exe"
 FORK_HASH="$STEAM_DIR/simutrans-fork.sha256"
@@ -142,6 +147,21 @@ do_export() {
 	echo "done: $out ($(du -h "$out" | cut -f1))"
 }
 
+# the fork's makeobj knows is_platformsignal and station_boundary; the objects go into the pakset
+# folder as an add-on, the rest of the pakset stays as Steam installed it
+do_signals() {
+	local dat="${1:-}" size="${2:-128}"
+	[ -n "$dat" ] && [ -f "$dat" ] || die "usage: $0 signals FILE.dat [SIZE]"
+	ensure_config
+	[ -x "$MSYS_BASH" ] || die "MSYS2 not found at $MSYS_BASH (winget install MSYS2.MSYS2)"
+	# makeobj/Makefile adds -march=pentium for mingw, which the 64 bit compiler refuses
+	MSYSTEM=MINGW64 "$MSYS_BASH" -lc "cd '$REPO' && make -j$JOBS makeobj OS_OPT='-DPNG_STATIC -DZLIB_STATIC'"
+	[ -f "$MAKEOBJ" ] || die "build produced no $MAKEOBJ"
+	local dir; dir="$(cd "$(dirname "$dat")" && pwd)"
+	(cd "$dir" && PATH="/c/msys64/mingw64/bin:$PATH" "$MAKEOBJ" "pak$size" "$STEAM_DIR/$PAKSET/" "$(basename "$dat")")
+	echo "done: objects from $dat are in $STEAM_DIR/$PAKSET/"
+}
+
 case "${1:-}" in
 	build)     do_build ;;
 	install)   do_install ;;
@@ -150,5 +170,6 @@ case "${1:-}" in
 	status)    do_status ;;
 	downgrade) shift; do_downgrade "$@" ;;
 	export)    shift; do_export "$@" ;;
-	*)         sed -n '2,20p' "$0"; exit 1 ;;
+	signals)   shift; do_signals "$@" ;;
+	*)         sed -n '2,24p' "$0"; exit 1 ;;
 esac

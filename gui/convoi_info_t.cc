@@ -20,6 +20,7 @@
 #include "../dataobj/loadsave.h"
 #include "../simconvoi.h"
 #include "../simline.h"
+#include "../simhalt.h"
 
 #include "../player/simplay.h"
 
@@ -316,10 +317,26 @@ void convoi_info_t::update_labels()
 	bool latest = false;
 	const convoihandle_t dep_cnv = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
 	const convoihandle_t passing = dep_cnv->get_passing_hold_for();
-	const bool show_departure = passing.is_bound()  ||  dep_cnv->get_planned_departure( slot, latest );
+	const bool section_wait = dep_cnv->get_section_wait()!=convoi_t::SECTION_WAIT_NONE  &&  dep_cnv->is_waiting();
+	const bool show_departure = passing.is_bound()  ||  section_wait  ||  dep_cnv->get_planned_departure( slot, latest );
 	if(  passing.is_bound()  ) {
 		// fork: waiting at the stop for a passing train to go by
 		departure_label.buf().printf( translator::translate("Waiting for %s to pass"), passing->get_name() );
+	}
+	else if(  section_wait  ) {
+		// fork: waiting at a platform signal or station boundary of a single-track line
+		const halthandle_t halt = dep_cnv->get_section_wait_halt();
+		switch(  dep_cnv->get_section_wait()  ) {
+			case convoi_t::SECTION_WAIT_TRACK:
+				departure_label.buf().printf( translator::translate("No free track at %s"), halt.is_bound() ? halt->get_name() : "?" );
+				break;
+			case convoi_t::SECTION_WAIT_ENTRY:
+				departure_label.buf().append( translator::translate("Waiting to enter the station") );
+				break;
+			default:
+				departure_label.buf().append( translator::translate("Waiting for the single track") );
+				break;
+		}
 	}
 	else if(  show_departure  ) {
 		const sint64 now = welt->get_calendar_minutes();
