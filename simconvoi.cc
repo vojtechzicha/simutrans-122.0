@@ -3431,10 +3431,11 @@ station_tile_search_ready: ;
 				uncouple_here();
 			}
 			else {
-				const schedule_entry_t &joined_entry = joined->schedule->get_current_entry();
+				// the joined line's timetable does not hold us (ours decides), but its open slot is used
+				// up as well, unless it belongs to a train of that line that came here first
 				sint64 joined_slot;
-				if(  joined->line.is_bound()  &&  simline_t::get_open_departure_slot( joined_entry, joined_slot )  ) {
-					// its slot is used as well
+				if(  joined->line.is_bound()  &&  joined->schedule->get_current_entry().has_timetable()  &&  welt->has_calendar()
+					&&  joined->line->can_take_departure_slot( joined->self, joined_slot )  ) {
 					joined->line->book_departure_slot( joined->schedule->get_current_stop(), joined_slot );
 				}
 				joined->schedule->advance();
@@ -4787,6 +4788,10 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 		return false;
 	}
 
+	// the trips up to here are paid before the vehicles are moved (the move itself is no trip)
+	P->calc_gewinn();
+	C->calc_gewinn();
+
 	// all their reservations go, the whole row is reserved for the primary below
 	C->unreserve_route();
 	P->unreserve_route();
@@ -4829,6 +4834,9 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 		P->route.append( k );
 	}
 	P->lay_out_on_route();
+	for(  uint8 i=0;  i<P->anz_vehikel;  i++  ) {
+		P->fahr[i]->last_stop_pos = P->fahr[i]->get_pos();
+	}
 	P->alte_richtung = P->fahr[0]->get_direction();
 	P->recalc_traction( false );
 	P->calc_loading();

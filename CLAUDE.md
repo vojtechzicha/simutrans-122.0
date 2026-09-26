@@ -278,7 +278,8 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
 - Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
   become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
   primary's direction (`lay_out_on_route`, the stock reversal code), all tiles reserved for the
-  primary. The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
+  primary. Revenue for the trip in is booked before the move, and moving vehicles count as no
+  trip (`last_stop_pos` is reset). The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
   its vehicles (for its window, finances, save) but the vehicles belong to the primary
   (`coupled_first`, `get_vehicle_owner`, `get_own_vehicle_count`). Fixed costs, goods categories,
   revenue, running costs (and their share of way tolls), distance, average speed and transported
@@ -287,7 +288,8 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   arrival) hold the whole train too.
   At most 255 vehicles together (the vehicle count is a uint8). A primary's load
   (`calc_loading`), sale value (`calc_restwert`) and purchase cost count only its own vehicles. The joined train's schedule follows
-  (`follow_to_stop` on arrival, `advance` on departure, its timetable slot is marked used too).
+  (`follow_to_stop` on arrival, `advance` on departure, its open timetable slot is marked used too, unless a train of that line that came first can take it;
+  the joined line's timetable never holds the coupled train).
 - Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
   or on arrival at a stop the joined train's schedule skips. The joined train goes off the map
   (UNCOUPLING) and remembers the tiles of the whole train (`uncouple_span`); the primary leaves on
