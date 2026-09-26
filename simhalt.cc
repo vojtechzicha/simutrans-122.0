@@ -2082,7 +2082,7 @@ bool haltestelle_t::recall_ware( ware_t& w, uint32 menge )
 
 
 
-void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts)
+void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts, bool only_missed)
 {
 	// first iterate over the next stop, then over the ware
 	// might be a little slower, but ensures that passengers to nearest stop are served first
@@ -2104,7 +2104,7 @@ void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *go
 					}
 
 					// skip empty entries
-					if(tmp.menge==0) {
+					if(tmp.menge==0  ||  (only_missed  &&  !tmp.missed_connection)) {
 						continue;
 					}
 
@@ -2129,6 +2129,7 @@ void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *go
 
 						// not too much?
 						ware_t neu(tmp);
+						neu.missed_connection = 0;
 						if(  tmp.menge > requested_amount  ) {
 							// not all can be loaded
 							neu.menge = requested_amount;
@@ -2156,6 +2157,31 @@ void haltestelle_t::fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *go
 	}
 }
 
+
+
+void haltestelle_t::mark_missed_connection( const goods_desc_t *good_category, const vector_tpl<halthandle_t>& destination_halts )
+{
+	vector_tpl<ware_t> *warray = cargo[good_category->get_catg_index()];
+	if(  warray == NULL  ||  destination_halts.empty()  ) {
+		return;
+	}
+	const bool avoid_overcrowding = welt->get_settings().is_avoid_overcrowding();
+	FOR( vector_tpl<ware_t>, &tmp, *warray ) {
+		if(  tmp.menge==0  ||  tmp.missed_connection  ||  !tmp.get_zwischenziel().is_bound()  ) {
+			continue;
+		}
+		const halthandle_t via = tmp.get_zwischenziel();
+		if(  !destination_halts.is_contained( via )  ) {
+			continue;
+		}
+		if(  avoid_overcrowding  &&  tmp.get_ziel()!=via  &&  via->is_overcrowded( tmp.get_index() )  ) {
+			// would not have boarded anyway (see fetch_goods)
+			continue;
+		}
+		tmp.missed_connection = 1;
+		resort_freight_info = true;
+	}
+}
 
 
 uint32 haltestelle_t::get_ware_summe(const goods_desc_t *wtyp) const

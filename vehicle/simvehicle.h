@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef VEHICLE_SIMVEHICLE_H
-#define VEHICLE_SIMVEHICLE_H
+#ifndef
+#define
 
 
 #include "../simtypes.h"
@@ -386,6 +386,15 @@ public:
 	*/
 	uint16 get_cargo_max() const {return desc->get_capacity(); }
 
+	/// fork: passenger vehicles take standing and overcrowded passengers beyond their seats
+	bool can_carry_crowd() const;
+
+	/// fork: seats plus standing places (1x the seats)
+	uint16 get_standing_max() const;
+
+	/// fork: seats, standing and overcrowded places (4.5x the seats more)
+	uint16 get_overcrowded_max() const;
+
 	const char * get_cargo_mass() const;
 
 	/**
@@ -427,10 +436,11 @@ public:
 	uint16 unload_cargo(halthandle_t halt, bool all, bool any = true );
 
 	/**
-	 * Load freight from halt
+	 * Load freight from halt up to limit (fork: above get_cargo_max() for standing or overcrowded passengers;
+	 * only_missed takes only those who missed a full convoy before)
 	 * @return amount loaded
 	 */
-	uint16 load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts);
+	uint16 load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts, uint16 limit, bool only_missed = false);
 
 	/**
 	* Remove freight that no longer can reach it's destination

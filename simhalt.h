@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMHALT_H
-#define SIMHALT_H
+#ifndef
+#define
 
 
 #include "convoihandle_t.h"
@@ -611,8 +611,15 @@ public:
 	 * @param amount How many units of the cargo we can fetch.
 	 * @param schedule Schedule of the vehicle requesting the fetch.
 	 * @param sp Company that's requesting the fetch.
+	 * @param only_missed fork: only goods that missed a full convoy before (overcrowded passengers)
 	 */
-	void fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts);
+	void fetch_goods( slist_tpl<ware_t> &load, const goods_desc_t *good_category, uint32 requested_amount, const vector_tpl<halthandle_t>& destination_halts, bool only_missed = false);
+
+	/**
+	 * Fork: a full convoy leaves for these next stops; everybody still waiting for them missed it
+	 * and may board the next one as overcrowded passengers.
+	 */
+	void mark_missed_connection( const goods_desc_t *good_category, const vector_tpl<halthandle_t>& destination_halts );
 
 	/**
 	 * Delivers goods (ware_t) to this halt.

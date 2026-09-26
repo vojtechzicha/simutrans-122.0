@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMVERSION_H
-#define SIMVERSION_H
+#ifndef
+#define
 
 
 #if defined(REVISION_FROM_FILE)  &&  !defined(REVISION)
@@ -23,7 +23,7 @@
 
 // Beware: SAVEGAME minor is often ahead of version minor when there were patches.
 // ==> These have no direct connection at all!
-#define SIM_SAVE_MINOR      7
+#define SIM_SAVE_MINOR      8
 #define SIM_SERVER_MINOR    0
 // NOTE: increment before next release to enable save/load of new features
 

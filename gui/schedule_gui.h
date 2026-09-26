@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef GUI_SCHEDULE_GUI_H
-#define GUI_SCHEDULE_GUI_H
+#ifndef
+#define
 
 
 #include "gui_frame.h"
@@ -44,6 +44,9 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	button_t bt_promote_to_line;
 	gui_combobox_t line_selector;
 	gui_label_buf_t lb_waitlevel;
+
+	// passengers standing or overcrowded when the seats are taken (fork), for the whole schedule
+	button_t bt_no_standing, bt_no_overcrowding;
 
 	// always needed
 	button_t bt_add, bt_insert, bt_remove; // stop management
@@ -87,6 +90,9 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 
 	// changes the waiting/loading levels if allowed
 	void update_selection();
+
+	// fork: checkbox states from the schedule
+	void update_crowding_buttons();
 protected:
 	schedule_t *schedule;
 	schedule_t* old_schedule;

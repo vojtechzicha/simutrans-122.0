@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef SIMWARE_H
-#define SIMWARE_H
+#ifndef
+#define
 
 
 #include "halthandle_t.h"
@@ -29,18 +29,24 @@ public:
 	typedef uint32 goods_amount_t;
 
 	// Maximum number of goods per ware package. Limited by the bit field used.
-	static goods_amount_t const GOODS_AMOUNT_LIMIT = (1 << 23) - 1;
+	static goods_amount_t const GOODS_AMOUNT_LIMIT = (1 << 22) - 1;
 
 	/// type of good, used as index into goods-types array
 	uint32 index: 8;
 
 	/// amount of goods
-	goods_amount_t menge : 23;
+	goods_amount_t menge : 22;
 
 	/**
 	 * To indicate that the ware's destination is a factory/consumer store
 	 */
 	uint32 to_factory : 1;
+
+	/**
+	 * Fork: passengers waiting at a stop who could not board a full convoy that left for their next stop.
+	 * Only they may board as overcrowded passengers. Cleared on boarding.
+	 */
+	uint32 missed_connection : 1;
 
 private:
 	/**
@@ -99,6 +105,7 @@ public:
 		return index  == w.index  &&
 			menge == w.menge &&
 			to_factory == w.to_factory &&
+			missed_connection == w.missed_connection &&
 			ziel  == w.ziel  &&
 			zwischenziel == w.zwischenziel &&
 			zielpos == w.zielpos;
@@ -109,7 +116,7 @@ public:
 	// mail and passengers just care about target station
 	// freight needs to obey coordinates (since more than one factory might by connected!)
 	inline bool same_destination(const ware_t &w) const {
-		return index==w.get_index()  &&  ziel==w.get_ziel()  &&  to_factory==w.to_factory  &&  (!to_factory  ||  zielpos==w.get_zielpos());
+		return index==w.get_index()  &&  ziel==w.get_ziel()  &&  to_factory==w.to_factory  &&  missed_connection==w.missed_connection  &&  (!to_factory  ||  zielpos==w.get_zielpos());
 	}
 
 	/**

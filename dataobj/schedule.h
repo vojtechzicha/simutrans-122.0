@@ -3,8 +3,8 @@
  * (see LICENSE.txt)
  */
 
-#ifndef DATAOBJ_SCHEDULE_H
-#define DATAOBJ_SCHEDULE_H
+#ifndef
+#define
 
 
 #include "schedule_entry.h"
@@ -28,6 +28,11 @@ class schedule_t
 	bool  editing_finished;
 	uint8 current_stop;
 
+	/// fork: passenger vehicles take no standing (and so no overcrowded) passengers
+	bool no_standing;
+	/// fork: passenger vehicles take no overcrowded passengers
+	bool no_overcrowding;
+
 	static schedule_entry_t dummy_entry;
 
 	/**
@@ -44,7 +49,7 @@ class schedule_t
 	}
 
 protected:
-	schedule_t() : editing_finished(false), current_stop(0) {}
+	schedule_t() : editing_finished(false), current_stop(0), no_standing(false), no_overcrowding(false) {}
 
 public:
 	enum schedule_type {
@@ -101,6 +106,15 @@ public:
 			current_stop = (current_stop+1)%entries.get_count();
 		}
 	}
+
+	/// fork: passengers may stand once all seats are taken
+	bool allows_standing() const { return !no_standing; }
+	/// fork: passengers who missed a full convoy may overcrowd once all standing places are taken too
+	bool allows_overcrowding() const { return !no_standing  &&  !no_overcrowding; }
+	bool is_no_standing() const { return no_standing; }
+	bool is_no_overcrowding() const { return no_overcrowding; }
+	void set_no_standing( bool b ) { no_standing = b; }
+	void set_no_overcrowding( bool b ) { no_overcrowding = b; }
 
 	inline bool is_editing_finished() const { return editing_finished; }
 	void finish_editing() { editing_finished = true; }

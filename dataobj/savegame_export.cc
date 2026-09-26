@@ -316,6 +316,9 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 	// 122.0 has no bidirectional/mirrored schedules
 	w.kv_null( "bidirectional" );
 	w.kv_null( "mirrored" );
+	// fork: standing and overcrowded passengers
+	w.kv_bool( "no_standing", schedule->is_no_standing() );
+	w.kv_bool( "no_overcrowding", !schedule->allows_overcrowding() );
 	w.array_key( "entries" );
 	FOR( minivec_tpl<schedule_entry_t>, const &entry, schedule->entries ) {
 		w.start_object();

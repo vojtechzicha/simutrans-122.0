@@ -752,18 +752,36 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all, bool unload_a
  * Load freight from halt
  * @return amount loaded
  */
-uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts)
+bool vehicle_t::can_carry_crowd() const
+{
+	return desc->get_freight_type()==goods_manager_t::passengers  &&  desc->get_capacity() > 0;
+}
+
+
+uint16 vehicle_t::get_standing_max() const
+{
+	return (uint16)min( 2 * (uint32)desc->get_capacity(), 65535 );
+}
+
+
+uint16 vehicle_t::get_overcrowded_max() const
+{
+	return (uint16)min( 13 * (uint32)desc->get_capacity() / 2, 65535 );
+}
+
+
+uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts, uint16 limit, bool only_missed)
 {
 	if(  !halt.is_bound()  ||  !halt->gibt_ab(desc->get_freight_type())  ) {
 		return 0;
 	}
 
 	const uint16 total_freight_start = total_freight;
-	const uint16 capacity_left = desc->get_capacity() - total_freight;
+	const uint16 capacity_left = limit > total_freight ? limit - total_freight : 0;
 	if (capacity_left > 0) {
 
 		slist_tpl<ware_t> freight_add;
-		halt->fetch_goods( freight_add, desc->get_freight_type(), capacity_left, destination_halts);
+		halt->fetch_goods( freight_add, desc->get_freight_type(), capacity_left, destination_halts, only_missed );
 
 		if(  freight_add.empty()  ) {
 			// now empty, but usually, we can get it here ...
@@ -1348,6 +1366,15 @@ sint64 vehicle_t::calc_revenue(const koord3d& start, const koord3d& end) const
 
 		// sum up new price
 		value += price;
+	}
+
+	if(  total_freight > desc->get_capacity()  &&  can_carry_crowd()  ) {
+		// fork: standing passengers pay 3/4, overcrowded ones 1/4, shared by all aboard during this hop
+		const sint64 all = total_freight;
+		const sint64 seated = desc->get_capacity();
+		const sint64 standing = all - seated < seated ? all - seated : seated;
+		const sint64 overcrowded = all - seated - standing;
+		value = value * (4*seated + 3*standing + overcrowded) / (4*all);
 	}
 
 	// Rounded value, in cents

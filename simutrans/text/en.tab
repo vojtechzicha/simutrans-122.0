@@ -1627,3 +1627,11 @@ Not allowed while coupled to another train
 %s and %s could not couple at %s (no free track behind the first train). They run separately.
 %s cannot continue after uncoupling at %s: its platform is still occupied.
 %s cannot continue after uncoupling at %s: its platform is still occupied.
+Disable standing
+Disable standing
+Disable overcrowding
+Disable overcrowding
+Passengers do not stand when all seats are taken
+Passengers do not stand when all seats are taken
+Passengers who missed a full vehicle do not overcrowd the next one
+Passengers who missed a full vehicle do not overcrowd the next one

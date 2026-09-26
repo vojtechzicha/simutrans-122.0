@@ -28,6 +28,7 @@ ware_t::ware_t() : ziel(), zwischenziel(), zielpos(-1, -1)
 	menge = 0;
 	index = 0;
 	to_factory = 0;
+	missed_connection = 0;
 }
 
 
@@ -36,6 +37,7 @@ ware_t::ware_t(const goods_desc_t *wtyp) : ziel(), zwischenziel(), zielpos(-1, -
 	menge = 0;
 	index = wtyp->get_index();
 	to_factory = 0;
+	missed_connection = 0;
 }
 
 
@@ -49,7 +51,7 @@ void ware_t::rdwr(loadsave_t *file)
 {
 	sint32 amount = menge;
 	file->rdwr_long(amount);
-	menge = amount;
+	menge = min( max( amount, 0 ), (sint32)GOODS_AMOUNT_LIMIT );
 	if(file->is_version_less(99, 8)) {
 		sint32 max;
 		file->rdwr_long(max);
@@ -62,6 +64,16 @@ void ware_t::rdwr(loadsave_t *file)
 	}
 	else if(  file->is_loading()  ) {
 		to_factory = 0;
+	}
+
+	if(  file->is_version_atleast(122, 8)  ) {
+		// fork: missed a full convoy, may board overcrowded
+		uint8 missed = missed_connection;
+		file->rdwr_byte(missed);
+		missed_connection = missed != 0;
+	}
+	else if(  file->is_loading()  ) {
+		missed_connection = 0;
 	}
 
 	uint8 catg=0;

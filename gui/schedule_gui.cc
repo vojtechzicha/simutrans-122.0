@@ -445,6 +445,22 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		add_component(&line_selector);
 	}
 
+	// standing and overcrowded passengers (fork)
+	add_table(2,1);
+	{
+		bt_no_standing.init( button_t::square_state, "Disable standing" );
+		bt_no_standing.set_tooltip( "Passengers do not stand when all seats are taken" );
+		bt_no_standing.add_listener(this);
+		add_component(&bt_no_standing);
+
+		bt_no_overcrowding.init( button_t::square_state, "Disable overcrowding" );
+		bt_no_overcrowding.set_tooltip( "Passengers who missed a full vehicle do not overcrowd the next one" );
+		bt_no_overcrowding.add_listener(this);
+		add_component(&bt_no_overcrowding);
+	}
+	end_table();
+	update_crowding_buttons();
+
 	// loading level and waiting time
 	add_table(2,2);
 	{
@@ -881,6 +897,14 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 		bt_remove.pressed = true;
 		update_tool( false );
 	}
+	else if(comp == &bt_no_standing) {
+		schedule->set_no_standing( !schedule->is_no_standing() );
+		update_crowding_buttons();
+	}
+	else if(comp == &bt_no_overcrowding) {
+		schedule->set_no_overcrowding( !schedule->is_no_overcrowding() );
+		update_crowding_buttons();
+	}
 	else if(comp == &numimp_load) {
 		if (!schedule->empty()) {
 			schedule->entries[schedule->get_current_stop()].minimum_loading = (uint8)p.i;
@@ -1096,9 +1120,21 @@ void schedule_gui_t::draw(scr_coord pos, scr_size size)
 		cnv->call_convoi_tool( 's', "1" );
 	}
 
+	// a line chosen in the selector brings its own settings
+	update_crowding_buttons();
+
 	// always dirty, to cater for shortening of halt names and change of selections
 	set_dirty();
 	gui_frame_t::draw(pos,size);
+}
+
+
+void schedule_gui_t::update_crowding_buttons()
+{
+	bt_no_standing.pressed = schedule->is_no_standing();
+	// no standing means no overcrowding either
+	bt_no_overcrowding.pressed = !schedule->allows_overcrowding();
+	bt_no_overcrowding.enable( schedule->allows_standing() );
 }
 
 

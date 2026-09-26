@@ -31,6 +31,7 @@
 #include "gui/convoi_detail_t.h"
 #include "boden/grund.h"
 #include "boden/wege/schiene.h" // for railblocks
+#include "bauer/goods_manager.h"
 
 #include "descriptor/citycar_desc.h"
 #include "descriptor/roadsign_desc.h"
@@ -737,7 +738,7 @@ DBG_MESSAGE("convoi_t::finish_rd()","next_stop_index=%d", next_stop_index );
 	}
 	if(  state==LOADING  ) {
 		// the fully the shorter => register again as older convoi
-		wait_lock = 2000-loading_level*20;
+		wait_lock = 2000-min(loading_level,100)*20;
 	}
 	// when saving with open window, this can happen
 	if(  state==EDIT_SCHEDULE  ) {
@@ -3400,8 +3401,10 @@ station_tile_search_ready: ;
 		bool next_depot;          // next stop in schedule will be a depot
 		bool loads, no_load, hold_loading;
 		const schedule_entry_t *entry;
+		const schedule_t *schedule;
 		vector_tpl<halthandle_t> destination_halts;
-		portion_t() : next_depot(false), loads(false), no_load(false), hold_loading(false), entry(NULL) {}
+		portion_t() : next_depot(false), loads(false), no_load(false), hold_loading(false), entry(NULL), schedule(NULL) {}
+		bool may_load() const { return !no_load  &&  loads  &&  !hold_loading  &&  !next_depot; }
 	};
 	portion_t portions[2];
 	convoi_t *const joined = is_coupled_primary() ? coupled_convoi.get_rep() : NULL;
@@ -3411,6 +3414,7 @@ station_tile_search_ready: ;
 		const schedule_t *const sched = c->schedule;
 
 		// stop type (fork): what this entry lets us do
+		pt.schedule = sched;
 		pt.entry = &sched->get_current_entry();
 		pt.loads = pt.entry->loads();
 		pt.no_load = c->no_load;
@@ -3494,11 +3498,11 @@ station_tile_search_ready: ;
 			joined->book( amount, CONVOI_TRANSPORTED_GOODS );
 		}
 
-		if(  !pt.no_load  &&  pt.loads  &&  !pt.hold_loading  &&  !pt.next_depot  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
+		if(  pt.may_load()  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
 			// load if: unloaded something (might go back) or previous non-filled car requested different cargo type
 			if (amount>0  ||  cargo_type_prev==NULL  ||  !cargo_type_prev->is_interchangeable(v->get_cargo_type())) {
 				// load
-				amount += v->load_cargo(halt, pt.destination_halts);
+				amount += v->load_cargo(halt, pt.destination_halts, v->get_cargo_max());
 			}
 			if (v->get_total_cargo() < v->get_cargo_max()) {
 				// not full
@@ -3513,6 +3517,50 @@ station_tile_search_ready: ;
 			changed_loading_level = true;
 		}
 	}
+
+	// fork: standing passengers board once every seat of their part of the train is taken, and
+	// overcrowded ones (only those who missed a full convoy before) once every standing place is taken too;
+	// space_left[portion][layer], layer 0 seats, 1 standing, 2 overcrowded
+	bool has_crowd[2] = { false, false };
+	bool space_left[2][3] = { { false, false, false }, { false, false, false } };
+	for(  unsigned i=0;  i<vehicles_loading;  i++  ) {
+		const vehicle_t *v = fahr[i];
+		const int p = (joined  &&  i>=coupled_first) ? 1 : 0;
+		if(  v->can_carry_crowd()  &&  portions[p].may_load()  ) {
+			has_crowd[p] = true;
+			space_left[p][0] |= v->get_total_cargo() < v->get_cargo_max();
+		}
+	}
+	for(  uint8 layer=1;  layer<=2;  layer++  ) {
+		bool allowed[2];
+		for(  int p=0;  p<2;  p++  ) {
+			allowed[p] = has_crowd[p]  &&  !space_left[p][layer-1]  &&
+				(layer==1 ? portions[p].schedule->allows_standing() : portions[p].schedule->allows_overcrowding());
+		}
+		if(  !allowed[0]  &&  !allowed[1]  ) {
+			continue;
+		}
+		for(  unsigned i=0;  i<vehicles_loading;  i++  ) {
+			vehicle_t *v = fahr[i];
+			const int p = (joined  &&  i>=coupled_first) ? 1 : 0;
+			if(  !allowed[p]  ||  !v->can_carry_crowd()  ) {
+				continue;
+			}
+			const uint16 limit = layer==1 ? v->get_standing_max() : v->get_overcrowded_max();
+			if(  v->get_total_cargo() >= limit  ) {
+				continue;
+			}
+			const uint16 amount = v->load_cargo( halt, portions[p].destination_halts, limit, layer==2 );
+			space_left[p][layer] |= v->get_total_cargo() < limit;
+			if(  amount  ) {
+				time = max( time, (amount*v->get_desc()->get_loading_time()) / max(v->get_cargo_max(), 1) );
+				v->mark_image_dirty(v->get_image(), 0);
+				v->calc_image();
+				changed_loading_level = true;
+			}
+		}
+	}
+
 	freight_info_resort |= changed_loading_level;
 	if(  changed_loading_level  ) {
 		halt->recalc_status();
@@ -3644,11 +3692,19 @@ station_tile_search_ready: ;
 			}
 		}
 
+		// fork: a full train leaves; whoever still waits for its next stops missed it and may overcrowd the next one
+		for(  int p=0;  p<2;  p++  ) {
+			if(  has_crowd[p]  &&  !space_left[p][0]  &&  (!portions[p].schedule->allows_standing()  ||  !space_left[p][1])  ) {
+				halt->mark_missed_connection( goods_manager_t::passengers, portions[p].destination_halts );
+			}
+		}
+
 		calc_speedbonus_kmh();
 
 		// add available capacity after loading(!) to statistics
 		for (unsigned i = 0; i<anz_vehikel; i++) {
-			get_vehicle_owner(i)->book(get_vehikel(i)->get_cargo_max()-get_vehikel(i)->get_total_cargo(), CONVOI_CAPACITY);
+			const vehicle_t *v = get_vehikel(i);
+			get_vehicle_owner(i)->book( v->get_cargo_max() > v->get_total_cargo() ? v->get_cargo_max()-v->get_total_cargo() : 0, CONVOI_CAPACITY);
 		}
 
 		// Advance schedule

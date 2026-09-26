@@ -55,7 +55,8 @@ for the one running behind it, null otherwise) and `coupled_with` (the other con
 only its own vehicles, and the states `coupled` and `uncoupling` are the joined train while it rides
 along and right after it was uncoupled. `running_late` is set for a train that missed its coupling.
 Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
-null) and `couple_max_wait` in calendar minutes.
+null) and `couple_max_wait` in calendar minutes. Schedules have `no_standing` and `no_overcrowding`
+(passenger vehicles take no standing or no overcrowded passengers; no standing implies no overcrowding).
 
 Map draws the whole map extent on a canvas: cities as labeled dots, stops as small squares, and each
 line schedule as a polyline in the color of its type. Drag to pan, use the wheel or the plus and

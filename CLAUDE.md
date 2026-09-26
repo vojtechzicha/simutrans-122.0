@@ -370,6 +370,26 @@ objects come from the pakset repo (`VZ-Signals-rail.pak`, built with the fork's 
 - Known limit: two stations of a section full of trains that all want that section lock (four
   trains, 2+2 tracks); timetable or more tracks.
 
+## Standing and overcrowded passengers (fork feature, savegame 122.8)
+
+A passenger vehicle (`vehicle_t::can_carry_crowd`) takes up to its seats (`get_cargo_max`, stock),
+then standing passengers up to 2x (`get_standing_max`), then overcrowded ones up to 6.5x
+(`get_overcrowded_max`, capped at 65535). `convoi_t::hat_gehalten` loads the seats of all vehicles
+first (stock pass), then standing places of all vehicles once no seat of that part of the train
+(coupling portion) is free, then overcrowded places once no standing place is free. Overcrowded
+places take only waiting packets with `ware_t::missed_connection`: when a passenger train leaves
+with no seat and no standing place free, `haltestelle_t::mark_missed_connection` flags every packet
+still waiting for its next stops (one pass over the stop's passengers, only at departure of a full
+train). The flag takes one bit from `menge` (packet limit now 2^22-1), is part of
+`same_destination` (flagged and unflagged packets do not merge), is cleared on boarding and saved
+with the packet (122.8). Revenue per hop (`vehicle_t::calc_revenue`) is scaled by the load during
+that hop: seats x1, standing x0.75, overcrowded x0.25, shared by everybody aboard. Schedule flags
+`no_standing` / `no_overcrowding` (`schedule_t`, saved 122.8, part of the schedule string as
+`current|type,flags|`, copied to line convoys) are the two checkboxes at the top of the schedule
+dialog; no standing implies no overcrowding. Unchanged: the full-load minimum means seats, loading
+level can go past 100%, line capacity statistics count seats only, the planner ignores it.
+JSON export: `no_standing`, `no_overcrowding` per schedule.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

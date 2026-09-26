@@ -43,6 +43,8 @@ void schedule_t::copy_from(const schedule_t *src)
 		entries.append(i);
 	}
 	set_current_stop( src->get_current_stop() );
+	no_standing = src->no_standing;
+	no_overcrowding = src->no_overcrowding;
 
 	editing_finished = src->is_editing_finished();
 }
@@ -290,6 +292,17 @@ void schedule_t::rdwr(loadsave_t *file)
 			}
 		}
 	}
+	if(  file->is_version_atleast(122, 8)  ) {
+		// fork: standing and overcrowded passengers
+		uint8 flags = (no_standing ? 1 : 0) | (no_overcrowding ? 2 : 0);
+		file->rdwr_byte(flags);
+		no_standing = (flags & 1) != 0;
+		no_overcrowding = (flags & 2) != 0;
+	}
+	else if(  file->is_loading()  ) {
+		no_standing = false;
+		no_overcrowding = false;
+	}
 	if(file->is_loading()) {
 		editing_finished = true;
 	}
@@ -439,7 +452,8 @@ void schedule_t::add_return_way()
 
 void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 {
-	buf.printf("%u|%d|", current_stop, (int)get_type());
+	// fork: the type is followed by the standing/overcrowding flags
+	buf.printf("%u|%d,%d|", current_stop, (int)get_type(), (no_standing ? 1 : 0) | (no_overcrowding ? 2 : 0));
 	FOR(minivec_tpl<schedule_entry_t>, const& i, entries) {
 		buf.printf("%s,%i,%i,%i,%i,%i,%i,%i", i.pos.get_str(), (int)i.minimum_loading, (int)i.waiting_time_shift, (int)i.waiting_time, (int)i.departure_interval, (int)i.departure_offset, (int)i.stop_type, (int)i.extra_offset_count);
 		for(  uint8 k=0;  k<i.extra_offset_count;  k++  ) {
@@ -479,7 +493,15 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		dbg->error( "schedule_t::sscanf_schedule()","schedule has wrong type (%d)! should have been %d.", type, get_type() );
 		return false;
 	}
+	no_standing = false;
+	no_overcrowding = false;
 	while(  *p  &&  *p!='|'  ) {
+		if(  *p==','  ) {
+			// fork: standing/overcrowding flags
+			const int flags = atoi( p+1 );
+			no_standing = (flags & 1) != 0;
+			no_overcrowding = (flags & 2) != 0;
+		}
 		p++;
 	}
 	if(  *p!='|'  ) {
