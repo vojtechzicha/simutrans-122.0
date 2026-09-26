@@ -3265,7 +3265,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 	sint32 enter = -1, end_signal = -1;
 	uint32 scan_from = 1;
 	track_search = 3; // the legs over any track, the tiles are checked below
-	for(  uint8 legs=0;  legs<16;  legs++  ) {
+	for(  uint8 legs=0;  legs<schedule->get_count();  legs++  ) {
 		for(  uint32 i=scan_from;  i<ahead.get_count();  i++  ) {
 			grund_t const* const gr = welt->lookup( ahead[i] );
 			if(  gr==NULL  ) {
@@ -3305,8 +3305,16 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 	}
 	track_search = 0;
 
+	if(  enter<0  &&  end_signal<0  ) {
+		// no end of the section found (no way on, or the schedule never leaves the line): stay red
+		sig->set_state( roadsign_t::rot );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_LINE, halthandle_t() );
+		restart_speed = 0;
+		return false;
+	}
+
 	// the line must be free up to there
-	const uint32 last = enter>=0 ? (uint32)enter : (end_signal>=0 ? (uint32)end_signal : ahead.get_count()-1);
+	const uint32 last = enter>=0 ? (uint32)enter : (uint32)end_signal;
 	for(  uint32 i=1;  i<=last;  i++  ) {
 		grund_t const* const gr = welt->lookup( ahead[i] );
 		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
@@ -3349,7 +3357,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			}
 			const uint16 track_start = get_track_start( path, get_waytype() );
 			if(  track_start>0  ) {
-				cnv->set_claim( path, track_start, stops );
+				cnv->set_claim( path, track_start, stops, schedule->entries[leg_entry].pos );
 			}
 			if(  leg==0  &&  track_start>0  ) {
 				// the current route through the claimed track
@@ -3414,7 +3422,7 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 			}
 			const uint16 track_start = get_track_start( path, get_waytype() );
 			if(  track_start>0  ) {
-				cnv->set_claim( path, track_start, stops );
+				cnv->set_claim( path, track_start, stops, schedule->get_current_entry().pos );
 			}
 			else if(  !route_through( route, next_block, path, stops )  ) {
 				restart_speed = 0;

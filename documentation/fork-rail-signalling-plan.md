@@ -78,7 +78,8 @@ Look ahead along the route and the following schedule stops, as long-block does 
    front (enters station B). For a train that turns at a halt or siding on the line, the
    return leg is followed, so B can be its home station.
    If the line ends in a station without `LT`, the section ends at the first signal that applies
-   (it must stand a train length past the junction).
+   (it must stand a train length past the junction). If neither is found within a whole schedule
+   cycle (no route on, or the schedule never leaves the line) the `P` stays red.
 2. Every tile of the line up to B's `LT` must be free.
 3. Choose a track in B (3.4).
 4. Claim that track (3.5).
@@ -112,8 +113,11 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
 - Stored on the convoy and saved (savegame 122.6), re-reserved after loading.
 - The route to the next stop in B, or through B, goes via the claimed track, not necessarily the
   one clicked in the schedule.
-- Released when the train reaches the track, or when its schedule changes, it goes to a depot or
-  is sold, or its route becomes impossible. A train leaving its own track keeps a claim on it.
+- Released when the train reaches the track, it goes to a depot or is sold, or it finds no route.
+  Every new route re-checks it (the schedule may have been edited): released when the stop whose
+  way enters that station is no longer in the schedule, or the way to it no longer passes the
+  station boundary. A `P` or `LT` of another station drops a stale claim too. A train leaving its
+  own track keeps a claim on it.
 - Choose signals, PR #1 detours and Hold searches see claimed tiles as reserved.
 
 ### 3.6 At halts and on arrival

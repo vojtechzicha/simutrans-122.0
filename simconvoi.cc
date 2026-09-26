@@ -129,6 +129,7 @@ void convoi_t::init(player_t *player)
 	passing_hold_released = false;
 	claim_first = 0;
 	claim_stops = false;
+	claim_stop = koord3d::invalid;
 	section_wait = SECTION_WAIT_NONE;
 	wait_lock = 0;
 	arrived_time = 0;
@@ -265,7 +266,7 @@ bool convoi_t::is_claimed_tile(koord3d pos) const
 }
 
 
-void convoi_t::set_claim(const route_t &path, uint16 first, bool stops)
+void convoi_t::set_claim(const route_t &path, uint16 first, bool stops, koord3d for_stop)
 {
 	release_claim( true );
 	for(  uint32 i=0;  i<path.get_count();  i++  ) {
@@ -273,6 +274,7 @@ void convoi_t::set_claim(const route_t &path, uint16 first, bool stops)
 	}
 	claim_first = first;
 	claim_stops = stops;
+	claim_stop = for_stop;
 	reserve_claim();
 }
 
@@ -317,6 +319,7 @@ void convoi_t::release_claim(bool unreserve)
 	claim_path.clear();
 	claim_first = 0;
 	claim_stops = false;
+	claim_stop = koord3d::invalid;
 }
 
 
@@ -1196,6 +1199,8 @@ bool convoi_t::drive_to()
 			}
 			// wait 25s before next attempt
 			wait_lock = 25000;
+			// fork: no way to the claimed track either
+			release_claim( true );
 		}
 		else {
 			bool route_ok = true;
@@ -1293,9 +1298,23 @@ bool convoi_t::drive_to()
 			if(  route_ok  &&  has_claim()  ) {
 				// fork: the new route may have been reserved over the claimed tiles and freed them
 				reserve_claim();
+				const sint8 via = route_via_claim( route, 0 );
+				bool keep = via > 0;
+				if(  via==0  ) {
+					// not at that station yet: its stop must still be ahead in the schedule, and a way
+					// to that stop must pass the station boundary (the schedule may have been edited)
+					keep = schedule->get_current_entry().pos!=claim_stop;
+					bool in_schedule = false;
+					for(  uint8 i=0;  keep  &&  !in_schedule  &&  i<schedule->get_count();  i++  ) {
+						in_schedule = schedule->entries[i].pos==claim_stop;
+					}
+					keep = keep  &&  in_schedule;
+				}
+				if(  !keep  ) {
+					release_claim( true );
+				}
 			}
-			if(  route_ok  &&  has_claim()  &&  route_via_claim( route, 0 ) < 0  ) {
-				// fork: the claimed track does not lead on to this stop
+			else if(  !route_ok  ) {
 				release_claim( true );
 			}
 			if(  route_ok  ) {
@@ -2767,6 +2786,7 @@ void convoi_t::rdwr(loadsave_t *file)
 		}
 		file->rdwr_short( claim_first );
 		file->rdwr_bool( claim_stops );
+		claim_stop.rdwr( file );
 	}
 
 	if(  file->is_loading()  ) {

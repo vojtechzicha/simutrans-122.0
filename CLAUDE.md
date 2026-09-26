@@ -240,7 +240,7 @@ with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `too
   the PR #1 detour signal count. A `P` acts as a normal signal unless the train leaves the station
   through an `LT` before any other signal: then `is_platform_signal_clear` follows the route and the
   next schedule legs (halts without signals included) to the `LT` of the next station, checks all
-  those tiles free, picks a track there with `find_station_track` (stopping: a stop position of the
+  those tiles free (no end within a schedule cycle: stays red), picks a track there with `find_station_track` (stopping: a stop position of the
   right platform type that leads on to the next stop; passing: a free track up to a `P` from which
   the route goes on; planned track first; searches never pass a signal that applies) and claims it.
 - Station boundary `LT`: sign outside the outermost switch where a single-track line enters a
@@ -249,8 +249,10 @@ with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `too
   briefly. Without a claim it chooses a track there.
 - Claim (`convoi_t::claim_path`, `claim_first`, `claim_stops`, saved 122.6, reserved again in
   `finish_rd`): the path from the `LT` through the chosen track; only its platform tiles are
-  reserved. `drive_to` routes through it (`route_via_claim`), `leave_tile` keeps it on a track the
-  train is leaving, depot/destroy release it, a `P` or `LT` of another station drops a stale one.
+  reserved. `drive_to` routes through it (`route_via_claim`) and releases it when `claim_stop` (the
+  schedule stop entering that station) left the schedule, its way misses the `LT`, or there is no
+  route; `leave_tile` keeps it on a track the train is leaving, depot/destroy release it, a `P` or
+  `LT` of another station drops a stale one.
 - Choose signals: the walk also ends at an `LT` and at a `P` that applies before the stop; then a
   passing train takes any free track up to its `P` (through-choose) instead of the PR #1 detour.
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.

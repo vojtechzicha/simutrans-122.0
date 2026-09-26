@@ -248,6 +248,8 @@ private:
 	vector_tpl<koord3d> claim_path;
 	uint16 claim_first;
 	bool claim_stops;
+	// the schedule stop whose way enters that station (the claim is out of date without it)
+	koord3d claim_stop;
 
 	// fork, rail: why the convoi waits at a platform signal or station boundary (not saved)
 	uint8 section_wait;
@@ -870,8 +872,9 @@ public:
 	bool has_claim() const { return !claim_path.empty(); }
 	koord3d get_claim_boundary() const { return claim_path.empty() ? koord3d::invalid : claim_path[0]; }
 	bool is_claimed_tile(koord3d pos) const;
-	// path: from the station boundary through the track; reserves its tiles from first on
-	void set_claim(const route_t &path, uint16 first, bool stops);
+	// path: from the station boundary through the track; reserves its tiles from first on;
+	// for_stop: the schedule stop whose way enters that station
+	void set_claim(const route_t &path, uint16 first, bool stops, koord3d for_stop);
 	// unreserve: free the claimed tiles (not those under this convoi)
 	void release_claim(bool unreserve);
 	// reserves the claimed tiles again (after loading)
