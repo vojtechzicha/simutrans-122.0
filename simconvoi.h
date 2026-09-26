@@ -489,6 +489,9 @@ private:
 	/// fork, coupling: the joined train's schedule follows the primary to this stop; false if it does not stop here
 	bool follow_to_stop(halthandle_t halt);
 
+	/// fork, coupling: after a schedule change of either train, points the joined train's schedule at the stop the primary is at or goes to
+	void resync_coupled_schedule();
+
 public:
 	/**
 	* Convoi haelt an Haltestelle und setzt quote fuer Fracht

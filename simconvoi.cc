@@ -1551,6 +1551,8 @@ void convoi_t::step()
 
 				set_schedule(schedule);
 				schedule_target = koord3d::invalid;
+				// fork, coupling: the joined train follows to wherever we go now
+				resync_coupled_schedule();
 
 				if(  schedule->empty()  ) {
 					// no entry => no route ...
@@ -4387,6 +4389,14 @@ void convoi_t::check_pending_updates()
 				wait_lock = 0;
 			}
 		}
+
+		// fork, coupling: the joined train keeps following the primary
+		if(  is_coupled_primary()  ) {
+			resync_coupled_schedule();
+		}
+		else if(  state==COUPLED  &&  coupled_convoi.is_bound()  ) {
+			coupled_convoi->resync_coupled_schedule();
+		}
 	}
 }
 
@@ -5232,6 +5242,63 @@ bool convoi_t::follow_to_stop(halthandle_t halt)
 		idx = (idx+1) % count;
 	}
 	return false;
+}
+
+
+void convoi_t::resync_coupled_schedule()
+{
+	if(  !is_coupled_primary()  ) {
+		return;
+	}
+	convoi_t *c = coupled_convoi.get_rep();
+	const uint8 pcount = schedule->get_count();
+	const uint8 ccount = c->schedule->get_count();
+	if(  pcount==0  ||  ccount==0  ) {
+		return;
+	}
+	// the stop we stand at or reach next, over waypoints
+	uint8 pi = schedule->get_current_stop();
+	halthandle_t halt;
+	for(  uint8 k=0;  k<pcount  &&  !halt.is_bound();  k++  ) {
+		halt = haltestelle_t::get_halt( schedule->entries[pi].pos, owner );
+		if(  !halt.is_bound()  ) {
+			const grund_t *gr = welt->lookup( schedule->entries[pi].pos );
+			if(  gr  &&  gr->get_depot()  ) {
+				return;
+			}
+			pi = (pi+1) % pcount;
+		}
+	}
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	const halthandle_t next = next_stop_halt( schedule, pi, owner );
+	if(  !next.is_bound()  ) {
+		return;
+	}
+
+	// the joined train's entry of that stop that goes on to the same next stop, the nearest ahead;
+	// a line edit may have moved its current stop elsewhere, or we left a stop without advancing it.
+	// Without such an entry the schedules part there anyway (on arrival or departure), so leave it.
+	sint16 first_stop = -1, best = -1;
+	uint8 ci = c->schedule->get_current_stop();
+	for(  uint8 n=0;  n<ccount  &&  best<0;  n++,  ci = (ci+1) % ccount  ) {
+		const koord3d pos = c->schedule->entries[ci].pos;
+		const halthandle_t h = haltestelle_t::get_halt( pos, c->owner );
+		if(  first_stop < 0  ) {
+			const grund_t *gr = welt->lookup( pos );
+			if(  h.is_bound()  ||  (gr  &&  gr->get_depot())  ) {
+				first_stop = ci;
+			}
+		}
+		if(  h==halt  &&  next==next_stop_halt( c->schedule, ci, c->owner )  ) {
+			best = ci;
+		}
+	}
+	if(  best >= 0  &&  best != first_stop  ) {
+		DBG_MESSAGE( "convoi_t::resync_coupled_schedule()", "%s: entry %d instead of %d", c->get_name(), best, c->schedule->get_current_stop() );
+		c->schedule->set_current_stop( (uint8)best );
+	}
 }
 
 

@@ -292,7 +292,12 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   At most 255 vehicles together (the vehicle count is a uint8). A primary's load
   (`calc_loading`), sale value (`calc_restwert`) and purchase cost count only its own vehicles. The joined train's schedule follows
   (`follow_to_stop` on arrival, `advance` on departure, its open timetable slot is marked used too, unless a train of that line that came first can take it;
-  the joined line's timetable never holds the coupled train).
+  the joined line's timetable never holds the coupled train). After a schedule change of either
+  train while coupled (a line edit, or the primary's own schedule sending it elsewhere),
+  `resync_coupled_schedule` points the joined train at its entry of the stop the primary is at or
+  goes to that leads on to the same next stop, so only edits that really make the schedules differ
+  part the pair (the stock re-match after a line edit, e.g. with a waypoint inserted in front, could
+  put it on another stop, and it parted on arrival).
 - Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
   or on arrival at a stop the joined train's schedule skips. The joined train goes off the map
   (UNCOUPLING) and remembers the tiles of the whole train (`uncouple_span`); the primary leaves on
