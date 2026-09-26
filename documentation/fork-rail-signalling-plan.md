@@ -99,6 +99,9 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
   planned length + 4 tiles (as the PR #1 detour).
 - Either way the track must lead on (rule 3): from its end there is a way to the next stop that
   starts at a signal applying to the train (for a train that turns in B, the `P` at the other end).
+  The planned track is held to the same rules: it must lead on, and a platform shorter than the
+  train is skipped when the station has one long enough (where none is, the train stops sticking
+  out, as in the stock game).
 - Which tracks a search can reach: Simutrans crossovers and switches can be run in every direction
   (a route may take any exit of a switch tile except straight back), so any train can reach any
   track through the crossovers. Among the free tracks that lead on, the cheapest path wins (planned

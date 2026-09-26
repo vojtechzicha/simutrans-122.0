@@ -3073,6 +3073,34 @@ static uint16 get_track_start(const route_t &path, waytype_t wt)
 }
 
 
+// some platform of this halt holds a train of length tiles (halt tiles in a row along the track)
+static bool has_platform_for(halthandle_t halt, uint16 length, waytype_t wt)
+{
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
+		weg_t const* const way = tile.grund->get_weg( wt );
+		if(  way==NULL  ) {
+			continue;
+		}
+		uint16 run = 1;
+		for(  int r=0;  r<4  &&  run<length;  r++  ) {
+			if(  (way->get_ribi_unmasked() & ribi_t::nsew[r])==0  ) {
+				continue;
+			}
+			const grund_t *gr = tile.grund;
+			grund_t *to;
+			while(  run<length  &&  gr->get_neighbour( to, wt, ribi_t::nsew[r] )  &&  to->get_halt()==halt  ) {
+				run ++;
+				gr = to;
+			}
+		}
+		if(  run >= length  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
 bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path)
 {
 	path.clear();
@@ -3113,6 +3141,18 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			}
 			planned_ok = is_platform_suitable( gr );
 		}
+		if(  planned_ok  &&  tiles>0  &&  has_platform_for( halt, cnv->get_tile_length(), get_waytype() )  ) {
+			// too short, and a platform long enough exists: the train would stand in the throat
+			// (where no platform is long enough, it stops sticking out as in the stock game)
+			planned_ok = false;
+		}
+		if(  planned_ok  &&  next_stop!=koord3d::invalid  ) {
+			// it must lead on to the next stop, like any other track
+			route_t on;
+			track_search = 3;
+			planned_ok = on.calc_route( welt, route->back(), next_stop, this, speed, 0 )!=route_t::no_route;
+			track_search = 0;
+		}
 	}
 	if(  planned_ok  ) {
 		for(  uint32 i=start;  i<=planned_end;  i++  ) {
@@ -3127,7 +3167,8 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	track_search_excluded.clear();
 	const ribi_t::ribi start_dir = ribi_type( route->at(start), route->at(start+1) );
 	bool found = false;
-	for(  uint8 attempt=0;  !found  &&  attempt<6;  attempt++  ) {
+	// every rejected track is excluded, so this ends after at most as many tries as tracks
+	for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
 		route_t candidate;
 		track_search = halt.is_bound() ? 1 : 2;
 		track_search_block = false;
