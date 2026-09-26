@@ -296,8 +296,12 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   train while coupled (a line edit, or the primary's own schedule sending it elsewhere),
   `resync_coupled_schedule` points the joined train at its entry of the stop the primary is at or
   goes to that leads on to the same next stop, so only edits that really make the schedules differ
-  part the pair (the stock re-match after a line edit, e.g. with a waypoint inserted in front, could
-  put it on another stop, and it parted on arrival).
+  part the pair.
+- Line edits (any train): `check_pending_updates` keeps a train's target while that stop is still
+  in the schedule in the same place (the stop before or after it unchanged, waypoints ignored),
+  else goes to the first following stop still there (`find_matching_entry`). The stock scoring
+  compared entries at fixed distances, so e.g. a waypoint inserted at the start while a train went
+  to one of the last stops made it skip that stop.
 - Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
   or on arrival at a stop the joined train's schedule skips. The joined train goes off the map
   (UNCOUPLING) and remembers the tiles of the whole train (`uncouple_span`); the primary leaves on

@@ -449,6 +449,13 @@ private:
 	// matches two halts; if the pos is not identical, maybe the halt still is
 	bool matches_halt( const koord3d pos1, const koord3d pos2 );
 
+	/// fork: helpers to find a convoy's place in its line's changed schedule (check_pending_updates)
+	bool is_stop_entry(const schedule_t *sched, uint8 idx) const;
+	uint8 get_following_stops(const schedule_t *sched, uint8 idx, koord3d *stops, uint8 max) const;
+	koord3d get_previous_stop(const schedule_t *sched, uint8 idx) const;
+	enum { MATCH_IN_PLACE, MATCH_AFTER_REMOVED, MATCH_ANY };
+	int find_matching_entry(const schedule_t *sched, koord3d target, koord3d old_prev, const koord3d *old_next, uint8 old_n, int old_idx, uint8 mode);
+
 	/**
 	 * Register the convoy with the stops in the schedule
 	 */

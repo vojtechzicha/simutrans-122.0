@@ -4261,6 +4261,91 @@ bool convoi_t::matches_halt( const koord3d pos1, const koord3d pos2 )
 }
 
 
+// fork: is this entry a stop (halt or depot), not a waypoint?
+bool convoi_t::is_stop_entry(const schedule_t *sched, uint8 idx) const
+{
+	const koord3d pos = sched->entries[idx].pos;
+	const grund_t *gr = welt->lookup( pos );
+	return haltestelle_t::get_halt( pos, owner ).is_bound()  ||  (gr  &&  gr->get_depot());
+}
+
+
+// fork: up to max stops after entry idx (waypoints skipped); returns how many
+uint8 convoi_t::get_following_stops(const schedule_t *sched, uint8 idx, koord3d *stops, uint8 max) const
+{
+	uint8 n = 0;
+	const uint8 count = sched->get_count();
+	for(  uint8 i=1;  i<count  &&  n<max;  i++  ) {
+		const uint8 j = (idx+i) % count;
+		if(  is_stop_entry( sched, j )  ) {
+			stops[n++] = sched->entries[j].pos;
+		}
+	}
+	return n;
+}
+
+
+// fork: the stop before entry idx (waypoints skipped); invalid if there is none
+koord3d convoi_t::get_previous_stop(const schedule_t *sched, uint8 idx) const
+{
+	const uint8 count = sched->get_count();
+	for(  uint8 i=1;  i<count;  i++  ) {
+		const uint8 j = (idx+count-i) % count;
+		if(  is_stop_entry( sched, j )  ) {
+			return sched->entries[j].pos;
+		}
+	}
+	return koord3d::invalid;
+}
+
+
+// fork: after a line edit, the entry of sched at target (same tile or same halt) whose following
+// stops match old_next best, in order and with stops added or removed in between; nearest to
+// old_idx on a tie; -1 if none. Which entries count: IN_PLACE the stop before it is still old_prev
+// or the stop after it is still old_next[0]; AFTER_REMOVED the stop before it is old_prev; ANY all.
+int convoi_t::find_matching_entry(const schedule_t *sched, koord3d target, koord3d old_prev, const koord3d *old_next, uint8 old_n, int old_idx, uint8 mode)
+{
+	static const int weight[3] = { 4, 2, 1 };
+	const uint8 count = sched->get_count();
+	int best = -1, best_score = -1, best_dist = 0;
+	for(  uint8 i=0;  i<count;  i++  ) {
+		if(  !matches_halt( target, sched->entries[i].pos )  ) {
+			continue;
+		}
+		koord3d next[3];
+		const uint8 n = get_following_stops( sched, i, next, 3 );
+		const koord3d prev = get_previous_stop( sched, i );
+		const bool prev_same = old_prev!=koord3d::invalid  &&  prev!=koord3d::invalid  &&  matches_halt( old_prev, prev );
+		if(  mode==MATCH_IN_PLACE  &&  !prev_same  &&  !(old_n>0  &&  n>0  &&  matches_halt( old_next[0], next[0] ))  ) {
+			continue;
+		}
+		if(  mode==MATCH_AFTER_REMOVED  &&  !prev_same  ) {
+			continue;
+		}
+		// the old following stops in order; each outweighs all later ones, so taking them greedily is best
+		int score = 0;
+		uint8 j = 0;
+		for(  uint8 m=0;  m<old_n;  m++  ) {
+			for(  uint8 t=j;  t<n;  t++  ) {
+				if(  matches_halt( old_next[m], next[t] )  ) {
+					score += weight[m];
+					j = t+1;
+					break;
+				}
+			}
+		}
+		const int d = abs( (int)i - old_idx );
+		const int dist = min( d, count - d );
+		if(  score > best_score  ||  (score == best_score  &&  dist < best_dist)  ) {
+			best = i;
+			best_score = score;
+			best_dist = dist;
+		}
+	}
+	return best;
+}
+
+
 // updates a line schedule and tries to find the best next station to go
 void convoi_t::check_pending_updates()
 {
@@ -4298,46 +4383,32 @@ void convoi_t::check_pending_updates()
 					current = schedule->get_current_entry().pos;
 				}
 
-				/* there could be only one entry that matches best:
-				 * we try first same sequence as in old schedule;
-				 * if not found, we try for same nextnext station
-				 * (To detect also places, where only the platform
-				 *  changed, we also compare the halthandle)
-				 */
-				const koord3d next = schedule->entries[(current_stop+1)%schedule->get_count()].pos;
-				const koord3d nextnext = schedule->entries[(current_stop+2)%schedule->get_count()].pos;
-				const koord3d nextnextnext = schedule->entries[(current_stop+3)%schedule->get_count()].pos;
-				int how_good_matching = 0;
-				const uint8 new_count = new_schedule->get_count();
-
-				for(  uint8 i=0;  i<new_count;  i++  ) {
-					int quality =
-						matches_halt(current,new_schedule->entries[i].pos)*3 +
-						matches_halt(next,new_schedule->entries[(i+1)%new_count].pos)*4 +
-						matches_halt(nextnext,new_schedule->entries[(i+2)%new_count].pos)*2 +
-						matches_halt(nextnextnext,new_schedule->entries[(i+3)%new_count].pos);
-					if(  quality>how_good_matching  ) {
-						// better match than previous: but depending of distance, the next number will be different
-						if(  matches_halt(current,new_schedule->entries[i].pos)  ) {
-							current_stop = i;
-						}
-						else if(  matches_halt(next,new_schedule->entries[(i+1)%new_count].pos)  ) {
-							current_stop = i+1;
-						}
-						else if(  matches_halt(nextnext,new_schedule->entries[(i+2)%new_count].pos)  ) {
-							current_stop = i+2;
-						}
-						else if(  matches_halt(nextnextnext,new_schedule->entries[(i+3)%new_count].pos)  ) {
-							current_stop = i+3;
-						}
-						current_stop %= new_count;
-						how_good_matching = quality;
-					}
+				// fork: our stop stays our stop as long as it is still in the schedule in the same place (the stop
+				// before or after it unchanged). The stock scoring compared entries at fixed distances, so an
+				// edit in front of our entry that also shifted the next few (e.g. a waypoint inserted at the
+				// start while we go to one of the last stops) made us skip a stop that was still there.
+				koord3d old_next[3];
+				const uint8 old_idx = schedule->get_current_stop();
+				const uint8 old_n = get_following_stops( schedule, old_idx, old_next, 3 );
+				const koord3d old_prev = get_previous_stop( schedule, old_idx );
+				int found = find_matching_entry( new_schedule, current, old_prev, old_next, old_n, old_idx, MATCH_IN_PLACE );
+				for(  uint8 k=0;  found<0  &&  k<old_n;  k++  ) {
+					// our stop was removed (with the ones after it up to k): go to the first one still there
+					found = find_matching_entry( new_schedule, old_next[k], old_prev, old_next+k+1, old_n-k-1, old_idx, MATCH_AFTER_REMOVED );
 				}
-
-				if(how_good_matching==0) {
+				// everything around changed: our stop anywhere, else the next one still there
+				if(  found<0  ) {
+					found = find_matching_entry( new_schedule, current, old_prev, old_next, old_n, old_idx, MATCH_ANY );
+				}
+				for(  uint8 k=0;  found<0  &&  k<old_n;  k++  ) {
+					found = find_matching_entry( new_schedule, old_next[k], old_prev, old_next+k+1, old_n-k-1, old_idx, MATCH_ANY );
+				}
+				if(  found<0  ) {
 					// nothing matches => take the one from the line
 					current_stop = new_schedule->get_current_stop();
+				}
+				else {
+					current_stop = found;
 				}
 				// if we go to same, then we do not need route recalculation ...
 				is_same = matches_halt(current,new_schedule->entries[current_stop].pos);
