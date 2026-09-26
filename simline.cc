@@ -118,15 +118,116 @@ waytype_t simline_t::linetype_to_waytype(const linetype lt)
 
 void simline_t::set_schedule(schedule_t* schedule)
 {
+	if(  this->schedule  &&  schedule  &&  schedule != this->schedule  ) {
+		// fork: an edit keeps the used slots and missed couplings of the entries it did not touch
+		keep_slots_across_edit( this->schedule, schedule );
+	}
+	else {
+		last_departure_slot.clear();
+		missed_couplings.clear();
+	}
 	if (this->schedule) {
 		unregister_stops();
 		delete this->schedule;
 	}
 	this->schedule = schedule;
-	// the entries may have moved, so the booked slots are meaningless now
-	last_departure_slot.clear();
-	missed_couplings.clear();
 }
+
+
+// fork: same timetable (interval and all departure offsets)?
+static bool same_timetable(const schedule_entry_t &a, const schedule_entry_t &b)
+{
+	if(  a.departure_interval != b.departure_interval  ) {
+		return false;
+	}
+	uint16 oa[schedule_entry_t::MAX_EXTRA_OFFSETS + 1], ob[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 na = a.get_departure_offsets( oa );
+	const uint8 nb = b.get_departure_offsets( ob );
+	return na == nb  &&  memcmp( oa, ob, na * sizeof(uint16) ) == 0;
+}
+
+
+// fork: same tile, or same halt of this owner
+static bool same_stop(koord3d a, koord3d b, const player_t *owner)
+{
+	if(  a == b  ) {
+		return true;
+	}
+	const halthandle_t h = haltestelle_t::get_halt( a, owner );
+	return h.is_bound()  &&  h == haltestelle_t::get_halt( b, owner );
+}
+
+
+void simline_t::keep_slots_across_edit(const schedule_t *old_schedule, const schedule_t *new_schedule)
+{
+	// which old entry each new entry continues: the longest run of the same stops in the same order
+	// (same tile, or same halt), so entries added, removed or moved elsewhere do not shift the rest
+	const uint32 n = old_schedule->get_count();
+	const uint32 m = new_schedule->get_count();
+	uint16 *len = new uint16[(n+1) * (m+1)];
+	#define LEN(i, j) len[(i) * (m+1) + (j)]
+	for(  uint32 i = n+1;  i-- > 0;  ) {
+		for(  uint32 j = m+1;  j-- > 0;  ) {
+			if(  i == n  ||  j == m  ) {
+				LEN(i, j) = 0;
+			}
+			else if(  same_stop( old_schedule->entries[i].pos, new_schedule->entries[j].pos, player )  ) {
+				LEN(i, j) = LEN(i+1, j+1) + 1;
+			}
+			else {
+				LEN(i, j) = max( LEN(i+1, j), LEN(i, j+1) );
+			}
+		}
+	}
+	vector_tpl<sint16> from( m );
+	for(  uint32 j=0;  j<m;  j++  ) {
+		from.append( -1 );
+	}
+	for(  uint32 i=0, j=0;  i<n  &&  j<m;  ) {
+		if(  same_stop( old_schedule->entries[i].pos, new_schedule->entries[j].pos, player )  &&  LEN(i, j) == LEN(i+1, j+1) + 1  ) {
+			from[j] = i;
+			i++;
+			j++;
+		}
+		else if(  LEN(i+1, j) >= LEN(i, j+1)  ) {
+			i++;
+		}
+		else {
+			j++;
+		}
+	}
+	#undef LEN
+	delete [] len;
+
+	// used slots: kept where the entry stayed and its timetable did not change
+	vector_tpl<sint64> slots( m );
+	for(  uint32 j=0;  j<m;  j++  ) {
+		const sint16 i = from[j];
+		const bool keep = i >= 0  &&  (uint32)i < last_departure_slot.get_count()  &&  same_timetable( old_schedule->entries[i], new_schedule->entries[j] );
+		slots.append( keep ? last_departure_slot[i] : -1 );
+	}
+	last_departure_slot.clear();
+	FOR( vector_tpl<sint64>, const s, slots ) {
+		last_departure_slot.append( s );
+	}
+
+	// missed couplings: follow their entry, dropped with it
+	for(  uint32 k = missed_couplings.get_count();  k-- > 0;  ) {
+		sint16 to = -1;
+		for(  uint32 j=0;  j<m  &&  to<0;  j++  ) {
+			if(  from[j] == missed_couplings[k].entry  ) {
+				to = j;
+			}
+		}
+		if(  to < 0  ) {
+			missed_couplings.remove_at( k );
+		}
+		else {
+			missed_couplings[k].entry = (uint8)to;
+		}
+	}
+}
+
 
 
 /*

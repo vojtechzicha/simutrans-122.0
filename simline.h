@@ -73,20 +73,25 @@ private:
 
 	/**
 	 * Timetable (fork): per schedule entry the calendar minute of the slot a convoy last
-	 * left in, so every slot is used by one convoy only. Cleared with the schedule.
+	 * left in, so every slot is used by one convoy only. A schedule edit keeps it for the entries
+	 * that stayed with the same timetable (keep_slots_across_edit).
 	 */
 	vector_tpl<sint64> last_departure_slot;
 
 	/**
 	 * Coupling (fork): slots a primary train used when it left without the train of this line
 	 * that should have joined it at schedule entry `entry`. The next train of this line reaching
-	 * that entry alone inherits the oldest one and runs late with it. Cleared with the schedule.
+	 * that entry alone inherits the oldest one and runs late with it. A schedule edit keeps them
+	 * for the entries that stayed.
 	 */
 	struct missed_coupling_t {
 		uint8 entry;
 		sint64 slot;
 	};
 	vector_tpl<missed_coupling_t> missed_couplings;
+
+	/// fork: carries last_departure_slot and missed_couplings over to the entries of an edited schedule
+	void keep_slots_across_edit(const schedule_t *old_schedule, const schedule_t *new_schedule);
 
 	/**
 	 * a list of all catg_index, which can be transported by this line.
