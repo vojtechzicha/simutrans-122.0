@@ -384,7 +384,6 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 {
 	schedule = NULL;
 	player   = NULL;
-	couple_table = NULL;
 	if (schedule_) {
 		init(schedule_, player_, cnv_);
 	}
@@ -421,7 +420,6 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		old_line = new_line = cnv->get_line();
 	}
 	old_line_count = 0;
-	couple_table = NULL;
 
 	stats->player = player;
 	stats->schedule = schedule;
@@ -448,35 +446,75 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		add_component(&line_selector);
 	}
 
-	// standing and overcrowded passengers (fork)
-	add_table(2,1);
-	{
-		bt_no_standing.init( button_t::square_state, "Disable standing" );
-		bt_no_standing.set_tooltip( "Passengers do not stand when all seats are taken" );
-		bt_no_standing.add_listener(this);
-		add_component(&bt_no_standing);
+	// settings of the current entry (fork): one tab each, the timetable first
+	add_component(&tabs);
+	// the tab panel has no margin of its own, so the pages get the frame's
+	const scr_size page_margin_tl( D_MARGIN_LEFT, D_V_SPACE );
+	const scr_size page_margin_br( D_MARGIN_RIGHT, D_V_SPACE );
 
-		bt_no_overcrowding.init( button_t::square_state, "Disable overcrowding" );
-		bt_no_overcrowding.set_tooltip( "Passengers who missed a full vehicle do not overcrowd the next one" );
-		bt_no_overcrowding.add_listener(this);
-		add_component(&bt_no_overcrowding);
+	if(  welt->has_calendar()  ) {
+		// timetable: departure slots, 0 = none; four rows (interval, offset, more offsets, window)
+		cont_timetable.set_table_layout(3,4);
+		cont_timetable.set_margin( page_margin_tl, page_margin_br );
+		{
+			cont_timetable.add_component(&lb_interval);
+			numimp_interval.set_width( 84 );
+			numimp_interval.set_value( schedule->get_current_entry().departure_interval );
+			numimp_interval.set_limits( 0, 24*60 );
+			numimp_interval.set_increment_mode( 1 );
+			numimp_interval.add_listener(this);
+			cont_timetable.add_component(&numimp_interval);
+			// room for the widest text, the layout is not recomputed when the value changes
+			lb_interval_fmt.set_min_width( proportional_string_width("= 23h59") );
+			lb_offset_fmt.set_min_width( proportional_string_width("= 23h59") );
+			cont_timetable.add_component(&lb_interval_fmt);
+
+			cont_timetable.add_component(&lb_offset);
+			numimp_offset.set_width( 84 );
+			numimp_offset.set_value( schedule->get_current_entry().departure_offset );
+			numimp_offset.set_limits( 0, 24*60-1 );
+			numimp_offset.set_increment_mode( 1 );
+			numimp_offset.add_listener(this);
+			cont_timetable.add_component(&numimp_offset);
+			cont_timetable.add_component(&lb_offset_fmt);
+
+			// the rare case of several departures per cycle, e.g. "11,31,41" next to offset 1
+			cont_timetable.add_component(&lb_extra);
+			extra_buf[0] = 0;
+			input_extra.set_text( extra_buf, sizeof(extra_buf) );
+			input_extra.set_width( 120 );
+			input_extra.add_listener(this);
+			cont_timetable.add_component(&input_extra, 2);
+
+			// how long a slot stays open; half the gap to the next slot until set by hand
+			cont_timetable.add_component(&lb_window);
+			numimp_window.set_width( 84 );
+			numimp_window.set_value( 0 );
+			numimp_window.set_limits( 0, 24*60-1 );
+			numimp_window.set_increment_mode( 1 );
+			numimp_window.add_listener(this);
+			cont_timetable.add_component(&numimp_window);
+			lb_window_fmt.set_min_width( proportional_string_width("= 23h59 ") + proportional_string_width( translator::translate("(half the gap)") ) );
+			cont_timetable.add_component(&lb_window_fmt);
+		}
+		tabs.add_tab( &cont_timetable, translator::translate("Scheduling") );
 	}
-	end_table();
-	update_crowding_buttons();
 
-	// loading level and waiting time
-	add_table(2,2);
+	// loading level and waiting time, and for the whole schedule standing and overcrowded passengers
+	cont_loading.set_table_layout(3,4);
+	cont_loading.set_margin( page_margin_tl, page_margin_br );
 	{
-		add_component(&lb_load);
+		cont_loading.add_component(&lb_load);
 
 		numimp_load.set_width( 60 );
 		numimp_load.set_value( schedule->get_current_entry().minimum_loading );
 		numimp_load.set_limits( 0, 100 );
 		numimp_load.set_increment_mode( gui_numberinput_t::PROGRESS );
 		numimp_load.add_listener(this);
-		add_component(&numimp_load);
+		cont_loading.add_component(&numimp_load);
+		cont_loading.new_component<gui_empty_t>();
 
-		add_component(&lb_wait);
+		cont_loading.add_component(&lb_wait);
 
 		if(  welt->has_calendar()  ) {
 			// world calendar: waiting time in minutes, 0 = off
@@ -485,10 +523,12 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			numimp_wait.set_limits( 0, welt->get_settings().get_minutes_per_month() );
 			numimp_wait.set_increment_mode( 1 );
 			numimp_wait.add_listener(this);
-			add_component(&numimp_wait);
+			cont_loading.add_component(&numimp_wait);
+			lb_wait_fmt.set_min_width( proportional_string_width("= 23h59") );
+			cont_loading.add_component(&lb_wait_fmt);
 		}
 		else {
-			add_component(&wait_load);
+			cont_loading.add_component(&wait_load);
 			wait_load.add_listener(this);
 
 			wait_load.new_component<gui_waiting_time_item_t>(0);
@@ -496,87 +536,49 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 				wait_load.new_component<gui_waiting_time_item_t>(w);
 			}
 			wait_load.set_rigid(true);
+			cont_loading.new_component<gui_empty_t>();
 		}
+
+		bt_no_standing.init( button_t::square_state, "Disable standing" );
+		bt_no_standing.set_tooltip( "Passengers do not stand when all seats are taken" );
+		bt_no_standing.add_listener(this);
+		cont_loading.add_component(&bt_no_standing, 3);
+
+		bt_no_overcrowding.init( button_t::square_state, "Disable overcrowding" );
+		bt_no_overcrowding.set_tooltip( "Passengers who missed a full vehicle do not overcrowd the next one" );
+		bt_no_overcrowding.add_listener(this);
+		cont_loading.add_component(&bt_no_overcrowding, 3);
 	}
-	end_table();
-
-	if(  welt->has_calendar()  ) {
-		// timetable: departure slots, 0 = none; four rows (interval, offset, more offsets, window)
-		add_table(3,4);
-		{
-			add_component(&lb_interval);
-			numimp_interval.set_width( 84 );
-			numimp_interval.set_value( schedule->get_current_entry().departure_interval );
-			numimp_interval.set_limits( 0, 24*60 );
-			numimp_interval.set_increment_mode( 1 );
-			numimp_interval.add_listener(this);
-			add_component(&numimp_interval);
-			// room for the widest text, the layout is not recomputed when the value changes
-			lb_interval_fmt.set_min_width( proportional_string_width("= 23h59") );
-			lb_offset_fmt.set_min_width( proportional_string_width("= 23h59") );
-			add_component(&lb_interval_fmt);
-
-			add_component(&lb_offset);
-			numimp_offset.set_width( 84 );
-			numimp_offset.set_value( schedule->get_current_entry().departure_offset );
-			numimp_offset.set_limits( 0, 24*60-1 );
-			numimp_offset.set_increment_mode( 1 );
-			numimp_offset.add_listener(this);
-			add_component(&numimp_offset);
-			add_component(&lb_offset_fmt);
-
-			// the rare case of several departures per cycle, e.g. "11,31,41" next to offset 1
-			add_component(&lb_extra);
-			extra_buf[0] = 0;
-			input_extra.set_text( extra_buf, sizeof(extra_buf) );
-			input_extra.set_width( 120 );
-			input_extra.add_listener(this);
-			add_component(&input_extra, 2);
-
-			// how long a slot stays open; half the gap to the next slot until set by hand
-			add_component(&lb_window);
-			numimp_window.set_width( 84 );
-			numimp_window.set_value( 0 );
-			numimp_window.set_limits( 0, 24*60-1 );
-			numimp_window.set_increment_mode( 1 );
-			numimp_window.add_listener(this);
-			add_component(&numimp_window);
-			lb_window_fmt.set_min_width( max( proportional_string_width("= 23h59"), proportional_string_width( translator::translate("(half the gap)") ) ) );
-			add_component(&lb_window_fmt);
-		}
-		end_table();
-	}
+	update_crowding_buttons();
+	tabs.add_tab( &cont_loading, translator::translate("Loading") );
 
 	if(  schedule->allows_hold()  ) {
 		// coupling: a train of this line joins a train of that line here
-		couple_table = add_table(2,2);
+		cont_coupling.set_table_layout(3,2);
+		cont_coupling.set_margin( page_margin_tl, page_margin_br );
 		{
-			add_component(&lb_couple);
+			cont_coupling.add_component(&lb_couple);
 			init_couple_selector();
 			couple_selector.add_listener(this);
-			add_component(&couple_selector);
+			cont_coupling.add_component(&couple_selector, 2);
 
-			add_component(&lb_couple_wait);
+			cont_coupling.add_component(&lb_couple_wait);
 			numimp_couple_wait.set_width( 84 );
 			numimp_couple_wait.set_limits( 0, 24*60 );
 			numimp_couple_wait.set_increment_mode( 1 );
 			numimp_couple_wait.add_listener(this);
-			add_component(&numimp_couple_wait);
+			cont_coupling.add_component(&numimp_couple_wait);
+			lb_couple_wait_fmt.set_min_width( proportional_string_width("= 23h59") );
+			cont_coupling.add_component(&lb_couple_wait_fmt);
 		}
-		end_table();
+		tabs.add_tab( &cont_coupling, translator::translate("Coupling") );
 	}
+	tabs.set_active_tab_index( 0 );
 
-	// return tickets
-	if(  !env_t::hide_rail_return_ticket  ||  schedule->get_waytype()==road_wt  ||  schedule->get_waytype()==air_wt  ||  schedule->get_waytype()==water_wt  ) {
-		//  hide the return ticket on rail stuff, where it causes much trouble
-		bt_return.init(button_t::roundbox, "return ticket");
-		bt_return.set_tooltip("Add stops for backward travel");
-		bt_return.add_listener(this);
-		add_component(&bt_return);
-	}
-
-	// action button row
-	add_table(3,1)->set_force_equal_columns(true);
+	// action button row, with the return tickets where they are offered
+	//  (hidden on rail stuff, where it causes much trouble)
+	const bool show_return = !env_t::hide_rail_return_ticket  ||  schedule->get_waytype()==road_wt  ||  schedule->get_waytype()==air_wt  ||  schedule->get_waytype()==water_wt;
+	add_table(show_return ? 4 : 3, 1)->set_force_equal_columns(true);
 	bt_add.init(button_t::roundbox_state | button_t::flexible, "Add Stop");
 	bt_add.set_tooltip("Appends stops at the end of the schedule");
 	bt_add.add_listener(this);
@@ -594,6 +596,13 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	bt_remove.add_listener(this);
 	bt_remove.pressed = false;
 	add_component(&bt_remove);
+
+	if(  show_return  ) {
+		bt_return.init(button_t::roundbox | button_t::flexible, "return ticket");
+		bt_return.set_tooltip("Add stops for backward travel");
+		bt_return.add_listener(this);
+		add_component(&bt_return);
+	}
 	end_table();
 
 	scrolly.set_show_scroll_x(true);
@@ -677,6 +686,21 @@ void schedule_gui_t::read_extra_offsets()
 }
 
 
+void schedule_gui_t::show_minutes(gui_label_minw_t &lb, uint16 minutes, bool shown, bool enabled, const char *suffix)
+{
+	lb.buf().clear();
+	if(  shown  ) {
+		lb.buf().append("= ");
+		schedule_t::append_minutes( lb.buf(), minutes );
+		if(  suffix  ) {
+			lb.buf().printf( " %s", suffix );
+		}
+	}
+	lb.update();
+	lb.set_color( enabled ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+}
+
+
 void schedule_gui_t::init_couple_selector()
 {
 	couple_selector.clear_elements();
@@ -734,28 +758,13 @@ void schedule_gui_t::update_selection()
 			numimp_offset.set_limits( 0, entry.departure_interval > 0 ? entry.departure_interval - 1 : 0 );
 			numimp_offset.set_value( entry.departure_offset );
 			// long intervals read better as hours
-			lb_interval_fmt.buf().append("= ");
-			schedule_t::append_minutes( lb_interval_fmt.buf(), entry.departure_interval );
-			lb_interval_fmt.update();
-			lb_offset_fmt.buf().append("= ");
-			schedule_t::append_minutes( lb_offset_fmt.buf(), entry.departure_offset );
-			lb_offset_fmt.update();
-			lb_interval_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
-			lb_offset_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			show_minutes( lb_interval_fmt, entry.departure_interval, true, entry.departure_interval > 0  &&  has_line() );
+			show_minutes( lb_offset_fmt, entry.departure_offset, true, entry.departure_interval > 0  &&  has_line() );
 			numimp_window.set_limits( 0, entry.departure_interval > 1 ? entry.departure_interval - 1 : 0 );
 			numimp_window.set_value( entry.has_departure_window() ? entry.departure_window : entry.get_auto_departure_window() );
-			if(  entry.departure_interval == 0  ) {
-				lb_window_fmt.buf().clear();
-			}
-			else if(  entry.has_departure_window()  ) {
-				lb_window_fmt.buf().append("= ");
-				schedule_t::append_minutes( lb_window_fmt.buf(), entry.departure_window );
-			}
-			else {
-				lb_window_fmt.buf().append( translator::translate("(half the gap)") );
-			}
-			lb_window_fmt.update();
-			lb_window_fmt.set_color( entry.departure_interval > 0  &&  has_line() ? SYSCOL_TEXT : SYSCOL_BUTTON_TEXT_DISABLED );
+			// until set by hand the window follows the timetable: half the gap to the next slot
+			const bool auto_window = entry.departure_interval > 0  &&  !entry.has_departure_window();
+			show_minutes( lb_window_fmt, numimp_window.get_value(), true, entry.departure_interval > 1  &&  has_line(), auto_window ? translator::translate("(half the gap)") : NULL );
 			show_extra_offsets( entry );
 			if(  has_line()  ) {
 				lb_interval.set_color( SYSCOL_TEXT );
@@ -787,6 +796,7 @@ void schedule_gui_t::update_selection()
 				}
 			}
 			numimp_wait.set_value( wait_minutes );
+			show_minutes( lb_wait_fmt, wait_minutes, true, wait_minutes > 0  &&  entry.loads() );
 
 			for(int i=0; i<wait_load.count_elements(); i++) {
 				if (gui_waiting_time_item_t *item = dynamic_cast<gui_waiting_time_item_t*>( wait_load.get_element(i) ) ) {
@@ -808,6 +818,7 @@ void schedule_gui_t::update_selection()
 			}
 			couple_selector.set_selection( couple_sel );
 			numimp_couple_wait.set_value( entry.couple_max_wait );
+			show_minutes( lb_couple_wait_fmt, entry.couple_max_wait, entry.has_coupling(), entry.has_coupling()  &&  welt->has_calendar() );
 			lb_couple.set_color( SYSCOL_TEXT );
 			couple_selector.enable();
 			if(  entry.has_coupling()  &&  welt->has_calendar()  ) {
@@ -837,6 +848,8 @@ void schedule_gui_t::update_selection()
 			lb_interval_fmt.update();
 			lb_offset_fmt.buf().clear();
 			lb_offset_fmt.update();
+			show_minutes( lb_wait_fmt, 0, false, false );
+			show_minutes( lb_couple_wait_fmt, 0, false, false );
 			extra_buf[0] = 0;
 		}
 	}
@@ -848,8 +861,8 @@ void schedule_gui_t::update_selection()
  */
 bool schedule_gui_t::infowin_event(const event_t *ev)
 {
-	// couple_selector sits in its own table, so its position is relative to that table
-	const scr_coord couple_off = couple_table ? couple_table->get_pos() : scr_coord(0,0);
+	// couple_selector sits on a tab page, so its position is relative to that page
+	const scr_coord couple_off = tabs.get_pos() + cont_coupling.get_pos();
 	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  &&  !couple_selector.getroffen(ev->cx-couple_off.x, ev->cy-D_TITLEBAR_HEIGHT-couple_off.y)  )  {
 
 		// close combo box; we must do it ourselves, since the box does not receive outside events ...

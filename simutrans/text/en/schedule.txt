@@ -16,6 +16,12 @@ When <strong>Schedule Controls</strong> is opened from Convoy Information the as
 Click on name-box and type new name to change name of Line.
 </p>
 <p>
+The settings of the selected Stop sit in tabs above the list, which always stays visible:
+<em>Scheduling</em> (departures every so many minutes, only with the world calendar; shown first),
+<em>Loading</em> (Wait For, the longest wait, and whether passengers may stand or overcrowd, which holds for the whole Schedule)
+and <em>Coupling</em> (rail only: the Line whose train this one joins here). Next to every input in minutes the same time is shown in hours and minutes.
+</p>
+<p>
 <em>Wait For:</em> sets the minimum quantity of goods and passengers required by a <a href="convoiinfo.txt">Convoy</a> to proceed.
 The percentage figure refers to the total capacity of the Convoy and not an indiviual type of item carried.<br>
 A Convoy will wait at Stop until required percentage is on board.<br>

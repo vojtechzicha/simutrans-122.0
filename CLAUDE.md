@@ -134,7 +134,11 @@ when set (savegame 122.9, `WINDOW_AUTO` = half the gap, `is_slot_open`; e.g. S6a
 but 30 apart need 15). The dialog keeps the single offset input and adds an "Also at (min)" text
 field for the extras and a "Leave up to (min late)" row that shows the automatic value with "(half
 the gap)" until set; changing the interval resets it to automatic. The entry list shows a set
-window as `[1h+30' late 15']`, the export as `departure_window` (null = automatic). A convoy leaves only when its loading rules are met (minimum load or
+window as `[1h+30' late 15']`, the export as `departure_window` (null = automatic).
+The schedule dialog (convoy and line) keeps the current entry's settings in tabs above the always
+visible entry list: Scheduling (timetable, calendar only, the default), Loading (full load, wait
+time and the crowding checkboxes of the whole schedule), Coupling (rail only); the return ticket
+button sits in the Add/Insert/Remove row. Every minute input has a "= 1h30" label (`show_minutes`). A convoy leaves only when its loading rules are met (minimum load or
 maximum wait, unchanged) and a slot is open that no other convoy of the line used at that entry
 (`simline_t::take_departure_slot`, `last_departure_slot` saved with the line; a schedule edit
 keeps it, and the missed couplings, for the entries that stayed: `keep_slots_across_edit` matches
@@ -446,8 +450,8 @@ train). The flag takes one bit from `menge` (packet limit now 2^22-1), is part o
 with the packet (122.8). Revenue per hop (`vehicle_t::calc_revenue`) is scaled by the load during
 that hop: seats x1, standing x0.75, overcrowded x0.25, shared by everybody aboard. Schedule flags
 `no_standing` / `no_overcrowding` (`schedule_t`, saved 122.8, part of the schedule string as
-`current|type,flags|`, copied to line convoys) are the two checkboxes at the top of the schedule
-dialog; no standing implies no overcrowding. Unchanged: the full-load minimum means seats, loading
+`current|type,flags|`, copied to line convoys) are the two checkboxes on the Loading tab of the
+schedule dialog; no standing implies no overcrowding. Unchanged: the full-load minimum means seats, loading
 level can go past 100%, line capacity statistics count seats only, the planner ignores it.
 JSON export: `no_standing`, `no_overcrowding` per schedule.
 UI: the convoy window shows "Seats x/y, standing x/y, overcrowded x/y" (own vehicles only, "no
