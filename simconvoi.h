@@ -472,8 +472,9 @@ private:
 	 * Puts the whole train on the start of its route and drives it on until it is completely on
 	 * the track (the vehicles are placed without hopping). Returns true if the route was too
 	 * short for that, i.e. the train is at its destination already.
+	 * fork: front_to_end drives the front to the end of the route instead, the rest closely behind it
 	 */
-	bool lay_out_on_route();
+	bool lay_out_on_route(bool front_to_end = false);
 
 	/// fork, coupling: the tiles under the vehicles, rear to front
 	void get_train_tiles(vector_tpl<koord3d> &tiles) const;

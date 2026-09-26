@@ -286,7 +286,7 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   without the calendar) because its platform stays occupied (`uncouple_since`, not saved).
 - Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
   become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
-  primary's direction (`lay_out_on_route`, the stock reversal code), all tiles reserved for the
+  primary's direction (`lay_out_on_route( true )`: the front stays where the front train stood, halfway through its tile heading north or west as `hop()` stops it, the rest packed behind; the stock reversal code packs from the rear instead), all tiles reserved for the
   primary. Revenue for the trip in is booked before the move, and moving vehicles count as no
   trip (`last_stop_pos` is reset). The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
   its vehicles (for its window, finances, save) but the vehicles belong to the primary

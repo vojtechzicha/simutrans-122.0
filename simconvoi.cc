@@ -2416,7 +2416,7 @@ bool convoi_t::can_go_alte_richtung()
 
 
 // put the convoi on its way
-bool convoi_t::lay_out_on_route()
+bool convoi_t::lay_out_on_route(bool front_to_end)
 {
 	bool at_dest = false;
 	// start route from the beginning at index 0, place everything on start
@@ -2440,10 +2440,22 @@ bool convoi_t::lay_out_on_route()
 		train_length += 1;
 	}
 	train_length = max(1,train_length);
+	uint32 dist = VEHICLE_STEPS_PER_CARUNIT*train_length<<YARDS_PER_VEHICLE_STEP_SHIFT;
+	if(  front_to_end  ) {
+		// fork: the front where a train driving to the end of the route stops: at the end of the last
+		// tile, or halfway through it heading north or west (as vehicle_t::hop() does for the leader)
+		fahr[0]->set_leading(false);
+		dist = fahr[0]->do_drive( (route.get_count()+1) * VEHICLE_STEPS_PER_TILE << YARDS_PER_VEHICLE_STEP_SHIFT );
+		const ribi_t::ribi dir = fahr[0]->get_direction();
+		if(  dir==ribi_t::north  ||  dir==ribi_t::west  ) {
+			const uint32 steps = fahr[0]->get_steps();
+			dist -= (steps - (steps/2+1)) << YARDS_PER_VEHICLE_STEP_SHIFT;
+		}
+		move_to(0);
+	}
 
 	// now advance all convoi until it is completely on the track
 	fahr[0]->set_leading(false); // switches off signal checks ...
-	uint32 dist = VEHICLE_STEPS_PER_CARUNIT*train_length<<YARDS_PER_VEHICLE_STEP_SHIFT;
 	for(unsigned i=0; i<anz_vehikel; i++) {
 		vehicle_t* v = fahr[i];
 
@@ -5196,7 +5208,8 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 	FOR( vector_tpl<koord3d>, const k, chain ) {
 		P->route.append( k );
 	}
-	P->lay_out_on_route();
+	// the front stays at the end of the row, where the train at the front stood (not packed from the rear)
+	P->lay_out_on_route( true );
 	for(  uint8 i=0;  i<P->anz_vehikel;  i++  ) {
 		P->fahr[i]->last_stop_pos = P->fahr[i]->get_pos();
 	}
