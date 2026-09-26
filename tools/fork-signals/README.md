@@ -26,6 +26,13 @@ station_boundary=1
 Image[0..3]=...     like the end-of-choose sign: N,S,W,E
 ```
 
+Image order matters for the station boundary. A signal shows the image of the direction it applies
+to, but a roadsign shows the image of its stored ribi, which is the opposite direction. So the
+station boundary's `Image[N]` must show the board as the southbound train sees it, and so on. A sheet
+drawn like the signal sheets (column = the direction it applies to) needs N/S and W/E swapped in the
+dat, otherwise every LT that looks right applies to the trains leaving the station and the
+single-track section is never protected. The pak128.cs set's `build.py` does that swap.
+
 The fastest way to real art is to copy the dat entry of an existing signal and of the end-of-choose
 sign in the pakset, give them new names and add the flag line. The pak node format is unchanged, so
 the stock game still reads the objects: the platform signal as a plain one-way signal, the station
