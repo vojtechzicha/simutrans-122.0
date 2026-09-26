@@ -92,6 +92,14 @@ private:
 
 	gui_button_to_chart_array_t button_to_chart;
 
+	// fork, coupling: the other train of a coupled pair, in the top part and in the freight tab
+	gui_aligned_container_t container_coupled;
+	button_t coupled_button;
+	gui_label_buf_t coupled_name_label, coupled_line_label, coupled_part_label, coupled_load_label, coupled_freight_label;
+	cbuffer_t freight_info_coupled;
+	gui_textarea_t text_coupled;
+	convoihandle_t shown_partner;
+
 	void init(convoihandle_t cnv);
 public:
 	convoi_info_t(convoihandle_t cnv = convoihandle_t());

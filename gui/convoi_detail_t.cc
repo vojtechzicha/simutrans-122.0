@@ -229,8 +229,17 @@ void convoi_detail_t::init(convoihandle_t cnv)
 	const sint32 cnv_kmh = (cnv->front()->get_waytype() == air_wt) ? speed_to_kmh(cnv->get_min_top_speed()) : cnv->get_speedbonus_kmh();
 
 	container.set_table_layout(1,0);
-	for(unsigned veh=0;  veh<cnv->get_vehicle_count(); veh++ ) {
-		vehicle_t *v = cnv->get_vehikel(veh);
+	// fork, coupling: a coupled pair lists the whole train, front first, with a heading per train
+	const convoihandle_t train = get_train();
+	const bool pair = train->is_coupled_primary();
+	for(unsigned veh=0;  veh<train->get_vehicle_count(); veh++ ) {
+		if(  pair  &&  (veh==0  ||  veh==train->get_coupled_first())  ) {
+			const convoihandle_t part = veh==0 ? train : train->get_coupled_convoi();
+			gui_label_buf_t *lb = container.new_component<gui_label_buf_t>( part==cnv ? SYSCOL_TEXT_HIGHLIGHT : SYSCOL_TEXT );
+			lb->buf().printf( translator::translate( part==cnv ? "This train: %s" : "Coupled train: %s" ), part->get_name() );
+			lb->update();
+		}
+		vehicle_t *v = train->get_vehikel(veh);
 		container.new_component<gui_vehicleinfo_t>(v, cnv_kmh);
 		container.new_component<gui_divider_t>();
 		shown_vehicles.append( v );
@@ -239,11 +248,18 @@ void convoi_detail_t::init(convoihandle_t cnv)
 }
 
 
+convoihandle_t convoi_detail_t::get_train() const
+{
+	return cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
+}
+
+
 bool convoi_detail_t::update_vehicles()
 {
-	bool changed = shown_vehicles.get_count() != cnv->get_vehicle_count();
+	const convoihandle_t train = get_train();
+	bool changed = shown_vehicles.get_count() != train->get_vehicle_count();
 	for(  uint32 i=0;  !changed  &&  i<shown_vehicles.get_count();  i++  ) {
-		changed = shown_vehicles[i] != cnv->get_vehikel(i);
+		changed = shown_vehicles[i] != train->get_vehikel(i);
 	}
 	if(  changed  ) {
 		// the rows hold vehicle pointers, which may belong to another convoy or be gone by now

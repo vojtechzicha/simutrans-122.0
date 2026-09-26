@@ -1613,10 +1613,22 @@ Wait for it (min)
 Wait for it (min)
 <no coupling>
 <no coupling>
-Coupled to %s
-Coupled to %s
-Coupled with %s
-Coupled with %s
+Coupled to %s (in front)
+Coupled to %s (in front)
+Coupled with %s (behind)
+Coupled with %s (behind)
+Open the window of the coupled train
+Open the window of the coupled train
+Uncouples at %s
+Uncouples at %s
+Stays coupled
+Stays coupled
+Loaded: %d%%
+Loaded: %d%%
+Coupled train: %s
+Coupled train: %s
+This train: %s
+This train: %s
 Uncoupled, waiting for the platform
 Uncoupled, waiting for the platform
 Waiting for the train to couple with

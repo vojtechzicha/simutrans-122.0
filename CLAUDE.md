@@ -308,11 +308,18 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   slot lies ahead again or it couples; spare time at the branch terminus recovers it.
 - Other: depot entry of a coupled primary takes both trains in as two convoys; deleting either
   train keeps the other (a deleted primary leaves the joined train standing where it is); the joined
-  train's schedule window is refused while coupled; the convoy window shows "Coupled to/with",
+  train's schedule window is refused while coupled; the convoy window shows
   "Uncoupled, waiting for the platform", waiting for the partner, "Running late"; the departure
   board lists the joined train's destination with the primary's time; JSON export `coupling`,
   `coupled_with`, `running_late` per convoy (each lists only its own vehicles) and `couple_line_id`,
   `couple_max_wait` per schedule entry.
+- Convoy window of either train while coupled: a panel under the destination names the other
+  train (in front/behind, button opens its window, names cut to 48 characters), its line, where
+  the two part (`convoi_t::get_uncouple_halt`, the laden()/follow_to_stop() rules played forward
+  over both schedules; "Stays coupled" if they never part) and its load. The Freight tab lists
+  this train's freight, then the other's (`build_freight_info`, uncached, since the other train's
+  own window uses its cache; `get_freight_info` counts own vehicles only). Vehicle Details lists
+  the whole train front first with a heading per part ("This train:", "Coupled train:").
 - Saved (122.6): the entry fields, both handles, `coupled_first`, `handover_to`, the span, the wait
   and late state, the line's missed slots. The primary saves its own vehicles and the joined train
   its own; `finish_rd` of the primary joins them again. `-saveversion 0.122.0` writes a joined

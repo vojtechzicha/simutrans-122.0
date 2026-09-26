@@ -3133,69 +3133,77 @@ void convoi_t::get_freight_info(cbuffer_t & buf)
 {
 	if(freight_info_resort) {
 		freight_info_resort = false;
-		// rebuilt the list with goods ...
-		vector_tpl<ware_t> total_fracht;
-
-		size_t const n = goods_manager_t::get_count();
-		ALLOCA(uint32, max_loaded_waren, n);
-		MEMZERON(max_loaded_waren, n);
-
-		for(  uint32 i = 0;  i != anz_vehikel;  ++i  ) {
-			const vehicle_t* v = fahr[i];
-
-			// first add to capacity indicator
-			const goods_desc_t* ware_desc = v->get_desc()->get_freight_type();
-			const uint16 menge = v->get_desc()->get_capacity();
-			if(menge>0  &&  ware_desc!=goods_manager_t::none) {
-				max_loaded_waren[ware_desc->get_index()] += menge;
-			}
-
-			// then add the actual load
-			FOR(slist_tpl<ware_t>, ware, v->get_cargo()) {
-				FOR(vector_tpl<ware_t>, & tmp, total_fracht) {
-					// could this be joined with existing freight?
-
-					// for pax: join according next stop
-					// for all others we *must* use target coordinates
-					if( ware.same_destination(tmp) ) {
-						tmp.menge += ware.menge;
-						ware.menge = 0;
-						break;
-					}
-				}
-
-				// if != 0 we could not join it to existing => load it
-				if(ware.menge != 0) {
-					total_fracht.append(ware);
-				}
-			}
-
-			INT_CHECK("simconvoi 2643");
-		}
-		buf.clear();
-
-		// apend info on total capacity
-		slist_tpl <ware_t>capacity;
-		for (size_t i = 0; i != n; ++i) {
-			if(max_loaded_waren[i]>0  &&  i!=goods_manager_t::INDEX_NONE) {
-				ware_t ware(goods_manager_t::get_info(i));
-				ware.menge = max_loaded_waren[i];
-				// append to category?
-				slist_tpl<ware_t>::iterator j   = capacity.begin();
-				slist_tpl<ware_t>::iterator end = capacity.end();
-				while (j != end && j->get_desc()->get_catg_index() < ware.get_desc()->get_catg_index()) ++j;
-				if (j != end && j->get_desc()->get_catg_index() == ware.get_desc()->get_catg_index()) {
-					j->menge += max_loaded_waren[i];
-				} else {
-					// not yet there
-					capacity.insert(j, ware);
-				}
-			}
-		}
-
-		// show new info
-		freight_list_sorter_t::sort_freight(total_fracht, buf, (freight_list_sorter_t::sort_mode_t)freight_info_order, &capacity, "loaded");
+		build_freight_info( buf, freight_info_order );
 	}
+}
+
+
+// fork: always builds the list, e.g. for the window of the train coupled to this one
+void convoi_t::build_freight_info(cbuffer_t & buf, uint8 sort_order) const
+{
+	// rebuilt the list with goods ...
+	vector_tpl<ware_t> total_fracht;
+
+	size_t const n = goods_manager_t::get_count();
+	ALLOCA(uint32, max_loaded_waren, n);
+	MEMZERON(max_loaded_waren, n);
+
+	// fork, coupling: a primary lists its own vehicles, the joined train its own
+	for(  uint32 i = 0;  i != get_own_vehicle_count();  ++i  ) {
+		const vehicle_t* v = fahr[i];
+
+		// first add to capacity indicator
+		const goods_desc_t* ware_desc = v->get_desc()->get_freight_type();
+		const uint16 menge = v->get_desc()->get_capacity();
+		if(menge>0  &&  ware_desc!=goods_manager_t::none) {
+			max_loaded_waren[ware_desc->get_index()] += menge;
+		}
+
+		// then add the actual load
+		FOR(slist_tpl<ware_t>, ware, v->get_cargo()) {
+			FOR(vector_tpl<ware_t>, & tmp, total_fracht) {
+				// could this be joined with existing freight?
+
+				// for pax: join according next stop
+				// for all others we *must* use target coordinates
+				if( ware.same_destination(tmp) ) {
+					tmp.menge += ware.menge;
+					ware.menge = 0;
+					break;
+				}
+			}
+
+			// if != 0 we could not join it to existing => load it
+			if(ware.menge != 0) {
+				total_fracht.append(ware);
+			}
+		}
+
+		INT_CHECK("simconvoi 2643");
+	}
+	buf.clear();
+
+	// apend info on total capacity
+	slist_tpl <ware_t>capacity;
+	for (size_t i = 0; i != n; ++i) {
+		if(max_loaded_waren[i]>0  &&  i!=goods_manager_t::INDEX_NONE) {
+			ware_t ware(goods_manager_t::get_info(i));
+			ware.menge = max_loaded_waren[i];
+			// append to category?
+			slist_tpl<ware_t>::iterator j   = capacity.begin();
+			slist_tpl<ware_t>::iterator end = capacity.end();
+			while (j != end && j->get_desc()->get_catg_index() < ware.get_desc()->get_catg_index()) ++j;
+			if (j != end && j->get_desc()->get_catg_index() == ware.get_desc()->get_catg_index()) {
+				j->menge += max_loaded_waren[i];
+			} else {
+				// not yet there
+				capacity.insert(j, ware);
+			}
+		}
+	}
+
+	// show new info
+	freight_list_sorter_t::sort_freight(total_fracht, buf, (freight_list_sorter_t::sort_mode_t)sort_order, &capacity, "loaded");
 }
 
 
@@ -5141,6 +5149,66 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 
 	DBG_MESSAGE( "convoi_t::couple()", "%s joined %s", C->get_name(), P->get_name() );
 	return true;
+}
+
+
+halthandle_t convoi_t::get_uncouple_halt() const
+{
+	// the rules of laden() (next stops differ) and follow_to_stop() (joined train does not stop there),
+	// played forward over both schedules
+	if(  !is_coupled_primary()  ) {
+		return halthandle_t();
+	}
+	const convoi_t *c = coupled_convoi.get_rep();
+	const uint8 pcount = schedule->get_count();
+	const uint8 ccount = c->schedule->get_count();
+	if(  pcount==0  ||  ccount==0  ) {
+		return halthandle_t();
+	}
+	uint8 pi = schedule->get_current_stop();
+	uint8 ci = c->schedule->get_current_stop();
+	for(  uint16 n=0;  n<2*(uint16)pcount+2;  n++  ) {
+		// the stop we reach next, over waypoints
+		halthandle_t halt;
+		for(  uint8 k=0;  k<pcount  &&  !halt.is_bound();  k++  ) {
+			halt = haltestelle_t::get_halt( schedule->entries[pi].pos, owner );
+			if(  !halt.is_bound()  ) {
+				const grund_t *gr = welt->lookup( schedule->entries[pi].pos );
+				if(  gr  &&  gr->get_depot()  ) {
+					return halthandle_t();
+				}
+				pi = (pi+1) % pcount;
+			}
+		}
+		if(  !halt.is_bound()  ) {
+			return halt;
+		}
+		// the joined train follows over waypoints only
+		bool follows = false;
+		for(  uint8 k=0;  k<ccount;  k++  ) {
+			const koord3d pos = c->schedule->entries[ci].pos;
+			const halthandle_t h = haltestelle_t::get_halt( pos, c->owner );
+			if(  h==halt  ) {
+				follows = true;
+				break;
+			}
+			const grund_t *gr = welt->lookup( pos );
+			if(  h.is_bound()  ||  (gr  &&  gr->get_depot())  ) {
+				break;
+			}
+			ci = (ci+1) % ccount;
+		}
+		if(  !follows  ) {
+			return halt;
+		}
+		const halthandle_t next = next_stop_halt( schedule, pi, owner );
+		if(  !next.is_bound()  ||  next!=next_stop_halt( c->schedule, ci, c->owner )  ) {
+			return halt;
+		}
+		pi = (pi+1) % pcount;
+		ci = (ci+1) % ccount;
+	}
+	return halthandle_t();
 }
 
 

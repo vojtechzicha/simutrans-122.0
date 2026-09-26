@@ -55,6 +55,74 @@ static const bool cost_type_money[convoi_t::MAX_CONVOI_COST] =
 
 bool convoi_info_t::route_search_in_progress=false;
 
+
+// fork: at most max_chars characters of text, cut at a character (not byte) boundary with "..."
+static void append_shortened(cbuffer_t &buf, const char *text, uint32 max_chars)
+{
+	uint32 chars = 0;
+	const char *p = text;
+	for(  ;  *p;  p++  ) {
+		if(  ((uint8)*p & 0xC0) != 0x80  ) {
+			if(  chars == max_chars - 3  ) {
+				// remember where a cut would go, if the text turns out too long
+				break;
+			}
+			chars++;
+		}
+	}
+	uint32 rest = 0;
+	for(  const char *q = p;  *q;  q++  ) {
+		if(  ((uint8)*q & 0xC0) != 0x80  ) {
+			rest++;
+		}
+	}
+	if(  chars + rest <= max_chars  ) {
+		buf.append( text );
+	}
+	else {
+		buf.append( text, p - text );
+		buf.append( "..." );
+	}
+}
+
+
+// fork: seats, standing and overcrowded places taken in the convoy's own vehicles; false if it has no seats
+static bool print_passenger_load(cbuffer_t &buf, convoihandle_t cnv)
+{
+	uint32 seats = 0, seated = 0, standing = 0, standing_places = 0, overcrowded = 0, overcrowded_places = 0;
+	for(  uint8 i=0;  i<cnv->get_own_vehicle_count();  i++  ) {
+		const vehicle_t *v = cnv->get_vehikel(i);
+		if(  v->can_carry_crowd()  ) {
+			uint16 s, st, o;
+			v->get_crowd_split( s, st, o );
+			seats += v->get_cargo_max();
+			seated += s;
+			standing += st;
+			overcrowded += o;
+			standing_places += v->get_standing_max() - v->get_cargo_max();
+			overcrowded_places += v->get_overcrowded_max() - v->get_standing_max();
+		}
+	}
+	if(  seats == 0  ) {
+		return false;
+	}
+	const schedule_t *sch = cnv->get_schedule();
+	buf.printf( translator::translate("Seats %u/%u"), seated, seats );
+	if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
+		buf.printf( translator::translate(", standing %u/%u"), standing, standing_places );
+	}
+	else {
+		buf.append( translator::translate(", no standing") );
+	}
+	if(  overcrowded > 0  ||  !sch  ||  sch->allows_overcrowding()  ) {
+		buf.printf( translator::translate(", overcrowded %u/%u"), overcrowded, overcrowded_places );
+	}
+	else if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
+		buf.append( translator::translate(", no overcrowding") );
+	}
+	return true;
+}
+
 /**
  * This variable defines by which column the table is sorted
  * Values: 0 = destination
@@ -75,7 +143,8 @@ convoi_info_t::convoi_info_t(convoihandle_t cnv) :
 	gui_frame_t(""),
 	text(&freight_info),
 	view(scr_size(max(64, get_base_tile_raster_width()), max(56, (get_base_tile_raster_width() * 7) / 8))),
-	scroll_freight(&container_freight, true, true)
+	scroll_freight(&container_freight, true, true),
+	text_coupled(&freight_info_coupled)
 {
 	if (cnv.is_bound()) {
 		init(cnv);
@@ -126,6 +195,23 @@ void convoi_info_t::init(convoihandle_t cnv)
 			add_component(&departure_label);
 			coupling_label.set_visible(false);
 			add_component(&coupling_label);
+
+			// fork, coupling: the other train
+			container_coupled.set_table_layout(2,0);
+			coupled_button.init( button_t::posbutton, NULL );
+			coupled_button.set_targetpos3d( koord3d::invalid );
+			coupled_button.set_tooltip( "Open the window of the coupled train" );
+			coupled_button.add_listener( this );
+			container_coupled.add_component(&coupled_button);
+			container_coupled.add_component(&coupled_name_label);
+			container_coupled.new_component<gui_empty_t>();
+			container_coupled.add_component(&coupled_line_label);
+			container_coupled.new_component<gui_empty_t>();
+			container_coupled.add_component(&coupled_part_label);
+			container_coupled.new_component<gui_empty_t>();
+			container_coupled.add_component(&coupled_load_label);
+			container_coupled.set_visible(false);
+			add_component(&container_coupled);
 
 			add_component(&container_line);
 			container_line.set_table_layout(3,1);
@@ -198,6 +284,11 @@ void convoi_info_t::init(convoihandle_t cnv)
 	}
 	container_freight.end_table();
 	container_freight.add_component(&text);
+	// fork, coupling: the freight of the other train below ours
+	coupled_freight_label.set_visible(false);
+	container_freight.add_component(&coupled_freight_label);
+	text_coupled.set_visible(false);
+	container_freight.add_component(&text_coupled);
 
 	switch_mode.add_tab(&container_stats, translator::translate("Chart"));
 
@@ -302,37 +393,7 @@ void convoi_info_t::update_labels()
 	weight_label.update();
 
 	// fork: passengers on seats, standing and overcrowded
-	uint32 seats = 0, seated = 0, standing = 0, standing_places = 0, overcrowded = 0, overcrowded_places = 0;
-	for(  uint8 i=0;  i<cnv->get_own_vehicle_count();  i++  ) {
-		const vehicle_t *v = cnv->get_vehikel(i);
-		if(  v->can_carry_crowd()  ) {
-			uint16 s, st, o;
-			v->get_crowd_split( s, st, o );
-			seats += v->get_cargo_max();
-			seated += s;
-			standing += st;
-			overcrowded += o;
-			standing_places += v->get_standing_max() - v->get_cargo_max();
-			overcrowded_places += v->get_overcrowded_max() - v->get_standing_max();
-		}
-	}
-	const bool show_crowd = seats > 0;
-	if(  show_crowd  ) {
-		const schedule_t *sch = cnv->get_schedule();
-		crowd_label.buf().printf( translator::translate("Seats %u/%u"), seated, seats );
-		if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
-			crowd_label.buf().printf( translator::translate(", standing %u/%u"), standing, standing_places );
-		}
-		else {
-			crowd_label.buf().append( translator::translate(", no standing") );
-		}
-		if(  overcrowded > 0  ||  !sch  ||  sch->allows_overcrowding()  ) {
-			crowd_label.buf().printf( translator::translate(", overcrowded %u/%u"), overcrowded, overcrowded_places );
-		}
-		else if(  standing > 0  ||  !sch  ||  sch->allows_standing()  ) {
-			crowd_label.buf().append( translator::translate(", no overcrowding") );
-		}
-	}
+	const bool show_crowd = print_passenger_load( crowd_label.buf(), cnv );
 	crowd_label.update();
 	if(  crowd_label.is_visible() != show_crowd  ) {
 		crowd_label.set_visible( show_crowd );
@@ -409,14 +470,8 @@ void convoi_info_t::update_labels()
 	}
 
 	// fork: coupling
-	const convoihandle_t other = cnv->get_coupled_convoi();
-	if(  cnv->is_coupled()  &&  other.is_bound()  ) {
-		coupling_label.buf().printf( translator::translate("Coupled to %s"), other->get_name() );
-	}
-	else if(  cnv->is_coupled_primary()  ) {
-		coupling_label.buf().printf( translator::translate("Coupled with %s"), other->get_name() );
-	}
-	else if(  cnv->get_state()==convoi_t::UNCOUPLING  ) {
+	// (a coupled pair is shown in container_coupled)
+	if(  cnv->get_state()==convoi_t::UNCOUPLING  ) {
 		coupling_label.buf().append( translator::translate("Uncoupled, waiting for the platform") );
 	}
 	else if(  cnv->is_waiting_for_coupling()  ) {
@@ -429,6 +484,57 @@ void convoi_info_t::update_labels()
 	coupling_label.update();
 	if(  coupling_label.is_visible() != show_coupling  ) {
 		coupling_label.set_visible( show_coupling );
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
+
+	// fork, coupling: the other train, where the two part, and its load
+	const convoihandle_t partner = cnv->is_coupled()  ||  cnv->is_coupled_primary() ? cnv->get_coupled_convoi() : convoihandle_t();
+	if(  partner.is_bound()  ) {
+		// names shortened like the destination above: long ones would widen the window
+		cbuffer_t name;
+		append_shortened( name, partner->get_name(), 48 );
+		coupled_name_label.buf().printf( translator::translate( cnv->is_coupled() ? "Coupled to %s (in front)" : "Coupled with %s (behind)" ), (const char *)name );
+		if(  partner->get_line().is_bound()  ) {
+			coupled_line_label.buf().printf( "%s ", translator::translate("Serves Line:") );
+			append_shortened( coupled_line_label.buf(), partner->get_line()->get_name(), 48 );
+		}
+		const convoihandle_t primary = cnv->is_coupled() ? partner : cnv;
+		const halthandle_t part = primary->get_uncouple_halt();
+		if(  part.is_bound()  ) {
+			coupled_part_label.buf().printf( translator::translate("Uncouples at %s"), part->get_name() );
+		}
+		else {
+			coupled_part_label.buf().append( translator::translate("Stays coupled") );
+		}
+		if(  !print_passenger_load( coupled_load_label.buf(), partner )  ) {
+			coupled_load_label.buf().printf( translator::translate("Loaded: %d%%"), partner->get_loading_level() );
+		}
+		coupled_freight_label.buf().printf( translator::translate("Coupled train: %s"), partner->get_name() );
+		// built anew each time: the partner's own window uses its cached list
+		const int old_coupled_len = freight_info_coupled.len();
+		freight_info_coupled.clear();
+		partner->build_freight_info( freight_info_coupled, cnv->get_sortby() );
+		if(  old_coupled_len != freight_info_coupled.len()  ) {
+			text_coupled.recalc_size();
+			scroll_freight.set_size( scroll_freight.get_size() );
+		}
+	}
+	coupled_name_label.update();
+	coupled_line_label.update();
+	coupled_part_label.update();
+	coupled_load_label.update();
+	coupled_freight_label.update();
+	if(  shown_partner != partner  ) {
+		shown_partner = partner;
+		container_coupled.set_visible( partner.is_bound() );
+		coupled_freight_label.set_visible( partner.is_bound() );
+		text_coupled.set_visible( partner.is_bound() );
+		if(  !partner.is_bound()  ) {
+			freight_info_coupled.clear();
+		}
+		text_coupled.recalc_size();
+		scroll_freight.set_size( scroll_freight.get_size() );
 		reset_min_windowsize();
 		set_windowsize( get_windowsize() );
 	}
@@ -549,6 +655,13 @@ bool convoi_info_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 		}
 		else {
 			welt->get_viewport()->set_follow_convoi(cnv);
+		}
+		return true;
+	}
+
+	if(  comp == &coupled_button  ) {
+		if(  shown_partner.is_bound()  ) {
+			shown_partner->open_info_window();
 		}
 		return true;
 	}

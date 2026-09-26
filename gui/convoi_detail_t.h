@@ -43,6 +43,9 @@ private:
 	vector_tpl<const vehicle_t *> shown_vehicles;
 
 	static karte_ptr_t welt;
+
+	/// fork, coupling: the convoy whose vehicles are listed, the primary of a coupled pair
+	convoihandle_t get_train() const;
 public:
 	convoi_detail_t(convoihandle_t cnv = convoihandle_t());
 

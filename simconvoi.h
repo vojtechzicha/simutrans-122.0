@@ -833,6 +833,9 @@ public:
 	* @return Freight description text (buf)
 	*/
 	void get_freight_info(cbuffer_t & buf);
+
+	/// fork: builds the freight list into buf now, without the cache of get_freight_info()
+	void build_freight_info(cbuffer_t & buf, uint8 sort_order) const;
 	void set_sortby(uint8 order);
 	uint8 get_sortby() const { return freight_info_order; }
 
@@ -992,6 +995,8 @@ public:
 	convoihandle_t get_vehicle_owner(uint8 i) const { return is_coupled_primary()  &&  i>=coupled_first ? coupled_convoi : self; }
 	/// the number of the primary's own vehicles, at the start of fahr
 	uint8 get_own_vehicle_count() const { return is_coupled_primary() ? coupled_first : anz_vehikel; }
+	/// fork, coupling: the stop where a coupled primary will leave its joined train behind (unbound: none found)
+	halthandle_t get_uncouple_halt() const;
 	bool is_running_late() const { return running_late; }
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
 	/// fork, coupling: the primary hands the tile over to the train it just uncoupled
