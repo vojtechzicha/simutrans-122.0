@@ -313,7 +313,7 @@ void convoi_info_t::update_labels()
 	sint64 slot = 0;
 	bool latest = false;
 	const convoihandle_t passing = cnv->get_passing_hold_for();
-	const bool section_wait = cnv->get_section_wait()!=convoi_t::SECTION_WAIT_NONE  &&  cnv->get_state()==convoi_t::WAITING_FOR_CLEARANCE;
+	const bool section_wait = cnv->get_section_wait()!=convoi_t::SECTION_WAIT_NONE  &&  cnv->is_waiting();
 	const bool show_departure = passing.is_bound()  ||  section_wait  ||  cnv->get_planned_departure( slot, latest );
 	if(  passing.is_bound()  ) {
 		// fork: waiting at the stop for a passing train to go by
