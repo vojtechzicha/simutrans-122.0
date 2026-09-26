@@ -409,7 +409,9 @@ The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from 
 with MSYS2 MinGW64 and installs the result as `simutrans.exe` in the Steam game folder
 (`D:\SteamLibrary\steamapps\common\Simutrans`); the exe Steam shipped is kept next to it as
 `simutrans-stock.exe`, and a Steam update that replaces `simutrans.exe` is detected and backed up
-again on the next install. Commands: `build`, `install`, `update` (both), `restore` (stock exe
+again on the next install. `install` also appends the fork's `simutrans/text/en.tab` pairs that
+Steam's `text/en.tab` lacks (Steam's file kept as `en.tab-stock`) and copies the help pages the
+fork changed (`text/en/*`, originals as `*-stock`); `restore` puts both back. Commands: `build`, `install`, `update` (both), `restore` (stock exe
 back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`. After every feature, run
 `tools/windows/steam-fork.sh update`.
 

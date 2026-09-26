@@ -7,7 +7,8 @@
 # Git Bash (the MSYS2 MinGW64 toolchain does the compiling).
 #
 #   tools/windows/steam-fork.sh build              make the fork (STATIC = 1, no DLLs needed)
-#   tools/windows/steam-fork.sh install            back up the Steam exe, copy the fork in
+#   tools/windows/steam-fork.sh install            back up the Steam exe, copy the fork in, add the
+#                                                  fork's English texts (text/en.tab) and help pages
 #   tools/windows/steam-fork.sh update             build + install
 #   tools/windows/steam-fork.sh restore            put the Steam exe back
 #   tools/windows/steam-fork.sh status             which exe is installed right now
@@ -38,6 +39,9 @@ MAKEOBJ="$REPO/build/default/makeobj/makeobj.exe"
 STEAM_EXE="$STEAM_DIR/simutrans.exe"
 STOCK_EXE="$STEAM_DIR/simutrans-stock.exe"
 FORK_HASH="$STEAM_DIR/simutrans-fork.sha256"
+STEAM_EN_TAB="$STEAM_DIR/text/en.tab"
+STOCK_EN_TAB="$STEAM_DIR/text/en.tab-stock"
+FORK_TEXT_MARK="# fork texts, added by tools/windows/steam-fork.sh"
 
 die() { echo "steam-fork: $*" >&2; exit 1; }
 sha() { sha256sum "$1" | cut -d' ' -f1; }
@@ -97,6 +101,54 @@ do_install() {
 	cp -f "$BUILT" "$STEAM_EXE"
 	sha "$STEAM_EXE" > "$FORK_HASH"
 	echo "installed fork as $STEAM_EXE"
+	install_texts
+}
+
+# The Steam text/en.tab is newer than 122.0, so keep it and append the pairs of the fork's
+# en.tab whose key it lacks (a later pair wins when the game reads the file). The help pages
+# the fork changed replace Steam's, whose originals are kept as NAME-stock.
+install_texts() {
+	[ -f "$STEAM_EN_TAB" ] || die "no $STEAM_EN_TAB"
+	if ! grep -qF "$FORK_TEXT_MARK" "$STEAM_EN_TAB"; then
+		# no fork texts in it: Steam's own file (first install or a Steam update)
+		cp -p "$STEAM_EN_TAB" "$STOCK_EN_TAB"
+	fi
+	[ -f "$STOCK_EN_TAB" ] || die "no stock backup at $STOCK_EN_TAB"
+	local tmp="$STEAM_EN_TAB.tmp"
+	{
+		cat "$STOCK_EN_TAB"
+		printf '%s\r\n' "$FORK_TEXT_MARK"
+		# pairs: every non-comment line after the language name is key, value, key, value, ...
+		LC_ALL=C awk '
+			{ sub(/\r$/, "") }
+			FNR == 1 || /^#/ { next }
+			FILENAME == ARGV[1] { if( ++n % 2 ) have[$0] = 1; next }
+			++m % 2 { key = $0; next }
+			!(key in have) { printf "%s\r\n%s\r\n", key, $0; added++ }
+			END { print added + 0 " fork texts added to en.tab" > "/dev/stderr" }
+		' "$STOCK_EN_TAB" "$REPO/simutrans/text/en.tab"
+	} > "$tmp"
+	mv -f "$tmp" "$STEAM_EN_TAB"
+	local f
+	for f in $(git -C "$REPO" diff --name-only 122.0 -- simutrans/text/en/); do
+		local dst="$STEAM_DIR/${f#simutrans/}"
+		if [ -f "$dst" ] && [ ! -f "$dst-stock" ]; then
+			cp -p "$dst" "$dst-stock"
+		fi
+		cp -f "$REPO/$f" "$dst"
+	done
+	echo "installed fork texts into $STEAM_DIR/text"
+}
+
+restore_texts() {
+	if [ -f "$STOCK_EN_TAB" ]; then
+		cp -f "$STOCK_EN_TAB" "$STEAM_EN_TAB"
+	fi
+	local f
+	for f in "$STEAM_DIR"/text/en/*-stock; do
+		[ -f "$f" ] && cp -f "$f" "${f%-stock}"
+	done
+	echo "restored stock texts"
 }
 
 do_restore() {
@@ -104,6 +156,7 @@ do_restore() {
 	cp -f "$STOCK_EXE" "$STEAM_EXE"
 	rm -f "$FORK_HASH"
 	echo "restored stock exe to $STEAM_EXE"
+	restore_texts
 }
 
 do_status() {
@@ -171,5 +224,5 @@ case "${1:-}" in
 	downgrade) shift; do_downgrade "$@" ;;
 	export)    shift; do_export "$@" ;;
 	signals)   shift; do_signals "$@" ;;
-	*)         sed -n '2,24p' "$0"; exit 1 ;;
+	*)         sed -n '2,25p' "$0"; exit 1 ;;
 esac
