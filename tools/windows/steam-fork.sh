@@ -154,7 +154,8 @@ do_signals() {
 	[ -n "$dat" ] && [ -f "$dat" ] || die "usage: $0 signals FILE.dat [SIZE]"
 	ensure_config
 	[ -x "$MSYS_BASH" ] || die "MSYS2 not found at $MSYS_BASH (winget install MSYS2.MSYS2)"
-	MSYSTEM=MINGW64 "$MSYS_BASH" -lc "cd '$REPO' && make -j$JOBS makeobj"
+	# makeobj/Makefile adds -march=pentium for mingw, which the 64 bit compiler refuses
+	MSYSTEM=MINGW64 "$MSYS_BASH" -lc "cd '$REPO' && make -j$JOBS makeobj OS_OPT='-DPNG_STATIC -DZLIB_STATIC'"
 	[ -f "$MAKEOBJ" ] || die "build produced no $MAKEOBJ"
 	local dir; dir="$(cd "$(dirname "$dat")" && pwd)"
 	(cd "$dir" && PATH="/c/msys64/mingw64/bin:$PATH" "$MAKEOBJ" "pak$size" "$STEAM_DIR/$PAKSET/" "$(basename "$dat")")
