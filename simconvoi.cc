@@ -68,6 +68,13 @@ karte_ptr_t convoi_t::welt;
 // fork, coupling: see below
 static halthandle_t next_stop_halt(const schedule_t *sched, uint8 from, const player_t *owner);
 
+// fork, coupling: a tick count for timers where 0 means "not running"; max(1u,ticks) is no
+// good for this, max() takes ints and ticks past 2^31 would come out as 1
+static inline uint32 nonzero_ticks(uint32 ticks)
+{
+	return ticks ? ticks : 1;
+}
+
 /*
  * Debugging helper - translate state value to human readable name
  */
@@ -2834,7 +2841,7 @@ void convoi_t::rdwr(loadsave_t *file)
 		uint32 waited = couple_wait_since ? welt->get_ticks() - couple_wait_since : 0;
 		file->rdwr_long( waited );
 		if(  file->is_loading()  ) {
-			couple_wait_since = waited ? max( 1u, welt->get_ticks() - waited ) : 0;
+			couple_wait_since = waited ? nonzero_ticks( welt->get_ticks() - waited ) : 0;
 		}
 		file->rdwr_longlong( couple_hold_slot );
 		file->rdwr_bool( running_late );
@@ -3385,7 +3392,7 @@ station_tile_search_ready: ;
 		uint16 max_wait;
 		if(  expects_partner( max_wait, partner_line, partner_entry )  ) {
 			if(  couple_wait_since==0  ) {
-				couple_wait_since = max( 1u, welt->get_ticks() );
+				couple_wait_since = nonzero_ticks( welt->get_ticks() );
 				couple_hold_slot = slot;
 			}
 			if(  (sint64)(welt->get_ticks() - couple_wait_since) < welt->calendar_minutes_to_ticks( max_wait )  ) {
@@ -4998,7 +5005,7 @@ void convoi_t::step_uncoupling()
 	if(  !all_ours  ) {
 		// the platform stays taken: warn once, the player may have to clear it
 		if(  uncouple_since==0  ) {
-			uncouple_since = max( 1u, welt->get_ticks() );
+			uncouple_since = nonzero_ticks( welt->get_ticks() );
 		}
 		const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 3);
 		if(  !uncouple_warned  &&  (sint64)(welt->get_ticks() - uncouple_since) > limit  ) {
