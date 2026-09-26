@@ -553,7 +553,7 @@ void roadsign_t::rdwr(loadsave_t *file)
 	file->rdwr_byte(dummy);
 	state = dummy;
 	dummy = dir;
-	if(  file->is_saving()  &&  desc->is_platform_signal()  &&  file->is_version_less(122, 6)  ) {
+	if(  file->is_saving()  &&  desc->is_platform_signal()  &&  file->is_version_less(122, 7)  ) {
 		// fork: for the stock game a one-way signal makes the track one-way, so write it two-way
 		if(  const grund_t *gr = welt->lookup(get_pos())  ) {
 			if(  const weg_t *weg = gr->get_weg(desc->get_wtyp()!=tram_wt ? desc->get_wtyp() : track_wt)  ) {

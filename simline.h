@@ -78,6 +78,17 @@ private:
 	vector_tpl<sint64> last_departure_slot;
 
 	/**
+	 * Coupling (fork): slots a primary train used when it left without the train of this line
+	 * that should have joined it at schedule entry `entry`. The next train of this line reaching
+	 * that entry alone inherits the oldest one and runs late with it. Cleared with the schedule.
+	 */
+	struct missed_coupling_t {
+		uint8 entry;
+		sint64 slot;
+	};
+	vector_tpl<missed_coupling_t> missed_couplings;
+
+	/**
 	 * a list of all catg_index, which can be transported by this line.
 	 */
 	minivec_tpl<uint8> goods_catg_index;
@@ -139,6 +150,26 @@ public:
 	 * line arrived there earlier. Books the slot for the convoy when it returns true.
 	 */
 	bool take_departure_slot(convoihandle_t cnv);
+
+	/// Timetable (fork): like take_departure_slot, but only tells the slot without booking it
+	bool can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const;
+
+	/// Timetable (fork): marks the slot as used at this schedule entry
+	void book_departure_slot(uint8 entry, sint64 slot);
+
+	/**
+	 * Timetable (fork), a train running late after a missed coupling: the slot it may leave in
+	 * right away, the inherited one (if still unused) or else the oldest slot of this entry that
+	 * no train of the line used yet, as long as that one is due already. False when the train
+	 * is on time again (the slot lies ahead), it then waits for its slot like any other.
+	 */
+	bool get_late_departure_slot(convoihandle_t cnv, sint64 inherited, sint64 &slot) const;
+
+	/// Coupling (fork): the primary left alone in this slot; the next train of this line at entry inherits it
+	void add_missed_coupling(uint8 entry, sint64 slot);
+
+	/// Coupling (fork): takes the oldest slot missed at this entry, if any
+	bool take_missed_coupling(uint8 entry, sint64 &slot);
 
 	/// Timetable (fork): convoys of the line loading at the same schedule entry that arrived before cnv
 	uint32 count_earlier_waiting(convoihandle_t cnv) const;

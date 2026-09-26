@@ -1,6 +1,6 @@
 # Rail signalling: stations, single track and choice (fork)
 
-Status: implemented (savegame 122.6) on top of PR #1 (overtaking at choose signals, platform types,
+Status: implemented (savegame 122.7) on top of PR #1 (overtaking at choose signals, platform types,
 Hold stop, waiting for passing trains, Hold marker, savegame 122.5), tested headless on pak64 with
 placeholder objects (section 7). Not yet seen in the Windows game with pak128.cs objects.
 
@@ -113,7 +113,7 @@ inside B (a few dozen tiles; `max_choose_route_steps` does not matter here).
   switch to the stop, or to the `P` at its far end), reserved for the convoy. The throat in front
   is not claimed (3.6). A path that ends on a track without platform (e.g. a branch train running
   on to the main line) claims nothing.
-- Stored on the convoy and saved (savegame 122.6), re-reserved after loading.
+- Stored on the convoy and saved (savegame 122.7), re-reserved after loading.
 - The route to the next stop in B, or through B, goes via the claimed track, not necessarily the
   one clicked in the schedule.
 - Released when the train reaches the track, it goes to a depot or is sold, or it finds no route.
@@ -293,9 +293,9 @@ first. `C→` trains prefer pass 3, 4 and freight, `←C` trains pass 1, 2; bran
 4. `vehicle/simvehicle.cc`: direction-aware signal helper everywhere (3.1);
    `is_platform_signal_clear` (3.2–3.6); section look-ahead; station search from `LT`; choose walk
    ends at an applicable `P`, through-choose for passing trains, lead-on check (3.7).
-5. `simconvoi.*`: claim (tiles + halt), rdwr 122.6, re-reserve after load, release paths, route via
+5. `simconvoi.*`: claim (tiles + halt), rdwr 122.7, re-reserve after load, release paths, route via
    the claim; convoy window texts ("Waiting for the line to X", "No free track at X").
-6. `simversion.h` 122.6; en.tab strings; JSON export optional `claim` key (+ viewer).
+6. `simversion.h` 122.7; en.tab strings; JSON export optional `claim` key (+ viewer).
 7. Downgrade (`-saveversion 0.122.0`): write `P` as a two-way plain signal so the stock game still
    runs (without the protection).
 8. `tools/windows/steam-fork.sh`: build makeobj and the add-on pak.

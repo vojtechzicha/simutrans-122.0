@@ -279,6 +279,15 @@ void schedule_t::rdwr(loadsave_t *file)
 					entries[i].set_extra_offsets( offsets, min( count, schedule_entry_t::MAX_EXTRA_OFFSETS ) );
 				}
 			}
+			if(file->is_version_atleast(122, 6)) {
+				// fork: coupling with a train of another line
+				file->rdwr_short(entries[i].couple_line_id);
+				file->rdwr_short(entries[i].couple_max_wait);
+				if(  file->is_loading()  &&  !allows_hold()  ) {
+					entries[i].couple_line_id = 0;
+					entries[i].couple_max_wait = 0;
+				}
+			}
 		}
 	}
 	if(file->is_loading()) {
@@ -436,6 +445,7 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 		for(  uint8 k=0;  k<i.extra_offset_count;  k++  ) {
 			buf.printf(",%i", (int)i.extra_offsets[k]);
 		}
+		buf.printf(",%i,%i", (int)i.couple_line_id, (int)i.couple_max_wait);
 		buf.append("|");
 	}
 }
@@ -477,9 +487,10 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		return false;
 	}
 	p++;
-	// now scan the entries: nine fixed values, then the number of extra offsets and those offsets
+	// now scan the entries: nine fixed values, then the number of extra offsets and those offsets,
+	// then the coupling line and its maximum wait
 	while(  *p>0  ) {
-		const int max_values = 10 + schedule_entry_t::MAX_EXTRA_OFFSETS;
+		const int max_values = 12 + schedule_entry_t::MAX_EXTRA_OFFSETS;
 		sint32 values[max_values];
 		int count = 0;
 		while(  *p  &&  *p != '|'  ) {
@@ -505,13 +516,18 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		}
 		// ok, now we have a complete entry
 		schedule_entry_t entry(koord3d(values[0], values[1], values[2]), values[3], values[4], values[5], values[6], values[7], values[8]);
+		const int extra_count = count > 9 ? min( (int)values[9], (int)schedule_entry_t::MAX_EXTRA_OFFSETS ) : 0;
 		if(  count > 10  ) {
 			uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS];
 			uint8 n = 0;
-			for(  int k=10;  k<count  &&  k<max_values  &&  n<schedule_entry_t::MAX_EXTRA_OFFSETS;  k++  ) {
+			for(  int k=10;  k<count  &&  k<max_values  &&  n<extra_count;  k++  ) {
 				offsets[n++] = (uint16)values[k];
 			}
 			entry.set_extra_offsets( offsets, n );
+		}
+		if(  count >= 12 + extra_count  &&  12 + extra_count <= max_values  ) {
+			entry.couple_line_id = (uint16)values[10 + extra_count];
+			entry.couple_max_wait = (uint16)values[11 + extra_count];
 		}
 		entries.append(entry);
 	}
@@ -534,6 +550,9 @@ void schedule_t::sanitize_stop_types()
 			if(  entry.stop_type == schedule_entry_t::hold  ) {
 				entry.stop_type = schedule_entry_t::regular;
 			}
+			// coupling needs rail vehicles as well
+			entry.couple_line_id = 0;
+			entry.couple_max_wait = 0;
 		}
 	}
 }

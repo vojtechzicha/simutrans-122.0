@@ -139,6 +139,18 @@ public:
 			stop.buf().append(" ");
 		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
+		if(  entry.has_coupling()  ) {
+			// coupling marker behind the name: [+ R12a]
+			const char *name = "?";
+			vector_tpl<linehandle_t> lines;
+			player->simlinemgmt.get_lines( simline_t::line, &lines );
+			FOR( vector_tpl<linehandle_t>, const l, lines ) {
+				if(  l.get_id()==entry.couple_line_id  ) {
+					name = l->get_name();
+				}
+			}
+			stop.buf().printf( " [+ %s]", name );
+		}
 		stop.update();
 	}
 
@@ -363,6 +375,9 @@ schedule_gui_t::schedule_gui_t(schedule_t* schedule_, player_t* player_, convoih
 	lb_interval("Departure every (min)"),
 	lb_offset("Offset (min)"),
 	lb_extra("Also at (min)"),
+	lb_couple("Couple with"),
+	lb_couple_wait("Wait for it (min)"),
+	couple_selector(line_scrollitem_t::compare),
 	stats(new schedule_gui_stats_t() ),
 	scrolly(stats)
 {
@@ -502,6 +517,25 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		end_table();
 	}
 
+	if(  schedule->allows_hold()  ) {
+		// coupling: a train of this line joins a train of that line here
+		add_table(2,2);
+		{
+			add_component(&lb_couple);
+			init_couple_selector();
+			couple_selector.add_listener(this);
+			add_component(&couple_selector);
+
+			add_component(&lb_couple_wait);
+			numimp_couple_wait.set_width( 84 );
+			numimp_couple_wait.set_limits( 0, 24*60 );
+			numimp_couple_wait.set_increment_mode( 1 );
+			numimp_couple_wait.add_listener(this);
+			add_component(&numimp_couple_wait);
+		}
+		end_table();
+	}
+
 	// return tickets
 	if(  !env_t::hide_rail_return_ticket  ||  schedule->get_waytype()==road_wt  ||  schedule->get_waytype()==air_wt  ||  schedule->get_waytype()==water_wt  ) {
 		//  hide the return ticket on rail stuff, where it causes much trouble
@@ -613,6 +647,22 @@ void schedule_gui_t::read_extra_offsets()
 }
 
 
+void schedule_gui_t::init_couple_selector()
+{
+	couple_selector.clear_elements();
+	couple_selector.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("<no coupling>"), SYSCOL_TEXT );
+	vector_tpl<linehandle_t> lines;
+	player->simlinemgmt.get_lines( schedule->get_type(), &lines );
+	FOR( vector_tpl<linehandle_t>, line, lines ) {
+		couple_selector.new_component<line_scrollitem_t>( line );
+	}
+	line_scrollitem_t::sort_mode = line_scrollitem_t::SORT_BY_NAME;
+	couple_selector.sort( 1 );
+	couple_selector.set_selection( 0 );
+	couple_line_count = player->simlinemgmt.get_line_count();
+}
+
+
 bool schedule_gui_t::has_line() const
 {
 	// a line's own schedule (no convoy) or a convoy that serves a line
@@ -630,6 +680,10 @@ void schedule_gui_t::update_selection()
 	lb_extra.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	numimp_interval.disable();
 	numimp_offset.disable();
+	lb_couple.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	lb_couple_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	couple_selector.disable();
+	numimp_couple_wait.disable();
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
@@ -693,6 +747,24 @@ void schedule_gui_t::update_selection()
 				}
 			}
 
+			// coupling: the line whose train we join here, and how long to wait for it
+			int couple_sel = 0;
+			for(  int i=1;  i<couple_selector.count_elements();  i++  ) {
+				if(  line_scrollitem_t *li = dynamic_cast<line_scrollitem_t*>( couple_selector.get_element(i) )  ) {
+					if(  li->get_line().is_bound()  &&  li->get_line().get_id()==entry.couple_line_id  ) {
+						couple_sel = i;
+					}
+				}
+			}
+			couple_selector.set_selection( couple_sel );
+			numimp_couple_wait.set_value( entry.couple_max_wait );
+			lb_couple.set_color( SYSCOL_TEXT );
+			couple_selector.enable();
+			if(  entry.has_coupling()  &&  welt->has_calendar()  ) {
+				lb_couple_wait.set_color( SYSCOL_TEXT );
+				numimp_couple_wait.enable();
+			}
+
 			if(  !entry.loads()  ) {
 				// nothing boards here, so loading rules do not apply
 				lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
@@ -723,10 +795,11 @@ void schedule_gui_t::update_selection()
  */
 bool schedule_gui_t::infowin_event(const event_t *ev)
 {
-	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  )  {
+	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  &&  !couple_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  )  {
 
 		// close combo box; we must do it ourselves, since the box does not receive outside events ...
 		line_selector.close_box();
+		couple_selector.close_box();
 	}
 	else if(  ev->ev_class == INFOWIN  &&  ev->ev_code == WIN_CLOSE  &&  schedule!=NULL  ) {
 
@@ -849,6 +922,28 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 	else if(comp == &input_extra) {
 		if(!schedule->empty()) {
 			read_extra_offsets();
+			update_selection();
+		}
+	}
+	else if(comp == &couple_selector) {
+		if(!schedule->empty()) {
+			schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+			line_scrollitem_t *li = dynamic_cast<line_scrollitem_t*>( couple_selector.get_selected_item() );
+			const uint16 id = li  &&  li->get_line().is_bound() ? li->get_line().get_id() : 0;
+			if(  id  &&  !entry.has_coupling()  &&  entry.couple_max_wait==0  ) {
+				// a sensible start: wait a quarter of an hour for the other train
+				entry.couple_max_wait = 15;
+			}
+			entry.couple_line_id = id;
+			if(  !id  ) {
+				entry.couple_max_wait = 0;
+			}
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_couple_wait) {
+		if(!schedule->empty()) {
+			schedule->entries[schedule->get_current_stop()].couple_max_wait = (uint16)p.i;
 			update_selection();
 		}
 	}
@@ -988,6 +1083,10 @@ void schedule_gui_t::draw(scr_coord pos, scr_size size)
 		// lines added or deleted
 		init_line_selector();
 		last_schedule_count = schedule->get_count();
+	}
+	if(  schedule->allows_hold()  &&  player->simlinemgmt.get_line_count()!=couple_line_count  ) {
+		init_couple_selector();
+		update_selection();
 	}
 
 	// after loading in network games, the schedule might still being updated

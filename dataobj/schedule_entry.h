@@ -33,7 +33,7 @@ public:
 	/// more departure offsets per cycle besides departure_offset (fork)
 	static const uint8 MAX_EXTRA_OFFSETS = 7;
 
-	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), stop_type(regular) {}
+	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), stop_type(regular), couple_line_id(0), couple_max_wait(0) {}
 
 	schedule_entry_t(koord3d const& pos, uint const minimum_loading, sint8 const waiting_time_shift, uint16 const waiting_time = 0, uint16 const departure_interval = 0, uint16 const departure_offset = 0, uint8 const stop_type = regular) :
 		pos(pos),
@@ -43,7 +43,9 @@ public:
 		departure_interval(departure_interval),
 		departure_offset(departure_offset),
 		extra_offset_count(0),
-		stop_type(stop_type < max_stop_type ? stop_type : (uint8)regular)
+		stop_type(stop_type < max_stop_type ? stop_type : (uint8)regular),
+		couple_line_id(0),
+		couple_max_wait(0)
 	{}
 
 	/**
@@ -119,13 +121,26 @@ public:
 	bool plans_departure() const { return loads(); }
 
 	static const char *get_stop_type_name(uint8 stop_type);
+
+	/**
+	 * Coupling (fork, rail): at this stop a train of this line joins a train of the line
+	 * couple_line_id (the primary) and runs behind it while both schedules go on to the same
+	 * stops; it uncouples at the first stop where their next stops differ. Whichever train
+	 * comes first waits up to couple_max_wait calendar minutes after it would otherwise leave.
+	 * 0 = no coupling here. Only the joining line carries the setting.
+	 */
+	uint16 couple_line_id;
+	uint16 couple_max_wait;
+
+	bool has_coupling() const { return couple_line_id != 0; }
 };
 
 inline bool operator ==(const schedule_entry_t &a, const schedule_entry_t &b)
 {
 	return a.pos == b.pos  &&  a.minimum_loading == b.minimum_loading  &&  a.waiting_time_shift == b.waiting_time_shift  &&  a.waiting_time == b.waiting_time
 		&&  a.departure_interval == b.departure_interval  &&  a.departure_offset == b.departure_offset  &&  a.stop_type == b.stop_type
-		&&  a.extra_offset_count == b.extra_offset_count  &&  memcmp( a.extra_offsets, b.extra_offsets, a.extra_offset_count * sizeof(uint16) ) == 0;
+		&&  a.extra_offset_count == b.extra_offset_count  &&  memcmp( a.extra_offsets, b.extra_offsets, a.extra_offset_count * sizeof(uint16) ) == 0
+		&&  a.couple_line_id == b.couple_line_id  &&  a.couple_max_wait == b.couple_max_wait;
 }
 
 

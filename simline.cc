@@ -125,6 +125,7 @@ void simline_t::set_schedule(schedule_t* schedule)
 	this->schedule = schedule;
 	// the entries may have moved, so the booked slots are meaningless now
 	last_departure_slot.clear();
+	missed_couplings.clear();
 }
 
 
@@ -291,22 +292,18 @@ bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &s
 }
 
 
-bool simline_t::take_departure_slot(convoihandle_t cnv)
+bool simline_t::can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const
 {
 	const schedule_t *cnv_schedule = cnv->get_schedule();
 	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
-		return true;
+		return false;
 	}
 	const uint8 idx = cnv_schedule->get_current_stop();
 	const schedule_entry_t &entry = cnv_schedule->entries[idx];
-	sint64 slot;
 	if(  !get_open_departure_slot( entry, slot )  ) {
 		return false;
 	}
-	while(  last_departure_slot.get_count() <= idx  ) {
-		last_departure_slot.append( -1 );
-	}
-	if(  last_departure_slot[idx] == slot  ) {
+	if(  idx < last_departure_slot.get_count()  &&  last_departure_slot[idx] == slot  ) {
 		// somebody left in this slot already
 		return false;
 	}
@@ -323,8 +320,99 @@ bool simline_t::take_departure_slot(convoihandle_t cnv)
 			return false;
 		}
 	}
-	last_departure_slot[idx] = slot;
 	return true;
+}
+
+
+void simline_t::book_departure_slot(uint8 entry, sint64 slot)
+{
+	while(  last_departure_slot.get_count() <= entry  ) {
+		last_departure_slot.append( -1 );
+	}
+	last_departure_slot[entry] = slot;
+}
+
+
+bool simline_t::take_departure_slot(convoihandle_t cnv)
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
+		return true;
+	}
+	sint64 slot;
+	if(  !can_take_departure_slot( cnv, slot )  ) {
+		return false;
+	}
+	book_departure_slot( cnv_schedule->get_current_stop(), slot );
+	return true;
+}
+
+
+bool simline_t::get_late_departure_slot(convoihandle_t cnv, sint64 inherited, sint64 &slot) const
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ||  !welt->has_calendar()  ) {
+		return false;
+	}
+	const uint8 idx = cnv_schedule->get_current_stop();
+	const schedule_entry_t &entry = cnv_schedule->entries[idx];
+	if(  !entry.has_timetable()  ) {
+		return false;
+	}
+	const sint64 last = idx < last_departure_slot.get_count() ? last_departure_slot[idx] : -1;
+	sint64 candidate = -1;
+	if(  inherited >= 0  &&  inherited > last  ) {
+		candidate = inherited;
+	}
+	else if(  last >= 0  ) {
+		candidate = next_departure_slot( entry, last );
+	}
+	if(  candidate < 0  ||  candidate > welt->get_calendar_minutes()  ) {
+		// nothing known, or the slot is still ahead: on time again
+		return false;
+	}
+	// a ready convoy of the line that arrived earlier goes first
+	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
+		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
+			continue;
+		}
+		const schedule_t *other_schedule = other->get_schedule();
+		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
+			continue;
+		}
+		if(  (sint32)(other->get_arrived_time() - cnv->get_arrived_time()) < 0  &&  other->is_ready_to_depart()  ) {
+			slot = -1;
+			return true;
+		}
+	}
+	slot = candidate;
+	return true;
+}
+
+
+void simline_t::add_missed_coupling(uint8 entry, sint64 slot)
+{
+	// a handful is plenty; drop the oldest beyond that
+	if(  missed_couplings.get_count() >= 8  ) {
+		missed_couplings.remove_at( 0 );
+	}
+	missed_coupling_t m;
+	m.entry = entry;
+	m.slot = slot;
+	missed_couplings.append( m );
+}
+
+
+bool simline_t::take_missed_coupling(uint8 entry, sint64 &slot)
+{
+	for(  uint32 i=0;  i<missed_couplings.get_count();  i++  ) {
+		if(  missed_couplings[i].entry == entry  ) {
+			slot = missed_couplings[i].slot;
+			missed_couplings.remove_at( i );
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -520,6 +608,26 @@ void simline_t::rdwr(loadsave_t *file)
 	if(  file->is_version_atleast(122, 5)  ) {
 		// fork: Hold marker
 		file->rdwr_bool(hold_marker);
+	}
+
+	if(  file->is_version_atleast(122, 6)  ) {
+		// fork: slots of primary trains that left without the train of this line (coupling)
+		uint8 count = (uint8)missed_couplings.get_count();
+		file->rdwr_byte(count);
+		if(  file->is_loading()  ) {
+			missed_couplings.clear();
+		}
+		for(  uint8 i=0;  i<count;  i++  ) {
+			missed_coupling_t m;
+			if(  file->is_saving()  ) {
+				m = missed_couplings[i];
+			}
+			file->rdwr_byte(m.entry);
+			file->rdwr_longlong(m.slot);
+			if(  file->is_loading()  ) {
+				missed_couplings.append( m );
+			}
+		}
 	}
 
 	// otherwise initialized to zero if loading ...

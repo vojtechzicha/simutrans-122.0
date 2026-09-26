@@ -64,6 +64,9 @@ class gui_departure_board_t : public gui_aligned_container_t
 
 	uint32 calc_ticks_until_arrival( convoihandle_t cnv );
 
+	// fork, coupling: adds the stop the train coupled behind cnv goes to, if it differs from next_halt
+	void add_coupled_destination( halthandle_t halt, convoihandle_t cnv, halthandle_t next_halt, sint32 delta_ticks );
+
 	void insert_image(convoihandle_t cnv);
 
 public:
@@ -733,6 +736,26 @@ uint32 gui_departure_board_t::calc_ticks_until_arrival( convoihandle_t cnv )
 }
 
 
+// fork, coupling: the train running behind a primary leaves with it, maybe for another stop
+void gui_departure_board_t::add_coupled_destination(halthandle_t halt, convoihandle_t cnv, halthandle_t next_halt, sint32 delta_ticks)
+{
+	if(  !cnv->is_coupled_primary()  ) {
+		return;
+	}
+	const convoihandle_t joined = cnv->get_coupled_convoi();
+	const halthandle_t joined_next = joined->get_schedule()->get_next_halt( joined->get_owner(), halt );
+	if(  joined_next.is_bound()  &&  joined_next != next_halt  ) {
+		dest_info_t next( joined_next, delta_ticks, joined );
+		if(  delta_ticks  ) {
+			destinations.insert_ordered( next, compare_hi );
+		}
+		else {
+			destinations.append_unique( next );
+		}
+	}
+}
+
+
 // refreshes the departure string
 void gui_departure_board_t::update_departures(halthandle_t halt)
 {
@@ -768,15 +791,18 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 			// fork: a waiting convoy leaves in its timetable slot or at the end of its wait, not right now
 			sint64 slot;
 			bool latest;
+			sint32 dep_ticks = 0;
 			if(  cnv->get_planned_departure( slot, latest )  ) {
 				const sint64 wait_ticks = welt->calendar_minutes_to_ticks( slot - welt->get_calendar_minutes() );
-				dest_info_t next( next_halt, cur_ticks + (sint32)max( wait_ticks, 0 ), cnv );
+				dep_ticks = cur_ticks + (sint32)max( wait_ticks, 0 );
+				dest_info_t next( next_halt, dep_ticks, cnv );
 				destinations.insert_ordered( next, compare_hi );
 			}
 			else {
 				dest_info_t next( next_halt, 0, cnv );
 				destinations.append_unique( next );
 			}
+			add_coupled_destination( halt, cnv, next_halt, dep_ticks );
 			if(  grund_t *gr = welt->lookup( cnv->get_vehikel(0)->last_stop_pos )  ) {
 				if(  gr->get_halt().is_bound()  &&  gr->get_halt() != halt  ) {
 					dest_info_t prev( gr->get_halt(), 0, cnv );
@@ -809,6 +835,7 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 				if(  next_halt.is_bound()  ) {
 					dest_info_t next( next_halt, delta_t+2000, cnv );
 					destinations.insert_ordered( next, compare_hi );
+					add_coupled_destination( halt, cnv, next_halt, delta_t+2000 );
 				}
 			}
 		}

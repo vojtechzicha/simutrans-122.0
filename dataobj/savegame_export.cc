@@ -261,6 +261,8 @@ static const char *export_convoi_state_name( int state )
 		case convoi_t::CAN_START_TWO_MONTHS:             return "can_start_two_months";
 		case convoi_t::LEAVING_DEPOT:                    return "leaving_depot";
 		case convoi_t::ENTERING_DEPOT:                   return "entering_depot";
+		case convoi_t::COUPLED:                          return "coupled";
+		case convoi_t::UNCOUPLING:                       return "uncoupling";
 		default:                                         return "unknown";
 	}
 }
@@ -340,6 +342,14 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 		}
 		w.end_array();
 		w.kv_int( "stop_type", entry.stop_type );
+		// fork, coupling: a train of this schedule joins a train of that line here
+		if(  entry.has_coupling()  ) {
+			w.kv_int( "couple_line_id", entry.couple_line_id );
+		}
+		else {
+			w.kv_null( "couple_line_id" );
+		}
+		w.kv_int( "couple_max_wait", entry.couple_max_wait );
 		w.end_object();
 	}
 	w.end_array();
@@ -908,12 +918,27 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		}
 		w.kv_string( "state", export_convoi_state_name( cnv->get_state() ) );
 		w.kv_koord3d( "pos", cnv->get_pos() );
-		w.kv_int( "vehicle_count", cnv->get_vehicle_count() );
+		// fork, coupling: a primary drives the vehicles of the joined train as well, they are listed there
+		const uint8 own_vehicles = cnv->get_own_vehicle_count();
+		w.kv_int( "vehicle_count", own_vehicles );
+		if(  cnv->is_coupled_primary()  ) {
+			w.kv_string( "coupling", "primary" );
+			w.kv_int( "coupled_with", cnv->get_coupled_convoi().get_id() );
+		}
+		else if(  cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound()  ) {
+			w.kv_string( "coupling", "joined" );
+			w.kv_int( "coupled_with", cnv->get_coupled_convoi().get_id() );
+		}
+		else {
+			w.kv_null( "coupling" );
+			w.kv_null( "coupled_with" );
+		}
+		w.kv_bool( "running_late", cnv->is_running_late() );
 
 		sint64 total_capacity = 0;
 		sint64 total_loaded = 0;
 		w.array_key( "vehicles" );
-		for(  uint8 i = 0;  i < cnv->get_vehicle_count();  i++  ) {
+		for(  uint8 i = 0;  i < own_vehicles;  i++  ) {
 			const vehicle_t *v = cnv->get_vehikel( i );
 			if(  v == NULL  ) {
 				continue;
@@ -942,6 +967,8 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 				w.kv_null( "max_speed" );
 				w.kv_null( "power" );
 			}
+			// fork, mixed traction: engine hauled without pulling right now
+			w.kv_bool( "idle", v->is_idle() );
 			w.end_object();
 		}
 		w.end_array();
@@ -949,6 +976,13 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		// min_top_speed is in internal speed units, the dialogs show it as km/h
 		w.kv_int( "max_speed", speed_to_kmh( cnv->get_min_top_speed() ) );
 		w.kv_int( "sum_power", cnv->get_sum_power() );
+		// fork, mixed traction (electric and other engines): which engines pull now, null otherwise
+		if(  cnv->has_mixed_traction()  ) {
+			w.kv_string( "traction", cnv->is_traction_off_wire() ? "off_wire" : (cnv->get_traction_both_under_wire() ? "under_wire_all" : "under_wire_electric") );
+		}
+		else {
+			w.kv_null( "traction" );
+		}
 		w.kv_int( "loading_level", cnv->get_loading_level() );
 		w.kv_int( "loading_limit", cnv->get_loading_limit() );
 		w.kv_int( "total_capacity", total_capacity );
