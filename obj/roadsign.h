@@ -51,9 +51,17 @@ public:
 
 	/**
 	 * fork: true when this sign or signal applies to a vehicle leaving its tile in direction exit_dir
-	 * (a one-way sign applies to the direction it lets through, a two-way sign to both)
+	 * (a one-way sign applies to the direction it lets through, a two-way sign to both).
+	 * A station boundary applies to the direction its image shows: a roadsign shows the image of dir,
+	 * a signal the image of the direction it lets through, so a station boundary with dir east looks
+	 * like a signal for eastbound trains and applies to them.
 	 */
-	bool applies_to(ribi_t::ribi exit_dir) const { return (exit_dir & calc_mask()) == 0; }
+	bool applies_to(ribi_t::ribi exit_dir) const {
+		if(  desc->is_station_boundary()  &&  ribi_t::is_single(dir)  ) {
+			return (exit_dir & dir) != 0;
+		}
+		return (exit_dir & calc_mask()) == 0;
+	}
 
 	/*
 	* sets ribi mask of the sign

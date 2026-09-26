@@ -333,9 +333,10 @@ with `is_signal=1`, and `station_boundary=1`; art and pak64 placeholders in `too
 objects come from the pakset repo (`VZ-Signals-rail.pak`, built with the fork's makeobj): `P` as
 `VZ-Signals-D3-P` and `VZ-Signals-D1-{New,Old,Dwarf}-P`, `LT` as `VZ-Signals-D3-LT` and
 `VZ-Signals-D1-{New,Old,Dwarf}-LT`; a `P` has 8 images (16 with a wired set), an `LT` exactly 4
-(more would make it a traffic light). A roadsign shows the image of its stored ribi, the opposite of the
-direction it applies to, so `LT` art drawn like a signal needs N/S and W/E swapped (the pakset's
-`build.py` does it; see `tools/fork-signals/README.md`):
+(more would make it a traffic light). An `LT` applies to the direction its image shows, like a signal:
+`roadsign_t::applies_to` reads its stored direction as the one it applies to (a stock one-way sign's
+is the blocked one), so an `LT` that looks right is right; its art keeps the signal image layout
+(see `tools/fork-signals/README.md`):
 - Platform signal `P`: one-way exit signal at each end of a station track. It applies only to trains
   leaving in its direction (`roadsign_t::applies_to`) and sets no ribi mask, so the track stays
   two-way. Rail code asks `rail_vehicle_t::is_stop_point` (a signal that applies, or a station

@@ -23,15 +23,16 @@ Obj=roadsign
 Name=StationBoundary
 waytype=track
 station_boundary=1
-Image[0..3]=...     like the end-of-choose sign: N,S,W,E
+Image[0..3]=...     N,S,W,E laid out like a signal (see below)
 ```
 
-Image order matters for the station boundary. A signal shows the image of the direction it applies
-to, but a roadsign shows the image of its stored ribi, which is the opposite direction. So the
-station boundary's `Image[N]` must show the board as the southbound train sees it, and so on. A sheet
-drawn like the signal sheets (column = the direction it applies to) needs N/S and W/E swapped in the
-dat, otherwise every LT that looks right applies to the trains leaving the station and the
-single-track section is never protected. The pak128.cs set's `build.py` does that swap.
+The station boundary's images are laid out like a signal's: `Image[E]` shows the board as the
+eastbound train sees it (with signals on the right: on its right, face towards it), and that sign
+applies to eastbound trains. The game picks a roadsign's image by its stored direction, so for this
+one sign the fork reads the stored direction as the direction it applies to (`roadsign_t::applies_to`),
+not as the blocked one like a stock one-way sign. Do not reorder the images to compensate: the
+per-image offsets, the foreground/background layer and the height on slopes belong to the slot, so
+reordered art stands on the wrong side and floats on slopes.
 
 The fastest way to real art is to copy the dat entry of an existing signal and of the end-of-choose
 sign in the pakset, give them new names and add the flag line. The pak node format is unchanged, so
