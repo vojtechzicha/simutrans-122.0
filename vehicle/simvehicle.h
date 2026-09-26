@@ -601,6 +601,14 @@ private:
 	// route->back(); path runs from route->at(start) to the stop end or to that signal
 	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path);
 
+	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none
+	uint32 get_onward_length(koord3d from, koord3d next_stop);
+
+	// a platform other than the planned one: the way on from it to next_stop exists and is not much
+	// longer than planned_length (from the planned platform, 0 = unknown); a platform on the other side
+	// with no crossover after it would only lead back
+	bool leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length);
+
 	// path (from find_station_track, starting at route index start) in place of the route from there on;
 	// when the train passes (!stops), on from the end of path to the end of the route
 	bool route_through(route_t *route, uint32 start, const route_t &path, bool stops);
