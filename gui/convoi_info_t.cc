@@ -121,6 +121,8 @@ void convoi_info_t::init(convoihandle_t cnv)
 
 			departure_label.set_visible(false);
 			add_component(&departure_label);
+			coupling_label.set_visible(false);
+			add_component(&coupling_label);
 
 			add_component(&container_line);
 			container_line.set_table_layout(3,1);
@@ -308,11 +310,13 @@ void convoi_info_t::update_labels()
 	}
 	line_label.update();
 
-	// fork: when this convoy is going to leave (timetable slot, or the end of its maximum wait)
+	// fork: when this convoy is going to leave (timetable slot, or the end of its maximum wait);
+	// a coupled train leaves with its primary
 	sint64 slot = 0;
 	bool latest = false;
-	const convoihandle_t passing = cnv->get_passing_hold_for();
-	const bool show_departure = passing.is_bound()  ||  cnv->get_planned_departure( slot, latest );
+	const convoihandle_t dep_cnv = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
+	const convoihandle_t passing = dep_cnv->get_passing_hold_for();
+	const bool show_departure = passing.is_bound()  ||  dep_cnv->get_planned_departure( slot, latest );
 	if(  passing.is_bound()  ) {
 		// fork: waiting at the stop for a passing train to go by
 		departure_label.buf().printf( translator::translate("Waiting for %s to pass"), passing->get_name() );
@@ -331,7 +335,7 @@ void convoi_info_t::update_labels()
 		else {
 			departure_label.buf().append( translator::translate(" (now)") );
 		}
-		const uint32 ahead = cnv->get_line().is_bound()  &&  cnv->get_schedule()->get_current_entry().has_timetable() ? cnv->get_line()->count_earlier_waiting( cnv ) : 0;
+		const uint32 ahead = dep_cnv->get_line().is_bound()  &&  dep_cnv->get_schedule()->get_current_entry().has_timetable() ? dep_cnv->get_line()->count_earlier_waiting( dep_cnv ) : 0;
 		if(  ahead > 0  ) {
 			departure_label.buf().printf( translator::translate(", %d ahead"), (int)ahead );
 		}
@@ -339,6 +343,31 @@ void convoi_info_t::update_labels()
 	departure_label.update();
 	if(  departure_label.is_visible() != show_departure  ) {
 		departure_label.set_visible( show_departure );
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
+
+	// fork: coupling
+	const convoihandle_t other = cnv->get_coupled_convoi();
+	if(  cnv->is_coupled()  &&  other.is_bound()  ) {
+		coupling_label.buf().printf( translator::translate("Coupled to %s"), other->get_name() );
+	}
+	else if(  cnv->is_coupled_primary()  ) {
+		coupling_label.buf().printf( translator::translate("Coupled with %s"), other->get_name() );
+	}
+	else if(  cnv->get_state()==convoi_t::UNCOUPLING  ) {
+		coupling_label.buf().append( translator::translate("Uncoupled, waiting for the platform") );
+	}
+	else if(  cnv->is_waiting_for_coupling()  ) {
+		coupling_label.buf().append( translator::translate("Waiting for the train to couple with") );
+	}
+	else if(  cnv->is_running_late()  ) {
+		coupling_label.buf().append( translator::translate("Running late (missed coupling)") );
+	}
+	const bool show_coupling = coupling_label.buf().len() > 0;
+	coupling_label.update();
+	if(  coupling_label.is_visible() != show_coupling  ) {
+		coupling_label.set_visible( show_coupling );
 		reset_min_windowsize();
 		set_windowsize( get_windowsize() );
 	}
@@ -409,6 +438,11 @@ void convoi_info_t::draw(scr_coord pos, scr_size size)
 	// update button & labels
 	follow_button.pressed = (welt->get_viewport()->get_follow_convoi()==cnv);
 	update_labels();
+	if(  details->update_vehicles()  ) {
+		// fork: coupled or uncoupled, the vehicle list and its labels got new sizes
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
 
 	route_bar.set_base(cnv->get_route()->get_count()-1);
 	cnv_route_index = cnv->front()->get_route_index() - 1;

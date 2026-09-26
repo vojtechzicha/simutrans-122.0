@@ -809,7 +809,7 @@ uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& 
  * Remove freight that no longer can reach it's destination
  * i.e. because of a changed schedule
  */
-void vehicle_t::remove_stale_cargo()
+void vehicle_t::remove_stale_cargo(const schedule_t *sched)
 {
 	DBG_DEBUG("vehicle_t::remove_stale_cargo()", "called");
 
@@ -818,6 +818,9 @@ void vehicle_t::remove_stale_cargo()
 	// the new schedule, if not -> remove
 	slist_tpl<ware_t> kill_queue;
 	total_freight = 0;
+	if(  sched == NULL  ) {
+		sched = cnv->get_schedule();
+	}
 
 	if (!fracht.empty()) {
 		FOR(slist_tpl<ware_t>, & tmp, fracht) {
@@ -825,7 +828,7 @@ void vehicle_t::remove_stale_cargo()
 
 			if(  tmp.get_zwischenziel().is_bound()  ) {
 				// the original halt exists, but does we still go there?
-				FOR(minivec_tpl<schedule_entry_t>, const& i, cnv->get_schedule()->entries) {
+				FOR(minivec_tpl<schedule_entry_t>, const& i, sched->entries) {
 					if(  haltestelle_t::get_halt( i.pos, cnv->get_owner()) == tmp.get_zwischenziel()  ) {
 						found = true;
 						break;
@@ -834,11 +837,11 @@ void vehicle_t::remove_stale_cargo()
 			}
 			if(  !found  ) {
 				// the target halt may have been joined or there is a closer one now, thus our original target is no longer valid
-				const int offset = cnv->get_schedule()->get_current_stop();
-				const int max_count = cnv->get_schedule()->entries.get_count();
+				const int offset = sched->get_current_stop();
+				const int max_count = sched->entries.get_count();
 				for(  int i=0;  i<max_count;  i++  ) {
 					// try to unload on next stop
-					halthandle_t halt = haltestelle_t::get_halt( cnv->get_schedule()->entries[ (i+offset)%max_count ].pos, cnv->get_owner() );
+					halthandle_t halt = haltestelle_t::get_halt( sched->entries[ (i+offset)%max_count ].pos, cnv->get_owner() );
 					if(  halt.is_bound()  ) {
 						if(  halt->is_enabled(tmp.get_index())  ) {
 							// ok, lets change here, since goods are accepted here
@@ -960,6 +963,8 @@ vehicle_t::vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t* player) 
 	check_for_finish = false;
 	use_calc_height = true;
 	has_driven = false;
+	idle = false;
+	on_wire = true;
 
 	previous_direction = direction = ribi_t::none;
 	target_halt = halthandle_t();
@@ -982,6 +987,8 @@ vehicle_t::vehicle_t() :
 	leading = last = false;
 	check_for_finish = false;
 	use_calc_height = true;
+	idle = false;
+	on_wire = true;
 
 	previous_direction = direction = ribi_t::none;
 }
@@ -1164,6 +1171,14 @@ void vehicle_t::hop(grund_t* gr)
 		speed_limit = SPEED_UNLIMITED;
 	}
 
+	// fork, mixed traction: an electric engine entering or leaving catenary changes which engines pull
+	if(  cnv->has_mixed_traction()  &&  desc->get_power()  &&  desc->get_engine_type()==vehicle_desc_t::electric  ) {
+		const bool was_on_wire = on_wire;
+		if(  update_on_wire() != was_on_wire  ) {
+			cnv->recalc_traction( false );
+		}
+	}
+
 	if(  leading  ) {
 		if(  check_for_finish  &&  (direction==ribi_t::north  ||  direction==ribi_t::west)  ) {
 			steps_next = (steps_next/2)+1;
@@ -1228,10 +1243,24 @@ void vehicle_t::calc_friction(const grund_t *gr)
 }
 
 
+bool vehicle_t::update_on_wire()
+{
+	if(  const grund_t *gr = welt->lookup( get_pos() )  ) {
+		const weg_t *w = gr->get_weg( get_waytype() );
+		if(  w == NULL  &&  get_waytype() == tram_wt  ) {
+			// tram depots stand on track
+			w = gr->get_weg( track_wt );
+		}
+		on_wire = w != NULL  &&  w->is_electrified();
+	}
+	return on_wire;
+}
+
+
 void vehicle_t::make_smoke() const
 {
-	// does it smoke at all?
-	if(  smoke  &&  desc->get_smoke()  ) {
+	// does it smoke at all? (fork: an idle engine does not)
+	if(  smoke  &&  !idle  &&  desc->get_smoke()  ) {
 		// only produce smoke when heavily accelerating or steam engine
 		if(  cnv->get_akt_speed() < (sint32)((cnv->get_speed_limit() * 7u) >> 3)  ||  desc->get_engine_type() == vehicle_desc_t::steam  ) {
 			grund_t* const gr = welt->lookup( get_pos() );
@@ -2398,6 +2427,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
+	couple_goal = koord3d::invalid;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2448,6 +2478,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
+	couple_goal = koord3d::invalid;
 }
 
 
@@ -2549,7 +2580,8 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 	if(sch->has_sign()) {
 		const roadsign_t* rs = bd->find<roadsign_t>();
 		if(  rs->get_desc()->get_wtyp()==get_waytype()  ) {
-			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_min_top_speed()  ) {
+			// fork, mixed traction: the engines that pull on this tile decide
+			if(  cnv != NULL  &&  rs->get_desc()->get_min_speed() > 0  &&  rs->get_desc()->get_min_speed() > cnv->get_traction_top_speed( sch->is_electrified() )  ) {
 				// below speed limit
 				return false;
 			}
@@ -2574,6 +2606,17 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 		}
 		// only free track, not even our own
 		return detour_any_track  ||  !sch->is_reserved();
+	}
+
+	if(  couple_search.is_bound()  ) {
+		// fork, coupling: the way to our partner, over any track up to the end of choose
+		if(  sch->has_sign()  ) {
+			const roadsign_t* rs = bd->find<roadsign_t>();
+			if(  rs  &&  rs->get_desc()->get_wtyp()==get_waytype()  &&  (rs->get_desc()->get_flags() & roadsign_desc_t::END_OF_CHOOSE_AREA)  ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	if(  target_halt.is_bound()  &&  cnv->is_waiting()  ) {
@@ -2628,6 +2671,10 @@ int rail_vehicle_t::get_cost(const grund_t *gr, const weg_t *w, const sint32 max
 bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 {
 	const schiene_t * sch1 = (const schiene_t *) gr->get_weg(get_waytype());
+	if(  couple_search.is_bound()  ) {
+		// fork, coupling: a tile of our partner standing there, or the end of its route into the stop
+		return couple_goal!=koord3d::invalid ? gr->get_pos()==couple_goal : sch1->get_reserved_convoi()==couple_search;
+	}
 	if(  detour_target!=koord3d::invalid  ) {
 		// way through a choose area: back on the planned route at the end of choose tile,
 		// driving on in the planned direction (check_next_tile made sure it is free)
@@ -2883,6 +2930,19 @@ skip_choose:
 		sig->set_state(  roadsign_t::rot );
 		restart_speed = 0;
 		return false;
+	}
+
+	{
+		// fork, coupling: to the platform of our partner, first come first served
+		bool standing;
+		const convoihandle_t partner = cnv->find_partner_at( target->get_halt(), standing );
+		if(  partner.is_bound()  ) {
+			const int result = reserve_to_partner( sig, start_block, partner, standing, restart_speed );
+			if(  result >= 0  ) {
+				return result > 0;
+			}
+			// no way to its platform from here: choose as usual
+		}
 	}
 
 	target_halt = target->get_halt();
@@ -3407,6 +3467,51 @@ bool rail_vehicle_t::reserve_choose_detour(const uint16 start_block, const uint1
 }
 
 
+int rail_vehicle_t::reserve_to_partner(signal_t *sig, const uint16 start_block, convoihandle_t partner, bool standing, sint32 &restart_speed)
+{
+	uint16 next_signal, next_crossing;
+	route_t const* const route = cnv->get_route();
+	// already on the way there?
+	const koord3d goal = standing ? partner->front()->get_pos() : partner->get_route()->back();
+	bool on_way = false;
+	for(  uint32 i=start_block+1;  !on_way  &&  i<route->get_count();  i++  ) {
+		const grund_t *gr = welt->lookup( route->at(i) );
+		const schiene_t *sch = gr ? obj_cast<schiene_t>( gr->get_weg( get_waytype() ) ) : NULL;
+		on_way = route->at(i)==goal  ||  (standing  &&  sch  &&  sch->get_reserved_convoi()==partner);
+	}
+	if(  !on_way  ) {
+		if(  !cnv->is_waiting()  ) {
+			// the route search needs a step: come to the signal first
+			restart_speed = -1;
+			return 0;
+		}
+		route_t target_rt;
+		couple_search = partner;
+		couple_goal = standing ? koord3d::invalid : goal;
+		const ribi_t::ribi start_dir = ribi_type( route->at(start_block), route->at(start_block+1) );
+		const bool found = target_rt.find_route( welt, route->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), start_dir, welt->get_settings().get_max_choose_route_steps() );
+		couple_search = convoihandle_t();
+		couple_goal = koord3d::invalid;
+		if(  !found  ) {
+			// no way there from this signal
+			return -1;
+		}
+		cnv->access_route()->remove_koord_from( start_block );
+		cnv->access_route()->append( &target_rt );
+	}
+	// reserves up to the tile right behind a standing partner (see convoi_t::cut_route_before_partner);
+	// fails while the partner still runs in, then we try again
+	if(  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
+		sig->set_state( roadsign_t::rot );
+		restart_speed = 0;
+		return 0;
+	}
+	sig->set_state( roadsign_t::gruen );
+	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+	return 1;
+}
+
+
 bool rail_vehicle_t::is_pre_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed)
 {
 	// parse to next signal; if needed recurse, since we allow cascading
@@ -3648,6 +3753,11 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 #endif
 	slist_tpl<grund_t *> signs; // switch all signals on their way too ...
 
+	// fork, coupling: stop right behind our partner standing at our next stop
+	if(  reserve  &&  route==cnv->get_route()  ) {
+		cnv->cut_route_before_partner( start_index );
+	}
+
 	if(start_index>=route->get_count()) {
 		cnv->set_next_reservation_index( max(route->get_count(),1)-1 );
 		return 0;
@@ -3762,6 +3872,10 @@ void rail_vehicle_t::leave_tile()
 			schiene_t *sch0 = (schiene_t *) gr->get_weg(get_waytype());
 			if(sch0) {
 				sch0->unreserve(this);
+				// fork, coupling: the train we just uncoupled takes the tile over
+				if(  cnv  ) {
+					cnv->handover_tile( get_pos() );
+				}
 				// tell next signal?
 				// and switch to red
 				if(sch0->has_signal()) {

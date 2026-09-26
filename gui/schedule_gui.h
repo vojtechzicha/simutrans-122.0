@@ -32,25 +32,6 @@ class schedule_gui_stats_t;
 
 
 /**
- * Label whose column keeps a minimum width, so a longer text later on is not clipped
- * to an ellipsis (the layout is computed once, with the text of that moment).
- */
-class gui_label_minw_t : public gui_label_buf_t
-{
-	scr_coord_val min_w;
-public:
-	gui_label_minw_t() : min_w(0) {}
-	void set_min_width(scr_coord_val w) { min_w = w; }
-	scr_size get_min_size() const OVERRIDE
-	{
-		scr_size s = gui_label_buf_t::get_min_size();
-		s.w = max( s.w, min_w );
-		return s;
-	}
-};
-
-
-/**
  * GUI for Schedule dialog
  */
 class schedule_gui_t : public gui_frame_t, public action_listener_t
@@ -83,6 +64,13 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 
 	void read_extra_offsets();       // parse input_extra into the current entry
 	void show_extra_offsets(const schedule_entry_t &entry);
+
+	/// coupling (fork, rail): at this stop a train of this line joins a train of the chosen line
+	gui_label_t lb_couple, lb_couple_wait;
+	gui_combobox_t couple_selector;
+	gui_numberinput_t numimp_couple_wait;
+	uint32 couple_line_count;        // lines in couple_selector, to notice new or deleted lines
+	void init_couple_selector();
 
 	/// the schedule belongs to a line (timetable slots only work with lines)
 	bool has_line() const;

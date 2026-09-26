@@ -44,6 +44,7 @@ private:
 	obj_view_t view;
 	gui_label_buf_t speed_label, profit_label, running_cost_label, weight_label, target_label, line_label;
 	gui_label_buf_t departure_label; // timetable (fork): planned departure while waiting at a stop
+	gui_label_buf_t coupling_label;  // coupling (fork): coupled with, uncoupled, running late
 	gui_textinput_t input;
 	gui_speedbar_t filled_bar;
 	gui_speedbar_t speed_bar;

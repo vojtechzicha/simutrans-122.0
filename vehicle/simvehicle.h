@@ -248,6 +248,8 @@ protected:
 	bool smoke:1;
 	bool check_for_finish:1; // true, if on the last tile
 	bool has_driven:1;
+	bool idle:1;    // fork, mixed traction: engine hauled without pulling (no power, cost, smoke, sound)
+	bool on_wire:1; // fork: the tile has catenary (tracked only for electric engines of mixed traction convoys)
 
 	bool check_next_tile(const grund_t* ) const OVERRIDE {return false;}
 
@@ -288,6 +290,13 @@ public:
 	sint32 get_purchase_time() const {return purchase_time;}
 
 	void get_smoke(bool yesno ) { smoke = yesno;}
+
+	/// fork, mixed traction: set by the convoy when this engine does not pull
+	void set_idle(bool yesno) { idle = yesno; }
+	bool is_idle() const { return idle; }
+
+	/// fork: reads whether the current tile has catenary and remembers it
+	bool update_on_wire();
 
 	virtual bool calc_route(koord3d start, koord3d ziel, sint32 max_speed, route_t* route);
 	uint16 get_route_index() const {return route_index;}
@@ -426,7 +435,8 @@ public:
 	* Remove freight that no longer can reach it's destination
 	* i.e. because of a changed schedule
 	*/
-	void remove_stale_cargo();
+	/// fork: sched is the schedule to check against (default: the convoi's; a coupled train's own)
+	void remove_stale_cargo(const schedule_t *sched = NULL);
 
 	/**
 	* Generate a matching schedule for the vehicle type
@@ -533,6 +543,15 @@ private:
 
 	// during the check that a Hold platform leads on to the end of choose: any track, reserved or not
 	bool detour_any_track;
+
+	// fork, coupling: during the search for the way to the platform of this partner: any of its tiles
+	// when it stands there, else couple_goal (the end of its route); unbound while no such search runs
+	convoihandle_t couple_search;
+	koord3d couple_goal;
+
+	// fork, coupling: at a choose signal, the way to the platform of our partner:
+	// 1 reserved, 0 wait at red (partner still running in, or the way is taken), -1 no way there
+	int reserve_to_partner(signal_t *sig, uint16 start_block, convoihandle_t partner, bool standing, sint32 &restart_speed);
 
 	// from the end of this way to a platform, the track leads on forward to the end of choose
 	bool has_onward_path(const route_t &to_platform, uint16 end_of_choose);

@@ -18,6 +18,7 @@
 #include "vehicle/overtaker.h"
 #include "tpl/array_tpl.h"
 #include "tpl/minivec_tpl.h"
+#include "tpl/vector_tpl.h"
 
 #include "convoihandle_t.h"
 #include "halthandle_t.h"
@@ -71,6 +72,8 @@ public:
 		CAN_START_TWO_MONTHS,
 		LEAVING_DEPOT,
 		ENTERING_DEPOT,
+		COUPLED,        ///< fork: joined to a primary train, which drives its vehicles (see coupled_convoi)
+		UNCOUPLING,     ///< fork: just uncoupled, off the map until the primary has left the platform
 		MAX_STATES
 	};
 
@@ -240,6 +243,38 @@ private:
 	bool passing_hold_released;
 
 	/**
+	 * Fork, coupling (rail). A primary train carries the vehicles of the train that joined it at
+	 * the end of fahr, from index coupled_first on, and coupled_convoi is that train. The joined
+	 * train is in state COUPLED: its fahr points to the same vehicles (they belong to the primary
+	 * while coupled, see get_vehicle_owner) and its coupled_convoi is the primary.
+	 * A train in state UNCOUPLING has just been uncoupled: its vehicles are off the map until the
+	 * primary (its coupled_convoi) has left uncouple_span (tiles, rear to front), then it appears
+	 * there. The primary hands over the span tiles as its last vehicle leaves them (handover_to).
+	 */
+	convoihandle_t coupled_convoi;
+	uint8 coupled_first;
+	convoihandle_t handover_to;
+	vector_tpl<koord3d> uncouple_span;
+
+	/**
+	 * Fork, coupling: waiting at a stop for the partner since this tick (0 = not waiting), and the
+	 * timetable slot held meanwhile (-1 = none), so a late departure keeps it.
+	 */
+	uint32 couple_wait_since;
+	sint64 couple_hold_slot;
+
+	/**
+	 * Fork, coupling: running late after the primary left without us; late_slot is the slot
+	 * inherited for the current stop (-1 = none), see simline_t::get_late_departure_slot.
+	 */
+	bool running_late;
+	sint64 late_slot;
+
+	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
+	uint32 uncouple_since;
+	bool uncouple_warned;
+
+	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
 	*/
 	bool freight_info_resort;
@@ -247,8 +282,22 @@ private:
 	// true, if at least one vehicle of a convoi is obsolete
 	bool has_obsolete;
 
-	// true, if there is at least one engine that requires catenary
+	// true, if all engines require catenary (fork: an electric engine together with another engine does not)
 	bool is_electric;
+
+	/**
+	 * Fork, mixed traction: the convoy has electric engines and other engines (diesel, steam, ...).
+	 * The electric ones pull only under wires, the others off wires, and under wires only when that
+	 * gives a higher loaded top speed (traction_both_under_wire, chosen at departure).
+	 * An idle engine adds neither power, running cost nor its top speed limit. Not saved.
+	 */
+	bool traction_mixed;
+	bool traction_off_wire;        ///< at least one electric engine is on a tile without catenary
+	bool traction_both_under_wire; ///< under wires the other engines pull too
+	sint32 traction_top_speed_under_wire; ///< top speed limit of the engines that pull under wires
+	sint32 traction_top_speed_off_wire;   ///< top speed limit of the engines that pull off wires
+	sint32 traction_power_speed_under_wire; ///< speed reachable under wires with the load at departure
+	sint32 traction_power_speed_off_wire;   ///< speed reachable off wires with the load at departure
 
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
@@ -256,7 +305,7 @@ private:
 	uint8 freight_info_order;
 
 	/*
-	 * caches the running costs
+	 * caches the running costs (fork: only of the vehicles that are not idle engines)
 	 */
 	sint32 sum_running_costs;
 	sint32 sum_fixed_costs;
@@ -393,6 +442,34 @@ private:
 
 	uint32 move_to(uint16 start_index);
 
+	/**
+	 * Puts the whole train on the start of its route and drives it on until it is completely on
+	 * the track (the vehicles are placed without hopping). Returns true if the route was too
+	 * short for that, i.e. the train is at its destination already.
+	 */
+	bool lay_out_on_route();
+
+	/// fork, coupling: the tiles under the vehicles, rear to front
+	void get_train_tiles(vector_tpl<koord3d> &tiles) const;
+
+	/// fork, coupling: joins the train C to the primary P standing next to it at a stop
+	static bool couple(convoihandle_t P, convoihandle_t C);
+
+	/// fork, coupling: at a stop where the schedules part, the joined train stays behind
+	void uncouple_here();
+
+	/// fork, coupling: while UNCOUPLING, takes the span tiles over and appears when all are ours
+	void step_uncoupling();
+
+	/// fork, coupling: the joined train takes its vehicles back where they stand (primary removed)
+	void release_coupled_in_place();
+
+	/// fork, coupling: a primary gives the joined train its vehicles back (they stay where they are)
+	void detach_coupled_vehicles();
+
+	/// fork, coupling: the joined train's schedule follows the primary to this stop; false if it does not stop here
+	bool follow_to_stop(halthandle_t halt);
+
 public:
 	/**
 	* Convoi haelt an Haltestelle und setzt quote fuer Fracht
@@ -429,6 +506,53 @@ public:
 
 	/* true, if electrification needed for this convoi */
 	bool needs_electrification() const { return is_electric; }
+
+	/// fork: true, if the convoy has electric and other engines (mixed traction)
+	bool has_mixed_traction() const { return traction_mixed; }
+
+	/// fork: true, if electric engines of this convoy are pulling now (for the electricity toll)
+	bool draws_electricity() const { return is_electric  ||  (traction_mixed  &&  !traction_off_wire); }
+
+	/// fork, mixed traction: true, if the other engines pull under wires as well
+	bool get_traction_both_under_wire() const { return traction_both_under_wire; }
+
+	/// fork, mixed traction: true, if an electric engine is off wires, so only the other engines pull
+	bool is_traction_off_wire() const { return traction_off_wire; }
+
+	/**
+	 * fork: top speed limit of the engines that pull on a tile with (@p electrified) or without
+	 * catenary; for route checks like minimum speed signs. min_top_speed for other convoys.
+	 */
+	sint32 get_traction_top_speed(bool electrified) const
+	{
+		return traction_mixed ? (electrified ? traction_top_speed_under_wire : traction_top_speed_off_wire) : min_top_speed;
+	}
+
+	/// fork: power (kW, without gear) of the engines that pull now
+	uint32 get_active_power() const;
+
+	/**
+	 * Fork: recalculates which engines pull (power, running costs, top speed) from the tiles of the
+	 * electric engines. With @p choose also decides whether the other engines pull under wires,
+	 * from the current weight. Called when the convoy changes, departs, and when an electric engine
+	 * of a mixed traction convoy enters or leaves catenary.
+	 */
+	void recalc_traction(bool choose);
+
+	/**
+	 * Fork: the power (times gear) and the top speed of the engines that pull in a mode, plus the
+	 * unpowered vehicles. For a convoy without mixed traction everything counts in every mode.
+	 */
+	void calc_traction_sums(bool off_wire, bool both_under_wire, sint32 &gear_and_power, sint32 &top_speed, sint32 &running_costs) const;
+
+	/**
+	 * Fork: top speed at @p total_weight under wires (the better choice of engines) or off wires.
+	 * Same as calc_max_speed() with all engines for a convoy without mixed traction.
+	 */
+	sint32 calc_traction_max_speed(uint64 total_weight, bool off_wire) const;
+
+	/// fork: plays the sound of the first engine that pulls (stock: of the front vehicle)
+	void play_start_sound() const;
 
 	/**
 	* set line
@@ -589,6 +713,9 @@ public:
 	 * Add the costs for travelling one tile
 	 */
 	void add_running_cost( const weg_t *weg );
+
+	/// fork, coupling: add_running_cost for our own vehicles (sum_running_costs)
+	void add_running_cost_own( const weg_t *weg );
 
 	/**
 	 * moving the vehicles of a convoi and acceleration/deceleration
@@ -836,6 +963,41 @@ public:
 
 	// standing at a stop (loading, or finding its route before leaving): road traffic may pass it
 	bool is_standing() const { return state==LOADING  ||  state==ROUTING_1  ||  state==NO_ROUTE; }
+
+	// fork, coupling (see coupled_convoi)
+	bool is_coupled() const { return state==COUPLED; }
+	bool is_coupled_primary() const { return coupled_convoi.is_bound()  &&  state!=COUPLED  &&  state!=UNCOUPLING; }
+	convoihandle_t get_coupled_convoi() const { return coupled_convoi; }
+	uint8 get_coupled_first() const { return coupled_first; }
+	/// the convoi whose vehicle i is (the joined train for its part of a coupled primary)
+	convoihandle_t get_vehicle_owner(uint8 i) const { return is_coupled_primary()  &&  i>=coupled_first ? coupled_convoi : self; }
+	/// the number of the primary's own vehicles, at the start of fahr
+	uint8 get_own_vehicle_count() const { return is_coupled_primary() ? coupled_first : anz_vehikel; }
+	bool is_running_late() const { return running_late; }
+	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
+	/// fork, coupling: the primary hands the tile over to the train it just uncoupled
+	void handover_tile(koord3d pos);
+
+	/**
+	 * Fork, coupling: does this train wait for a partner at its current stop? max_wait is the
+	 * waiting time in calendar minutes; for a primary also the line and entry of the partner.
+	 */
+	bool expects_partner(uint16 &max_wait, linehandle_t &partner_line, uint8 &partner_entry) const;
+
+	/**
+	 * Fork, coupling: the partner at the stop this train heads for, standing there or with its
+	 * route reserved into it (standing is set accordingly). Unbound if there is none.
+	 */
+	convoihandle_t find_partner_at(halthandle_t halt, bool &standing) const;
+
+	/**
+	 * Fork, coupling, called when reserving: cut our route before the first tile of our partner
+	 * standing at our next stop, so we stop right behind it. Returns true if the route was cut.
+	 */
+	bool cut_route_before_partner(uint16 start_index);
+
+	/// fork, coupling: can the train C join the primary P at the stop where both stand?
+	static bool can_couple_here(const convoi_t *P, const convoi_t *C);
 
 	// fork, rail: marked as Hold by itself or by its line
 	bool get_hold_marker() const { return hold_marker; }
