@@ -703,6 +703,13 @@ void convoi_t::rotate90( const sint16 y_size )
 	if(schedule) {
 		schedule->rotate90( y_size );
 	}
+	// fork: the claimed track turns with the map
+	for(  uint32 i=0;  i<claim_path.get_count();  i++  ) {
+		claim_path[i].rotate90( y_size );
+	}
+	if(  claim_stop!=koord3d::invalid  ) {
+		claim_stop.rotate90( y_size );
+	}
 	for(  int i=0;  i<anz_vehikel;  i++  ) {
 		fahr[i]->rotate90_freight_destinations( y_size );
 	}
