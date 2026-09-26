@@ -2773,6 +2773,7 @@ bool rail_vehicle_t::is_choose_signal_clear(signal_t *sig, const uint16 start_bl
 {
 	bool choose_ok = false;
 	target_halt = halthandle_t();
+	platform_needs = 0; // set below only for a stop in this area
 
 	uint16 next_signal, next_crossing;
 	grund_t const* const target = welt->lookup(cnv->get_route()->back());
@@ -3255,9 +3256,11 @@ bool rail_vehicle_t::reserve_hold_platform(const uint16 start_block, const uint1
 {
 	route_t const* const route = cnv->get_route();
 
-	// search a free platform before the end of choose, first off the planned way, then anywhere
+	// search a free platform before the end of choose, first off the planned way, then anywhere;
+	// nothing is loaded there, so any platform type will do
 	route_t target_rt;
 	bool found = false;
+	platform_needs = 0;
 	detour_start = route->at(start_block);
 	hold_avoid_from = start_block+1;
 	hold_avoid_to = end_of_choose;
