@@ -252,6 +252,16 @@ no save change). Only a train that turns back at the stop may use one.
   next station counts only if that train comes back from there (turns back there).
 - Passing trains, the PR #1 overtaking detour and the Hold diversion already need a way on forward,
   so they never pick a bay.
+- Directed bays: no platform choice takes a way in that runs through the station the other way
+  first (`turns_round_through`: a tile of the halt passed opposite to the heading at the stop), the
+  way a train turning back would reach a bay facing away from it by U-turning over the crossovers of
+  the far throat, or come back onto a through track from the far side. Such candidates are excluded
+  in the stock choose search, `find_station_track` and the Hold platform search. A planned (clicked)
+  stop reached that way is refused too, unless no stop position of the halt can be reached without
+  it, taken or not (`can_enter_without_turning`, the same search over reserved track), so a layout
+  that needs it (a loop beyond the station) still works. Stations with `P` at their track ends
+  rarely offered such a way anyway (the searches stop at a signal that applies); stations with
+  choose signals did.
 
 ## 4. Stations
 
@@ -426,6 +436,12 @@ that builds the layouts in code (not committed):
   the bay, the turning train takes the bay when its platform is held (before: the westbound
   platform, against the flow), and a through train whose stop was clicked into the bay stops on
   a through track (before: it turned back in the bay and U-turned over the crossovers at A).
+- Directed bays: the same double track with a second bay facing east (entered from the east throat).
+  A train from the west turning back, its tracks and the west bay held, stops on the westbound
+  platform; before, it ran east through B and U-turned into the east bay. A train from the east
+  turning back takes the east bay when its platform is held. A train from the west with its stop
+  clicked into the east bay turns back in the west bay (15 min a round instead of 20), and with all
+  its tracks held on the westbound platform. The earlier bay scenarios run unchanged.
 
 Seen in the Windows game (2026-09-26, merged with coupling and mixed traction, savegame 122.7,
 pak128.cs with the owner's `VZ-Signals-rail.pak`), with a headless harness on Windows plus the GUI:

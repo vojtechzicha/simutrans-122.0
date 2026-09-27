@@ -438,7 +438,10 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   restricted). A train turning back keeps its planned platform when free, else searches bays first
   (`bay_search` 2), then any track; stock choose search and `find_station_track` alike. In the last
   free track rule a free bay counts only at a station of bays only, or in `station_can_release` for a
-  train that comes back from that station.
+  train that comes back from that station. Directed bays: no platform choice takes a way in that runs
+  through the station the other way first (`turns_round_through`; a bay facing away, or a track from
+  the far side, reached by U-turning over the far throat); a clicked stop reached that way is refused
+  too unless the halt has no other way in, taken or not (`can_enter_without_turning`, `turn_probe`).
 - Lock warning: a train waiting 30 minutes for a track (`check_section_lock`) checks the same way
   whether the stations are really locked and posts one message naming them ("Trains are locked
   up at ..."). What still locks: more trains than a group of stations can hold, e.g. trains coming

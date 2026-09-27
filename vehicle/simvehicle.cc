@@ -2581,11 +2581,33 @@ static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &
 	}
 }
 
+/* fork: the path (from index from on) runs through a platform of halt the other way before it stops there:
+ * the train would pass its station, turn round beyond it and come back in (into a bay facing away from
+ * it, or onto a track from the far side). Station platforms are straight, so the way is compared per tile.
+ */
+static bool turns_round_through(const route_t &path, uint32 from, halthandle_t halt)
+{
+	const uint32 n = path.get_count();
+	if(  !halt.is_bound()  ||  n<2  ||  from+1>=n  ) {
+		return false;
+	}
+	const ribi_t::ribi back = ribi_t::backward( ribi_type( path.at(n-2), path.at(n-1) ) );
+	for(  uint32 i=from+1;  i<n;  i++  ) {
+		grund_t const* const gr = world()->lookup( path.at(i) );
+		if(  gr  &&  gr->get_halt()==halt  &&  ribi_type( path.at(i-1), path.at(i) )==back  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
 rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : vehicle_t()
 {
 	detour_start = detour_target = detour_exit = koord3d::invalid;
 	platform_needs = 0;
 	bay_search = 0;
+	turn_probe = false;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
@@ -2646,6 +2668,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	detour_start = detour_target = detour_exit = koord3d::invalid;
 	platform_needs = 0;
 	bay_search = 0;
+	turn_probe = false;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
@@ -2779,7 +2802,7 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 		if(  track_search_block  ||  track_search_excluded.is_contained( bd->get_pos() )  ) {
 			return false;
 		}
-		return sch->can_reserve( cnv->self );
+		return turn_probe  ||  sch->can_reserve( cnv->self );
 	}
 
 	if(  detour_target!=koord3d::invalid  ||  hold_search  ) {
@@ -2829,8 +2852,8 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 			}
 		}
 		// but we can only use empty blocks ...
-		// now check, if we could enter here
-		return sch->can_reserve(cnv->self);
+		// now check, if we could enter here (fork: any block while probing the way in)
+		return turn_probe  ||  sch->can_reserve(cnv->self);
 	}
 
 	return true;
@@ -2930,7 +2953,7 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		return is_stop_position( gr, prev_gr, halt );
 	}
 	// first check blocks, if we can go there (fork: not a platform found not to lead on)
-	if(  sch1->can_reserve(cnv->self)  &&  !track_search_excluded.is_contained( gr->get_pos() )  ) {
+	if(  (turn_probe  ||  sch1->can_reserve(cnv->self))  &&  !track_search_excluded.is_contained( gr->get_pos() )  ) {
 		//  just check, if we reached a free stop position of this halt
 		return is_stop_position( gr, prev_gr, target_halt );
 	}
@@ -3219,7 +3242,17 @@ skip_choose:
 		target_halt = halthandle_t();
 		return false;
 	}
-	if(  !is_planned_platform_suitable()  ||  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
+	bool planned_ok = is_planned_platform_suitable();
+	if(  planned_ok  &&  turns_round_through( *cnv->get_route(), start_block, target_halt )  ) {
+		// fork: planned to run through the station and come back in: only if there is no other way in
+		if(  !cnv->is_waiting()  ) {
+			restart_speed = -1;
+			target_halt = halthandle_t();
+			return false;
+		}
+		planned_ok = !can_enter_without_turning( cnv->get_route()->at(start_block), ribi_type(get_pos(), pos_next), target_halt, false );
+	}
+	if(  !planned_ok  ||  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
 		// no free route to target!
 		// note: any old reservations should be invalid after the block reserver call.
 		// => We can now start freshly all over
@@ -3246,6 +3279,11 @@ skip_choose:
 			for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
 				if(  !target_rt.find_route( welt, cnv->get_route()->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), richtung, welt->get_settings().get_max_choose_route_steps() )  ) {
 					break;
+				}
+				if(  turns_round_through( target_rt, 0, target_halt )  ) {
+					// fork: never through the station and back in (a bay facing the other way)
+					track_search_excluded.append( target_rt.back() );
+					continue;
 				}
 				if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 					planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
@@ -3439,6 +3477,10 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			planned_ok = false;
 		}
 	}
+	if(  planned_ok  &&  halt.is_bound()  &&  turns_round_through( *route, start, halt )  ) {
+		// through the station and back in: only if there is no other way in
+		planned_ok = !can_enter_without_turning( route->at(start), ribi_type( route->at(start), route->at(start+1) ), halt, true );
+	}
 	// the way on from the planned platform, also the measure for the others (measured when needed)
 	uint32 planned_onward = 0xFFFFFFFFul;
 	if(  planned_ok  &&  halt.is_bound()  &&  next_stop!=koord3d::invalid  ) {
@@ -3503,10 +3545,13 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			bool leads_on = false;
 			if(  ok  &&  candidate.get_count()>=2  ) {
 				if(  halt.is_bound()  ) {
-					if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
-						planned_onward = get_onward_length( route->back(), next_stop );
+					// never through the station and back in (a bay facing the other way)
+					if(  !turns_round_through( candidate, 0, halt )  ) {
+						if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+							planned_onward = get_onward_length( route->back(), next_stop );
+						}
+						leads_on = next_stop==koord3d::invalid  ||  leads_on_like_planned( candidate.back(), next_stop, planned_onward );
 					}
-					leads_on = next_stop==koord3d::invalid  ||  leads_on_like_planned( candidate.back(), next_stop, planned_onward );
 				}
 				else {
 					route_t on;
@@ -4501,6 +4546,42 @@ bool rail_vehicle_t::setup_bay_search(const route_t *route, uint32 start, haltha
 }
 
 
+bool rail_vehicle_t::can_enter_without_turning(koord3d start, ribi_t::ribi dir, halthandle_t halt, bool station_search)
+{
+	// every stop position of halt, taken or not; the one found first each time is excluded, so this
+	// ends after at most as many tries as stop positions
+	const sint32 speed = speed_to_kmh( cnv->get_min_top_speed() );
+	const uint8 old_search = track_search;
+	bool found = false;
+	turn_probe = true;
+	track_search_excluded.clear();
+	for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+		route_t probe;
+		if(  station_search  ) {
+			track_search = 1;
+			track_search_halt = halt;
+			track_search_start = start;
+			track_search_block = false;
+		}
+		const bool ok = probe.find_route( welt, start, this, speed, dir, welt->get_settings().get_max_choose_route_steps() );
+		track_search = old_search;
+		if(  !ok  ||  probe.get_count()<2  ) {
+			break;
+		}
+		found = !turns_round_through( probe, 0, halt );
+		if(  !found  ) {
+			track_search_excluded.append( probe.back() );
+		}
+	}
+	track_search_excluded.clear();
+	turn_probe = false;
+	if(  station_search  ) {
+		track_search_start = koord3d::invalid;
+	}
+	return found;
+}
+
+
 bool rail_vehicle_t::reverses_at_stop(const route_t *route, uint32 start, koord3d next_stop)
 {
 	const uint32 n = route->get_count();
@@ -4878,7 +4959,8 @@ bool rail_vehicle_t::reserve_hold_platform(const uint16 start_block, const uint1
 				break;
 			}
 			hold_search = 0;
-			found = has_onward_path( target_rt, end_of_choose );
+			grund_t const* const end_gr = welt->lookup( target_rt.back() );
+			found = !turns_round_through( target_rt, 0, end_gr ? end_gr->get_halt() : halthandle_t() )  &&  has_onward_path( target_rt, end_of_choose );
 			if(  !found  ) {
 				hold_platform_excluded.append( target_rt.back() );
 			}

@@ -619,6 +619,14 @@ private:
 	// last switch before it when the stop itself only leads back (a bay would always)
 	bool reverses_at_stop(const route_t *route, uint32 start, koord3d next_stop);
 
+	// fork: while set, the stop searches (stock choose and find_station_track) take reserved track too
+	bool turn_probe;
+
+	// fork: some stop position of halt can be reached from start (heading dir) without running through
+	// the station the other way first, taken or not; station_search: find_station_track's search rules
+	// (not past a signal that applies), else the stock choose search
+	bool can_enter_without_turning(koord3d start, ribi_t::ribi dir, halthandle_t halt, bool station_search);
+
 	/* A train that should pass this one in the choose area ending at end_of_choose on our route:
 	 * it runs through the area without stopping, enters it through a choose signal, and would reach
 	 * the end of choose within passing_hold_minutes (passenger trains wait for passenger trains only).
