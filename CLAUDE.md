@@ -408,7 +408,8 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   from the others, e.g. Olomouc hl.n. 5172 for trains turning back to Bystrovany) is taken only
   when no other is free: a second pass inside each bay phase of the bays-first order, so no new
   waits. Tram and road stops of a combined halt do not count as platforms there.
-  Both platform searches (stock choose, `find_station_track` for a stopping train) first run with
+  Both platform searches (stock choose, `find_station_track` for a stopping train) and the
+  `can_enter_without_turning` probe first run with
   `stop_search_halt` set: `rail_vehicle_t::get_ribi` never lets them run on out of a platform's far
   end. `route_t::find_route` enters each tile only once, so a way through a goods platform, round the
   throat and back could reach a free platform from behind and close its stop tile before the way in

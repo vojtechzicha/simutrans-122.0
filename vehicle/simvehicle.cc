@@ -5111,25 +5111,32 @@ bool rail_vehicle_t::can_enter_without_turning(koord3d start, ribi_t::ribi dir, 
 	const uint8 old_search = track_search;
 	bool found = false;
 	turn_probe = true;
-	track_search_excluded.clear();
-	for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
-		route_t probe;
-		if(  station_search  ) {
-			track_search = 1;
-			track_search_halt = halt;
-			track_search_start = start;
-			track_search_block = false;
-		}
-		const bool ok = probe.find_route( welt, start, this, speed, dir, welt->get_settings().get_max_choose_route_steps() );
-		track_search = old_search;
-		if(  !ok  ||  probe.get_count()<2  ) {
-			break;
-		}
-		found = !turns_round_through( probe, 0, halt );
-		if(  !found  ) {
-			track_search_excluded.append( probe.back() );
+	// first never on out of a platform of halt (see stop_search_halt), then as before
+	stop_search_start = start;
+	for(  uint8 pass=0;  !found  &&  pass<2;  pass++  ) {
+		track_search_excluded.clear();
+		for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+			route_t probe;
+			if(  station_search  ) {
+				track_search = 1;
+				track_search_halt = halt;
+				track_search_start = start;
+				track_search_block = false;
+			}
+			stop_search_halt = pass==0 ? halt : halthandle_t();
+			const bool ok = probe.find_route( welt, start, this, speed, dir, welt->get_settings().get_max_choose_route_steps() );
+			stop_search_halt = halthandle_t();
+			track_search = old_search;
+			if(  !ok  ||  probe.get_count()<2  ) {
+				break;
+			}
+			found = !turns_round_through( probe, 0, halt );
+			if(  !found  ) {
+				track_search_excluded.append( probe.back() );
+			}
 		}
 	}
+	stop_search_start = koord3d::invalid;
 	track_search_excluded.clear();
 	turn_probe = false;
 	if(  station_search  ) {
