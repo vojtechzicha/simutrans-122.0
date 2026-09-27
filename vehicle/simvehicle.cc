@@ -5244,6 +5244,11 @@ convoihandle_t rail_vehicle_t::get_passing_train(const uint32 end_of_choose, con
 	const koord3d eoc_pos = route->at( end_of_choose );
 	const koord3d eoc_next = route->at( end_of_choose+1 );
 	const bool we_carry_passengers = carries_passengers( cnv );
+	// fork: where we stand (a train entering through a station boundary must not need these tiles)
+	vector_tpl<koord3d> our_tiles;
+	for(  uint8 i=0;  halt.is_bound()  &&  i<cnv->get_vehicle_count();  i++  ) {
+		our_tiles.append_unique( cnv->get_vehikel(i)->get_pos() );
+	}
 
 	convoihandle_t passing;
 	sint64 passing_eta = window + 1;
@@ -5288,6 +5293,16 @@ convoihandle_t rail_vehicle_t::get_passing_train(const uint32 end_of_choose, con
 			}
 		}
 
+		// fork: waiting for a track at this station (at a station boundary, or at the platform signal
+		// of the station before): it cannot get in either
+		if(  halt.is_bound()  &&  other->get_akt_speed()==0  &&  other->get_section_wait_halt()==halt  ) {
+			const uint8 sw = other->get_section_wait();
+			if(  sw==convoi_t::SECTION_WAIT_TRACK  ||  sw==convoi_t::SECTION_WAIT_ENTRY  ||  sw==convoi_t::SECTION_WAIT_LAST_TRACK  ) {
+				stuck = true;
+				return convoihandle_t();
+			}
+		}
+
 		if(  we_carry_passengers  &&  !carries_passengers( other.get_rep() )  ) {
 			continue;
 		}
@@ -5303,7 +5318,9 @@ convoihandle_t rail_vehicle_t::get_passing_train(const uint32 end_of_choose, con
 			continue;
 		}
 		// and enters the area through a choose signal, so it can get round us
+		// (fork: or through a station boundary, see below)
 		uint32 choose_idx = INVALID_INDEX;
+		bool via_boundary = false;
 		for(  uint32 i=ix;  i>0  &&  choose_idx==INVALID_INDEX;  i--  ) {
 			grund_t const* const gr = welt->lookup( r->at(i-1) );
 			weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
@@ -5313,9 +5330,43 @@ convoihandle_t rail_vehicle_t::get_passing_train(const uint32 end_of_choose, con
 			if(  has_choose_signal( gr, way )  ) {
 				choose_idx = i-1;
 			}
+			else if(  roadsign_t const* const lt = get_station_boundary( gr )  ) {
+				if(  !lt->applies_to( ribi_type( r->at(i-1), r->at(i) ) )  ) {
+					// the way out of another station
+					break;
+				}
+				choose_idx = i-1;
+				via_boundary = true;
+			}
 		}
 		if(  choose_idx==INVALID_INDEX  ) {
 			continue;
+		}
+		if(  via_boundary  ) {
+			// fork: through a station boundary (only for a train waiting at a stop): with a track claimed
+			// there (it got green at the station before for a free track here), let in there (its way
+			// in reserved) or already past it, so it comes and never waits for a track; and its way to
+			// our end of choose must not run over the tiles we stand on (it chose its track at the
+			// boundary, nothing gets it round us later)
+			if(  !halt.is_bound()  ) {
+				continue;
+			}
+			bool comes = from > choose_idx  ||  other->get_claim_boundary()==r->at(choose_idx);
+			if(  !comes  ) {
+				grund_t const* const lt_gr = welt->lookup( r->at(choose_idx) );
+				schiene_t const* const lt_way = lt_gr ? (schiene_t const*)lt_gr->get_weg( get_waytype() ) : NULL;
+				comes = lt_way  &&  lt_way->get_reserved_convoi()==other;
+			}
+			if(  !comes  ) {
+				continue;
+			}
+			bool over_us = false;
+			for(  uint32 i=from;  !over_us  &&  i<ix;  i++  ) {
+				over_us = our_tiles.is_contained( r->at(i) );
+			}
+			if(  over_us  ) {
+				continue;
+			}
 		}
 		if(  behind!=koord3d::invalid  ) {
 			// it must still come by where we are
@@ -5356,7 +5407,8 @@ bool rail_vehicle_t::is_held_for_passing_train()
 		grund_t const* const gr = welt->lookup( route->at(idx) );
 		weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
 		if(  way==NULL  ||  has_choose_signal( gr, way )  ||  get_station_boundary( gr )  ) {
-			// fork: nor across a station boundary (single-track lines have no end of choose)
+			// fork: nor across a station boundary (single-track lines have no end of choose; holding
+			// there would hand the line to trains coming the other way)
 			break;
 		}
 		if(  is_stop_point( route, idx )  &&  ++signals_passed > 1  ) {
@@ -5390,6 +5442,8 @@ bool rail_vehicle_t::is_held_for_passing_train()
 	else {
 		cnv->set_passing_hold( passing, cnv->get_passing_hold_since() );
 	}
+	// fork: not waiting for the line while held (else a train at the signal ahead would let us go first)
+	cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 	return true;
 }
 

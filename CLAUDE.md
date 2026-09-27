@@ -229,6 +229,15 @@ All rail only, in `vehicle/simvehicle.cc` unless noted.
   The departure slot of a timetable is taken before (end of loading), so a held train leaves late but
   keeps its slot. Settings in simuconf.tab, saved with the game (defaults 5 and 20, needs the
   calendar: without it `calendar_minutes_to_ticks` is 0 and nobody waits).
+  Mixed layouts (Blažovice: single-track lines in through `LT`s, double-track exit with an `E`): a
+  train entering the area through a station boundary that applies to it counts as passing too, if it
+  holds a claim there, has that `LT` tile reserved (close to it the claim turns into a reservation) or
+  is past it, and its way to the `E` does not run over the tiles the waiting train stands on. A train
+  standing with a section wait for a track at this halt (TRACK, LAST_TRACK) also ends the wait. A held
+  train clears its section wait (else a train at the signal ahead yields to it: `yields_to_waiting`).
+  The `E` must come before the second signal after the stop (the walk stops there: at Blažovice the
+  dwarf signal at 4752,3427 stands in front of it). No waiting at a single-track exit (own `LT` as the
+  merge point was tried: it hands the line to opposing trains and everyone loses in two-way traffic).
 - Hold marker (convoy and line, `convoi_t::hold_marker` / `simline_t::hold_marker`, tool commands
   convoy `h` and line `h,id,0|1`, buttons in the convoy window and line management): at a choose
   signal of an area it passes without stopping, a marked train whose passing train is coming
