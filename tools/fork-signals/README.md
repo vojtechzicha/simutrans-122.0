@@ -24,7 +24,19 @@ Name=StationBoundary
 waytype=track
 station_boundary=1
 Image[0..3]=...     N,S,W,E laid out like a signal (see below)
+
+Obj=roadsign
+Name=BlockPost
+waytype=track
+is_signal=1
+is_blockpost=1
+Image[0..7]=...     like the platform signal: red N,S,W,E then green N,S,W,E
 ```
+
+- **Block post** (hradlo): a block signal on the open single-track line between two stations, placed
+  as a pair (one object per direction on two neighbouring tiles). One-way and never makes the track
+  one-way, like the platform signal. It lets a second train follow the first one in the same
+  direction (see the signalling plan).
 
 The station boundary's images are laid out like a signal's: `Image[E]` shows the board as the
 eastbound train sees it (with signals on the right: on its right, face towards it), and that sign
@@ -50,5 +62,5 @@ signals two-way so the stock game can still drive through the stations.
   into the pakset folder in the Steam game dir).
 
 The objects are built on their own, so the pakset itself does not need rebuilding. If a pakset is
-ever built with its own patched makeobj, port the two keys from
-`descriptor/writer/roadsign_writer.cc` (search for `is_platformsignal` and `station_boundary`).
+ever built with its own patched makeobj, port the three keys from
+`descriptor/writer/roadsign_writer.cc` (search for `is_platformsignal`, `station_boundary` and `is_blockpost`).

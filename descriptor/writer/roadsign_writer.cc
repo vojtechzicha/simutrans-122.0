@@ -34,6 +34,10 @@ void roadsign_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& ob
 			// fork: exit signal of a station track
 			flags |= roadsign_desc_t::PLATFORM_SIGNAL;
 		}
+		else if(  obj.get_int("is_blockpost",0)  ) {
+			// fork: block signal (hradlo) on a single-track line
+			flags |= roadsign_desc_t::BLOCK_POST;
+		}
 	}
 	else if(  obj.get_int("is_presignal",0)   ) {
 		flags = roadsign_desc_t::SIGN_PRE_SIGNAL;

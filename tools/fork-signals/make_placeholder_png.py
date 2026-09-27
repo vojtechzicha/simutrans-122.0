@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Draws placeholder images for the fork's platform signal and station boundary (pak64).
+"""Draws placeholder images for the fork's platform signal, station boundary and block post (pak64).
 
 Writes platform_signal.png (8 tiles: red N,S,W,E then green N,S,W,E) and
-station_boundary.png (4 tiles: N,S,W,E). Only needs the Python standard library.
+station_boundary.png (4 tiles: N,S,W,E), block_post.png (8 tiles like the platform signal). Only needs the Python standard library.
 Real art for other paksets replaces these; keep the same tile order.
 """
 import struct
@@ -37,15 +37,15 @@ def rect(pix, width, x0, y0, x1, y1, colour):
 SPOTS = [(40, 22), (18, 34), (14, 20), (44, 36)]
 
 
-def platform_signal():
+def signal(path, head):
 	pix, width = canvas(8)
 	for state, lamp in enumerate([(220, 0, 0), (0, 200, 0)]):
 		for d, (x, y) in enumerate(SPOTS):
 			ox = (state * 4 + d) * TILE
 			rect(pix, width, ox + x, y, ox + x + 2, y + 22, (60, 60, 60))           # pole
-			rect(pix, width, ox + x - 3, y - 8, ox + x + 5, y + 2, (30, 60, 200))   # blue head: platform signal
+			rect(pix, width, ox + x - 3, y - 8, ox + x + 5, y + 2, head)             # head: blue platform signal, yellow block post
 			rect(pix, width, ox + x - 1, y - 6, ox + x + 3, y, lamp)                # lamp
-	png('platform_signal.png', width, TILE, pix)
+	png(path, width, TILE, pix)
 
 
 def station_boundary():
@@ -59,5 +59,6 @@ def station_boundary():
 	png('station_boundary.png', width, TILE, pix)
 
 
-platform_signal()
+signal('platform_signal.png', (30, 60, 200))
+signal('block_post.png', (220, 180, 0))
 station_boundary()

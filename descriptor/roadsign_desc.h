@@ -46,7 +46,8 @@ public:
 		END_OF_CHOOSE_AREA    = 1U << 7,
 		SIGN_PRIORITY_SIGNAL  = 1U << 8,
 		PLATFORM_SIGNAL       = 1U << 9,  // fork: exit signal of a station track (with SIGN_SIGNAL)
-		STATION_BOUNDARY      = 1U << 10  // fork: sign where a single-track line enters a station
+		STATION_BOUNDARY      = 1U << 10, // fork: sign where a single-track line enters a station
+		BLOCK_POST            = 1U << 11  // fork: block signal on a single-track line (with SIGN_SIGNAL)
 	};
 
 	image_id get_image_id(ribi_t::dir dir) const
@@ -92,6 +93,12 @@ public:
 
 	// fork: one-way exit signal of a station track; it never makes the track one-way
 	bool is_platform_signal() const { return (flags & PLATFORM_SIGNAL) != 0; }
+
+	// fork: one-way block signal (hradlo) on a single-track line; it never makes the track one-way
+	bool is_block_post() const { return (flags & BLOCK_POST) != 0; }
+
+	// fork: one-way signal that leaves the track two-way (platform signal or block post)
+	bool is_directional_signal() const { return (flags & (PLATFORM_SIGNAL | BLOCK_POST)) != 0; }
 
 	// fork: where a single-track line enters a station (lichobeznikova tabulka)
 	bool is_station_boundary() const { return (flags & STATION_BOUNDARY) != 0; }
