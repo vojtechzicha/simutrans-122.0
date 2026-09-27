@@ -445,6 +445,19 @@ public:
 	 */
 	uint16 load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& destination_halts, uint16 limit, bool only_missed = false);
 
+	/// fork: on arrival, those who boarded at the last stop become ordinary riders (ware_t::boarded_here)
+	void clear_boarded_here();
+
+	/**
+	 * Fork: removes up to amount of those who boarded here and change at via, into out
+	 * (for a train that leaves first, see convoi_t::take_boarded_passengers)
+	 * @return amount taken
+	 */
+	uint16 take_boarded(halthandle_t via, uint16 amount, slist_tpl<ware_t> &out);
+
+	/// fork: loads from ware (of this vehicle's cargo type) up to limit, subtracts it there; @return amount loaded
+	uint16 add_cargo(ware_t &ware, uint16 limit);
+
 	/**
 	* Remove freight that no longer can reach it's destination
 	* i.e. because of a changed schedule

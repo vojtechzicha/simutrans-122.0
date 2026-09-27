@@ -507,6 +507,31 @@ load as "350/163 passengers (163 standing, 24 overcrowded)" (`vehicle_t::get_cro
 stop's waiting list heads passengers with ", N missed a full vehicle" and marks flagged packets
 "(missed)" except in the via-sum sort, which merges them (`freight_list_sorter.cc`).
 
+## Passengers change to the train that leaves first (fork feature, save bit in 122.10)
+
+Passengers and mail who boarded a train standing at a stop (`ware_t::boarded_here`, set in
+`vehicle_t::load_cargo` before packets are joined, so they never merge with those riding through;
+cleared for every vehicle in `ziel_erreicht` on arrival and on the packet handed to a halt in
+`unload_cargo`) move to another train of the same owner that physically starts from that stop first
+and takes them to their next stop (`zwischenziel` in its destination list, the stop-type-aware walk
+now in `collect_destination_halts`). The departure block of `hat_gehalten` records the stop, both
+parts' destination lists and the vehicles at the platform (`leaving_halt`, not saved); the move
+happens where the train really starts (`vorfahren` and the CAN_START step, both to DRIVING), so a
+train still held by a signal, a passing hold or a train in front never takes anybody.
+`convoi_t::take_boarded_passengers` checks each LOADING train at that halt: a packet moves only if the
+estimated arrival at its next stop (departure + tiles<<20/top speed + 2 calendar minutes per stop
+before it; 1/256 month without the calendar) is no later than with its own train, whose departure
+comes from `get_planned_departure`, is now when it is ready, or never when it waits for its load.
+Seats first, then standing places if the receiving part allows standing, never overcrowded places;
+a coupled train fills each part from its own list. Direct vehicle to vehicle (`take_boarded`,
+`add_cargo`): no halt statistics, the free capacity booked at departure is corrected. Nothing moves
+back: the receiving train is gone. The bit is saved as bit 1 of the 122.8 `missed_connection` byte
+from 122.10 on (no version bump; `ware_t` grew from 12 to 16 bytes). Tested headless with the harness
+(`pax` and `loads` commands): local waiting for its slot loses its passengers for X to an express,
+keeps those for its own stops and those riding through; express leaving 1 min after a local keeps
+them, 15 min after loses them; capacity limit; save/load while waiting; coupled pair filling its
+joined part; the 34 rail regression scenarios unchanged.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

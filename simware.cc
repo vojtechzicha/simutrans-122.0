@@ -29,6 +29,7 @@ ware_t::ware_t() : ziel(), zwischenziel(), zielpos(-1, -1)
 	index = 0;
 	to_factory = 0;
 	missed_connection = 0;
+	boarded_here = 0;
 }
 
 
@@ -38,6 +39,7 @@ ware_t::ware_t(const goods_desc_t *wtyp) : ziel(), zwischenziel(), zielpos(-1, -
 	index = wtyp->get_index();
 	to_factory = 0;
 	missed_connection = 0;
+	boarded_here = 0;
 }
 
 
@@ -67,13 +69,18 @@ void ware_t::rdwr(loadsave_t *file)
 	}
 
 	if(  file->is_version_atleast(122, 8)  ) {
-		// fork: missed a full convoy, may board overcrowded
-		uint8 missed = missed_connection;
-		file->rdwr_byte(missed);
-		missed_connection = missed != 0;
+		// fork: bit 0 missed a full convoy, may board overcrowded; bit 1 (122.10) boarded at this stop
+		uint8 flags = missed_connection;
+		if(  file->is_version_atleast(122, 10)  ) {
+			flags |= boarded_here << 1;
+		}
+		file->rdwr_byte(flags);
+		missed_connection = flags & 1;
+		boarded_here = file->is_version_atleast(122, 10) ? (flags >> 1) & 1 : 0;
 	}
 	else if(  file->is_loading()  ) {
 		missed_connection = 0;
+		boarded_here = 0;
 	}
 
 	uint8 catg=0;

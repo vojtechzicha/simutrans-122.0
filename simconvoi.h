@@ -295,6 +295,16 @@ private:
 	sint64 couple_hold_slot;
 
 	/**
+	 * Fork: the stop this convoi just finished loading at and still stands at, the halts each part
+	 * (0 own, 1 the joined train) takes passengers to from there, and how many vehicles stood at the
+	 * platform. When it starts moving, it takes over those who boarded other trains there that leave
+	 * later (take_boarded_passengers). Not saved.
+	 */
+	halthandle_t leaving_halt;
+	uint16 leaving_loadable;
+	vector_tpl<halthandle_t> leaving_halts[2];
+
+	/**
 	 * Fork, coupling: running late after the primary left without us; late_slot is the slot
 	 * inherited for the current stop (-1 = none), see simline_t::get_late_departure_slot.
 	 */
@@ -535,6 +545,13 @@ public:
 	/// fork: true if this convoy arrived before other; the same tick goes by convoy number, so two
 	/// convoys never both come first (saves before the fix load all waiting convoys with one tick)
 	bool arrived_before(const convoi_t *other) const;
+
+	/**
+	 * Fork: this convoi starts from leaving_halt. Passengers and mail who boarded another train of the
+	 * same owner loading there change to us if we take them to their next stop no later than that
+	 * train would (departure, top speed and intermediate stops; see estimate_arrival).
+	 */
+	void take_boarded_passengers();
 
 	/**
 	 * loading rules satisfied: the minimum load is reached, the maximum waiting time is over,

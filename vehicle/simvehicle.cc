@@ -709,7 +709,10 @@ uint16 vehicle_t::unload_cargo(halthandle_t halt, bool unload_all, bool unload_a
 //						halt->get_name());
 
 					// here, only ordinary goods should be processed
-					int menge = halt->liefere_an(tmp);
+					// (fork: what waits at a halt never counts as boarded)
+					ware_t delivered = tmp;
+					delivered.boarded_here = 0;
+					int menge = halt->liefere_an(delivered);
 					sum_menge += menge;
 					total_freight -= menge;
 					sum_weight -= tmp.menge * tmp.get_desc()->get_weight_per_unit();
@@ -805,6 +808,10 @@ uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& 
 			total_freight += ware.menge;
 			sum_weight += ware.menge * ware.get_desc()->get_weight_per_unit();
 
+			// fork: boarded here, so a train that leaves first may take them over (before joining,
+			// so they stay apart from those who ride through)
+			ware.boarded_here = ware.is_passenger()  ||  ware.is_mail();
+
 			// could this be joined with existing freight?
 			FOR( slist_tpl<ware_t>, & tmp, fracht ) {
 				// for pax: join according next stop
@@ -831,6 +838,86 @@ uint16 vehicle_t::load_cargo(halthandle_t halt, const vector_tpl<halthandle_t>& 
 		}
 	}
 	return total_freight - total_freight_start;
+}
+
+
+void vehicle_t::clear_boarded_here()
+{
+	bool any = false;
+	FOR( slist_tpl<ware_t>, & w, fracht ) {
+		if(  w.boarded_here  ) {
+			w.boarded_here = 0;
+			any = true;
+		}
+	}
+	if(  !any  ) {
+		return;
+	}
+	// join what boarded at the last stop with those who rode through it
+	for(  slist_tpl<ware_t>::iterator i = fracht.begin();  i != fracht.end();  ++i  ) {
+		slist_tpl<ware_t>::iterator j = i;
+		++j;
+		while(  j != fracht.end()  ) {
+			if(  (*i).same_destination( *j )  ) {
+				(*i).menge += (*j).menge;
+				j = fracht.erase( j );
+			}
+			else {
+				++j;
+			}
+		}
+	}
+}
+
+
+uint16 vehicle_t::take_boarded(halthandle_t via, uint16 amount, slist_tpl<ware_t> &out)
+{
+	uint16 taken = 0;
+	for(  slist_tpl<ware_t>::iterator i = fracht.begin();  i != fracht.end()  &&  taken < amount;  ) {
+		ware_t &w = *i;
+		if(  !w.boarded_here  ||  w.menge == 0  ||  w.get_zwischenziel() != via  ) {
+			++i;
+			continue;
+		}
+		const uint16 n = (uint16)min( (uint32)w.menge, (uint32)(amount - taken) );
+		ware_t part = w;
+		part.menge = n;
+		part.boarded_here = 0;
+		out.append( part );
+		taken += n;
+		total_freight -= n;
+		sum_weight -= n * w.get_desc()->get_weight_per_unit();
+		if(  n == w.menge  ) {
+			i = fracht.erase( i );
+		}
+		else {
+			w.menge -= n;
+			++i;
+		}
+	}
+	return taken;
+}
+
+
+uint16 vehicle_t::add_cargo(ware_t &ware, uint16 limit)
+{
+	if(  ware.menge == 0  ||  total_freight >= limit  ) {
+		return 0;
+	}
+	const uint16 n = (uint16)min( (uint32)ware.menge, (uint32)(limit - total_freight) );
+	ware.menge -= n;
+	total_freight += n;
+	sum_weight += n * ware.get_desc()->get_weight_per_unit();
+	FOR( slist_tpl<ware_t>, & tmp, fracht ) {
+		if(  ware.same_destination( tmp )  ) {
+			tmp.menge += n;
+			return n;
+		}
+	}
+	ware_t part = ware;
+	part.menge = n;
+	fracht.append( part );
+	return n;
 }
 
 

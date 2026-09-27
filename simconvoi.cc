@@ -157,6 +157,7 @@ void convoi_t::init(player_t *player)
 	coupled_first = 0;
 	couple_wait_since = 0;
 	couple_hold_slot = -1;
+	leaving_loadable = 0;
 	running_late = false;
 	late_slot = -1;
 	uncouple_since = 0;
@@ -1769,6 +1770,13 @@ void convoi_t::step()
 					if(haltestelle_t::get_halt(v->get_pos(),owner).is_bound()) {
 						play_start_sound();
 					}
+					if(  leaving_halt.is_bound()  ) {
+						// fork: we leave first, those who boarded later trains here may change to us
+						if(  state == DRIVING  ) {
+							take_boarded_passengers();
+						}
+						leaving_halt = halthandle_t();
+					}
 				}
 				else if(  steps_driven==0  ) {
 					// on rail depot tile, do not reserve this
@@ -2132,6 +2140,11 @@ void convoi_t::ziel_erreicht()
 			arrived_time = welt->get_ticks();
 			couple_wait_since = 0;
 			couple_hold_slot = -1;
+			// fork: who boarded at the last stop rides on as anybody else (joined train included)
+			for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+				fahr[i]->clear_boarded_here();
+			}
+			leaving_halt = halthandle_t();
 			if(  is_coupled_primary()  ) {
 				// fork, coupling: the joined train stops here as well, or parts here
 				convoi_t *c = coupled_convoi.get_rep();
@@ -2677,6 +2690,10 @@ void convoi_t::vorfahren()
 					play_start_sound();
 				}
 				state = DRIVING;
+				if(  leaving_halt.is_bound()  ) {
+					// fork: we leave first, those who boarded later trains here may change to us
+					take_boarded_passengers();
+				}
 			}
 		}
 		else {
@@ -3315,6 +3332,8 @@ void convoi_t::build_freight_info(cbuffer_t & buf, uint8 sort_order) const
 
 		// then add the actual load
 		FOR(slist_tpl<ware_t>, ware, v->get_cargo()) {
+			// (fork: boarded at this stop or earlier makes no difference here)
+			ware.boarded_here = 0;
 			FOR(vector_tpl<ware_t>, & tmp, total_fracht) {
 				// could this be joined with existing freight?
 
@@ -3515,6 +3534,44 @@ void convoi_t::calc_gewinn()
 
 
 /**
+ * The halts a convoi standing at halt with this schedule loads for, in schedule order: up to its next visit
+ * of halt, a depot or a terminal/all-off entry (fork: stop types). next_depot: the next entry is a depot.
+ */
+static void collect_destination_halts(const schedule_t *sched, halthandle_t halt, player_t *owner, vector_tpl<halthandle_t> &destination_halts, bool &next_depot)
+{
+	const uint8 count = sched->get_count();
+	for(  uint8 i=1;  i<count;  i++  ) {
+		const uint8 wrap_i = (i + sched->get_current_stop()) % count;
+		const schedule_entry_t &next_entry = sched->entries[wrap_i];
+
+		const halthandle_t plan_halt = haltestelle_t::get_halt(next_entry.pos, owner);
+		if(plan_halt == halt) {
+			// we will come later here again ...
+			break;
+		}
+		else if(  !plan_halt.is_bound()  ) {
+			if(  grund_t *gr = world()->lookup( next_entry.pos )  ) {
+				if(  gr->get_depot()  ) {
+
+					next_depot = i==1;
+					// do not load for stops after a depot
+					break;
+				}
+			}
+			continue;
+		}
+		if(  next_entry.unloads()  ) {
+			destination_halts.append(plan_halt);
+		}
+		if(  !next_entry.rides_through()  ) {
+			// terminal or all-off: nothing aboard continues past it
+			break;
+		}
+	}
+}
+
+
+/**
  * convoi an haltestelle anhalten
  *
  * minimum_loading is now stored in the object (not returned)
@@ -3597,35 +3654,7 @@ station_tile_search_ready: ;
 
 		// prepare a list of all destination halts in the schedule
 		if (!pt.no_load  &&  pt.loads) {
-			const uint8 count = sched->get_count();
-			for(  uint8 i=1;  i<count;  i++  ) {
-				const uint8 wrap_i = (i + sched->get_current_stop()) % count;
-				const schedule_entry_t &next_entry = sched->entries[wrap_i];
-
-				const halthandle_t plan_halt = haltestelle_t::get_halt(next_entry.pos, owner);
-				if(plan_halt == halt) {
-					// we will come later here again ...
-					break;
-				}
-				else if(  !plan_halt.is_bound()  ) {
-					if(  grund_t *gr = welt->lookup( next_entry.pos )  ) {
-						if(  gr->get_depot()  ) {
-
-							pt.next_depot = i==1;
-							// do not load for stops after a depot
-							break;
-						}
-					}
-					continue;
-				}
-				if(  next_entry.unloads()  ) {
-					pt.destination_halts.append(plan_halt);
-				}
-				if(  !next_entry.rides_through()  ) {
-					// terminal or all-off: nothing aboard continues past it
-					break;
-				}
-			}
+			collect_destination_halts( sched, halt, owner, pt.destination_halts, pt.next_depot );
 		}
 
 		// timetable (fork): while a convoy of the line that arrived earlier still waits at this stop,
@@ -3877,6 +3906,19 @@ station_tile_search_ready: ;
 			}
 		}
 
+		// fork: when we really start from here, who boarded a train that leaves later may change to us
+		// (a joined train that stays here takes no part, so after uncouple_here)
+		leaving_halt = halt;
+		leaving_loadable = min( vehicles_loading, anz_vehikel );
+		for(  int p=0;  p<2;  p++  ) {
+			leaving_halts[p].clear();
+			if(  portions[p].may_load()  &&  (p==0  ||  is_coupled_primary())  ) {
+				FOR( vector_tpl<halthandle_t>, const h, portions[p].destination_halts ) {
+					leaving_halts[p].append( h );
+				}
+			}
+		}
+
 		// fork: a full train leaves; whoever still waits for its next stops missed it and may overcrowd the next one
 		for(  int p=0;  p<2;  p++  ) {
 			if(  has_crowd[p]  &&  !space_left[p][0]  &&  (!portions[p].schedule->allows_standing()  ||  !space_left[p][1])  ) {
@@ -3919,6 +3961,212 @@ bool convoi_t::arrived_before(const convoi_t *other) const
 	}
 	// the same convoy (or both unbound): compare where they live, never both first
 	return this < other;
+}
+
+
+// fork: position of h in halts, -1 if not there
+static sint32 find_halt(const vector_tpl<halthandle_t> &halts, halthandle_t h)
+{
+	for(  uint32 i=0;  i<halts.get_count();  i++  ) {
+		if(  halts[i] == h  ) {
+			return (sint32)i;
+		}
+	}
+	return -1;
+}
+
+
+// fork: rough ticks until a convoy leaving after 'dep' ticks gets 'tiles' away at its top speed
+// (the tiles<<20/speed estimate of the passing hold), each stop on the way costing 'per_stop'
+static sint64 estimate_arrival(sint64 dep, uint32 tiles, sint32 speed, sint32 stops_before, sint64 per_stop)
+{
+	return dep + (((sint64)tiles << 20) / (speed > 0 ? speed : 1)) + stops_before * per_stop;
+}
+
+
+void convoi_t::take_boarded_passengers()
+{
+	const halthandle_t halt = leaving_halt;
+	leaving_halt = halthandle_t();
+	if(  !halt.is_bound()  ||  anz_vehikel == 0  ||  haltestelle_t::get_halt( fahr[0]->get_pos(), owner ) != halt  ) {
+		return;
+	}
+
+	// what a stop on the way costs in the estimate
+	const sint64 per_stop = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 2 ) : (sint64)(welt->ticks_per_world_month >> 8);
+	uint32 moved_total = 0;
+
+	for(  int p=0;  p<2;  p++  ) {
+		const vector_tpl<halthandle_t> &ours = leaving_halts[p];
+		if(  ours.empty()  ||  (p==1  &&  !is_coupled_primary())  ) {
+			continue;
+		}
+		const convoi_t *const part = p==0 ? this : coupled_convoi.get_rep();
+		const bool standing = part->get_schedule()->allows_standing();
+		// only the vehicles that stood at the platform, of this part of the train
+		const uint8 first = p==0 ? 0 : coupled_first;
+		const uint8 end = (uint8)min( leaving_loadable, p==0  &&  is_coupled_primary() ? coupled_first : anz_vehikel );
+
+		FOR( slist_tpl<convoihandle_t>, const &other_h, halt->get_loading_convois() ) {
+			if(  !other_h.is_bound()  ||  other_h == self  ||  other_h->get_state() != LOADING  ||  other_h->get_owner() != owner  ) {
+				continue;
+			}
+			convoi_t *const other = other_h.get_rep();
+
+			// when does it leave? (worked out once it matters)
+			bool other_known = false, other_leaves = false;
+			sint64 other_dep = 0;
+			vector_tpl<halthandle_t> other_halts[2];
+			bool other_halts_done[2] = { false, false };
+			bool other_changed = false;
+
+			for(  uint8 i=0;  i<other->anz_vehikel;  i++  ) {
+				vehicle_t *const sv = other->fahr[i];
+				const goods_desc_t *const type = sv->get_cargo_type();
+				if(  sv->get_total_cargo() == 0  ||  (type != goods_manager_t::passengers  &&  type != goods_manager_t::mail)  ) {
+					continue;
+				}
+				// the next stops of those who boarded here
+				vector_tpl<halthandle_t> vias;
+				FOR( slist_tpl<ware_t>, const &w, sv->get_cargo() ) {
+					if(  w.boarded_here  &&  w.menge > 0  ) {
+						vias.append_unique( w.get_zwischenziel() );
+					}
+				}
+				const int op = (other->is_coupled_primary()  &&  i >= other->coupled_first) ? 1 : 0;
+
+				FOR( vector_tpl<halthandle_t>, const via, vias ) {
+					const sint32 our_idx = find_halt( ours, via );
+					if(  our_idx < 0  ) {
+						continue;
+					}
+
+					// no later than with their own train
+					if(  !other_halts_done[op]  ) {
+						other_halts_done[op] = true;
+						const convoi_t *const c = op==0 ? other : other->coupled_convoi.get_rep();
+						bool next_depot = false;
+						collect_destination_halts( c->schedule, halt, owner, other_halts[op], next_depot );
+					}
+					const sint32 their_idx = find_halt( other_halts[op], via );
+					if(  their_idx >= 0  ) {
+						if(  !other_known  ) {
+							other_known = true;
+							sint64 minutes;
+							bool latest;
+							if(  other->get_planned_departure( minutes, latest )  ) {
+								other_leaves = true;
+								const sint64 now = welt->get_calendar_minutes();
+								other_dep = minutes > now ? welt->calendar_minutes_to_ticks( minutes - now ) : 0;
+							}
+							else if(  other->is_ready_to_depart()  &&  (!other->is_coupled_primary()  ||  other->coupled_convoi->is_ready_to_depart())  ) {
+								// (not timetabled) it goes as soon as it can
+								other_leaves = true;
+							}
+							else if(  !welt->has_calendar()  &&  other->schedule->get_current_entry().has_waiting_time()  ) {
+								other_leaves = true;
+								const sint64 waited = (sint64)(uint32)(welt->get_ticks() - other->arrived_time);
+								other_dep = (sint64)other->schedule->get_current_entry().get_waiting_ticks() - waited;
+								if(  other_dep < 0  ) {
+									other_dep = 0;
+								}
+							}
+							// else it waits for its load, no telling how long: we are sooner
+						}
+						if(  other_leaves  ) {
+							const uint32 tiles = koord_distance( halt->get_basis_pos(), via->get_basis_pos() );
+							if(  estimate_arrival( 0, tiles, get_min_top_speed(), our_idx, per_stop ) > estimate_arrival( other_dep, tiles, other->get_min_top_speed(), their_idx, per_stop )  ) {
+								continue;
+							}
+						}
+					}
+					// (their_idx < 0: their train does not even go there any more)
+
+					// room: seats first, then standing places if allowed
+					uint32 room = 0;
+					for(  uint8 j=first;  j<end;  j++  ) {
+						const vehicle_t *v = fahr[j];
+						if(  v->get_cargo_type()->get_catg_index() != type->get_catg_index()  ) {
+							continue;
+						}
+						const uint16 limit = standing  &&  v->can_carry_crowd() ? v->get_standing_max() : v->get_cargo_max();
+						if(  v->get_total_cargo() < limit  ) {
+							room += limit - v->get_total_cargo();
+						}
+					}
+					if(  room == 0  ) {
+						continue;
+					}
+
+					slist_tpl<ware_t> moving;
+					const uint16 taken = sv->take_boarded( via, (uint16)min( room, 65535u ), moving );
+					if(  taken == 0  ) {
+						continue;
+					}
+					for(  int layer=0;  layer<2  &&  !moving.empty();  layer++  ) {
+						for(  uint8 j=first;  j<end;  j++  ) {
+							vehicle_t *v = fahr[j];
+							if(  v->get_cargo_type()->get_catg_index() != type->get_catg_index()  ) {
+								continue;
+							}
+							if(  layer==1  &&  !(standing  &&  v->can_carry_crowd())  ) {
+								continue;
+							}
+							const uint16 limit = layer==0 ? v->get_cargo_max() : v->get_standing_max();
+							const uint16 free_before = v->get_cargo_max() > v->get_total_cargo() ? v->get_cargo_max() - v->get_total_cargo() : 0;
+							bool added = false;
+							FOR( slist_tpl<ware_t>, &w, moving ) {
+								added |= v->add_cargo( w, limit ) > 0;
+							}
+							if(  added  ) {
+								// the free capacity was booked at departure already
+								const uint16 free_after = v->get_cargo_max() > v->get_total_cargo() ? v->get_cargo_max() - v->get_total_cargo() : 0;
+								get_vehicle_owner(j)->book( (sint64)free_after - (sint64)free_before, CONVOI_CAPACITY );
+								v->calc_image();
+							}
+						}
+						// drop what is placed
+						for(  slist_tpl<ware_t>::iterator k = moving.begin();  k != moving.end();  ) {
+							if(  (*k).menge == 0  ) {
+								k = moving.erase( k );
+							}
+							else {
+								++k;
+							}
+						}
+					}
+					// whatever did not fit after all goes back (should not happen)
+					uint16 back = 0;
+					FOR( slist_tpl<ware_t>, &w, moving ) {
+						w.boarded_here = 1;
+						back += sv->add_cargo( w, 65535 );
+					}
+					moved_total += taken - back;
+					sv->calc_image();
+					other_changed = true;
+				}
+			}
+
+			if(  other_changed  ) {
+				other->calc_loading();
+				other->freight_info_resort = true;
+				if(  other->is_coupled_primary()  ) {
+					other->coupled_convoi->calc_loading();
+					other->coupled_convoi->freight_info_resort = true;
+				}
+			}
+		}
+	}
+
+	if(  moved_total > 0  ) {
+		DBG_MESSAGE( "convoi_t::take_boarded_passengers()", "%s leaves %s first and takes over %u boarded elsewhere", get_name(), halt->get_name(), moved_total );
+		calc_loading();
+		freight_info_resort = true;
+		if(  is_coupled_primary()  ) {
+			coupled_convoi->calc_loading();
+			coupled_convoi->freight_info_resort = true;
+		}
+	}
 }
 
 

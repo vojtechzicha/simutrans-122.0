@@ -64,6 +64,15 @@ private:
 	 */
 	koord zielpos;
 
+public:
+	/**
+	 * Fork: aboard a vehicle, the passengers or mail boarded at the stop the vehicle stands at (set in
+	 * vehicle_t::load_cargo, cleared on arrival at the next stop). A train that leaves that stop first
+	 * may take them over (convoi_t::take_boarded_passengers). Never set on packets waiting at a halt.
+	 */
+	uint8 boarded_here : 1;
+
+private:
 	/**
 	 * Update target (zielpos) for factory-going goods (after loading or rotating)
 	 */
@@ -106,6 +115,7 @@ public:
 			menge == w.menge &&
 			to_factory == w.to_factory &&
 			missed_connection == w.missed_connection &&
+			boarded_here == w.boarded_here &&
 			ziel  == w.ziel  &&
 			zwischenziel == w.zwischenziel &&
 			zielpos == w.zielpos;
@@ -116,7 +126,7 @@ public:
 	// mail and passengers just care about target station
 	// freight needs to obey coordinates (since more than one factory might by connected!)
 	inline bool same_destination(const ware_t &w) const {
-		return index==w.get_index()  &&  ziel==w.get_ziel()  &&  to_factory==w.to_factory  &&  missed_connection==w.missed_connection  &&  (!to_factory  ||  zielpos==w.get_zielpos());
+		return index==w.get_index()  &&  ziel==w.get_ziel()  &&  to_factory==w.to_factory  &&  missed_connection==w.missed_connection  &&  boarded_here==w.boarded_here  &&  (!to_factory  ||  zielpos==w.get_zielpos());
 	}
 
 	/**
