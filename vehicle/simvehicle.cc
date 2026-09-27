@@ -6036,6 +6036,8 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 	next_signal_index=INVALID_INDEX;
 	next_crossing_index=INVALID_INDEX;
 	bool unreserve_now = false;
+	vector_tpl<signal_t *> autoblocks; // fork: freed ones get their aspect once the loop is done
+	vector_tpl<uint16> junctions;      // fork: switches reserved, may join autoblock sections from the side
 	for ( ; success  &&  count>=0  &&  i<route->get_count(); i++) {
 
 		koord3d pos = route->at(i);
@@ -6064,6 +6066,9 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 			if(  !sch1->reserve( cnv->self, ribi_type( route->at(max(1u,i)-1u), route->at(min(route->get_count()-1u,i+1u)) ) )  ) {
 				success = false;
 			}
+			else if(  signal_t::any_autoblock  &&  ribi_t::is_threeway( sch1->get_ribi_unmasked() )  ) {
+				junctions.append( i );
+			}
 			if(next_crossing_index==INVALID_INDEX  &&  sch1->is_crossing()) {
 				next_crossing_index = i;
 			}
@@ -6072,6 +6077,9 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 			if(!sch1->unreserve(cnv->self)) {
 				if(unreserve_now) {
 					// reached an reserved or free track => finished
+					FOR( vector_tpl<signal_t *>, const sig, autoblocks ) {
+						sig->refresh_autoblock();
+					}
 					return false;
 				}
 			}
@@ -6081,7 +6089,11 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 			}
 			if(sch1->has_signal()) {
 				signal_t* signal = gr->find<signal_t>();
-				if(signal) {
+				if(  signal  &&  signal->get_desc()->is_autoblock()  ) {
+					// fork: green again if nobody else holds its block
+					autoblocks.append( signal );
+				}
+				else if(signal) {
 					signal->set_state(roadsign_t::rot);
 				}
 			}
@@ -6096,6 +6108,9 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 	}
 
 	if(!reserve) {
+		FOR( vector_tpl<signal_t *>, const sig, autoblocks ) {
+			sig->refresh_autoblock();
+		}
 		return false;
 	}
 	// here we go only with reserve
@@ -6118,6 +6133,11 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 		if (signal_t* const signal = g->find<signal_t>()) {
 			signal->set_state(roadsign_t::gruen);
 		}
+	}
+	// fork: a train joining over a switch takes the block of the autoblocks on the other branches
+	FOR( vector_tpl<uint16>, const j, junctions ) {
+		const ribi_t::ribi exit_dir = j+1u<route->get_count() ? ribi_type( route->at(j), route->at(j+1) ) : (ribi_t::ribi)ribi_t::none;
+		signal_t::refresh_autoblocks_behind( route->at(j), exit_dir, get_waytype() );
 	}
 	cnv->set_next_reservation_index( i );
 
@@ -6148,13 +6168,22 @@ void rail_vehicle_t::leave_tile()
 				// and switch to red
 				if(sch0->has_signal()) {
 					signal_t* sig = gr->find<signal_t>();
-					if(sig) {
+					if(  sig  &&  sig->get_desc()->is_autoblock()  ) {
+						// fork: red while we are still in its block (green if we turned back out of it)
+						sig->refresh_autoblock();
+					}
+					else if(sig) {
 						sig->set_state(roadsign_t::rot);
 					}
 				}
 				else if(  sch0->has_sign()  ) {
 					// fork: an entry signal turns red behind the train, or shows the next train's aspect
 					update_boundary_aspect( get_pos() );
+				}
+				// fork: we left the block of the autoblocks behind us, which ends here
+				if(  signal_t::any_autoblock  &&  (sch0->has_signal()  ||  get_station_boundary( gr ))  ) {
+					const ribi_t::ribi exit_dir = pos_next!=get_pos() ? ribi_type( get_pos(), pos_next ) : (ribi_t::ribi)ribi_t::none;
+					signal_t::refresh_autoblocks_behind( get_pos(), exit_dir, get_waytype() );
 				}
 			}
 		}

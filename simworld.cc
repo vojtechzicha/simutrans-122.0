@@ -5896,6 +5896,9 @@ DBG_MESSAGE("karte_t::load()", "%d factories loaded", fab_list.get_count());
 	}
 	haltestelle_t::end_load_game();
 
+	// fork: autoblock aspects follow the reservations restored above
+	signal_t::refresh_loaded_autoblocks();
+
 	// register all line stops and change line types, if needed
 	for(int i=0; i<MAX_PLAYER_COUNT ; i++) {
 		if(  players[i]  ) {

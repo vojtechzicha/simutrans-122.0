@@ -27,6 +27,8 @@ public:
 	/// @copydoc obj_t::info
 	void info(cbuffer_t & buf) const OVERRIDE;
 
+	void finish_rd() OVERRIDE;
+
 	typ get_typ() const OVERRIDE { return obj_t::signal; }
 	const char *get_name() const OVERRIDE {return "Signal";}
 
@@ -34,6 +36,28 @@ public:
 	* Calculate the actual image
 	*/
 	void calc_image() OVERRIDE;
+
+	/**
+	 * fork: aspect of an automatic block signal (autoblok), display only: green unless the block ahead,
+	 * up to the next signal or station boundary, is reserved by a train other than the one that
+	 * reserved this signal's tile. Trains still stop only when their reservation fails.
+	 */
+	void refresh_autoblock();
+
+	/// fork: refreshes the autoblocks whose block ends at pos, a signal or station boundary a train
+	/// just left in direction exit_dir, walking back over the track to the previous signals
+	static void refresh_autoblocks_behind(koord3d pos, ribi_t::ribi exit_dir, waytype_t wt);
+
+	/// fork: a train left the map from tiles front to rear (depot, deletion): the autoblocks of the
+	/// blocks it held, both ways (there may be no signal behind it to do this)
+	static void refresh_autoblocks_around(koord3d front, koord3d rear, waytype_t wt);
+
+	/// fork: true once an autoblock was built or loaded; the walks above run only then
+	static bool any_autoblock;
+
+	/// fork: aspects of the autoblocks loaded or built since the last call (after loading: once the
+	/// convoys have reserved their routes again)
+	static void refresh_loaded_autoblocks();
 };
 
 #endif

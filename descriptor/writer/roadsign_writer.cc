@@ -38,6 +38,10 @@ void roadsign_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& ob
 			// fork: block signal (hradlo) on a single-track line
 			flags |= roadsign_desc_t::BLOCK_POST;
 		}
+		else if(  obj.get_int("is_autoblock",0)  ) {
+			// fork: automatic block signal, drives like a plain signal
+			flags |= roadsign_desc_t::AUTOBLOCK;
+		}
 	}
 	else if(  obj.get_int("is_presignal",0)   ) {
 		flags = roadsign_desc_t::SIGN_PRE_SIGNAL;

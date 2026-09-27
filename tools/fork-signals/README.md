@@ -31,12 +31,24 @@ waytype=track
 is_signal=1
 is_blockpost=1
 Image[0..7]=...     like the platform signal: red N,S,W,E then green N,S,W,E
+
+Obj=roadsign
+Name=Autoblock
+waytype=track
+is_signal=1
+is_autoblock=1
+Image[0..7]=...     like a plain signal: red N,S,W,E then green N,S,W,E (16 with a catenary set)
 ```
 
 - **Block post** (hradlo): a block signal on the open single-track line between two stations, placed
   as a pair (one object per direction on two neighbouring tiles). One-way and never makes the track
   one-way, like the platform signal. It lets a second train follow the first one in the same
   direction (see the signalling plan).
+- **Autoblock** (automaticky blok): a plain signal in every respect (one-way like a stock signal,
+  same running and reservations) that shows green while its block ahead, up to the next signal or
+  station boundary, is free, and red while another train holds it. A plain signal shows red unless
+  a train has reserved past it. No yellow. Autoblocks belong on double track or long plain lines, not
+  between a platform signal and the next station boundary (any signal there ends section mode).
 
 The station boundary's images are laid out like a signal's: `Image[E]` shows the board as the
 eastbound train sees it (with signals on the right: on its right, face towards it), and that sign
@@ -70,5 +82,6 @@ signals two-way so the stock game can still drive through the stations.
   into the pakset folder in the Steam game dir).
 
 The objects are built on their own, so the pakset itself does not need rebuilding. If a pakset is
-ever built with its own patched makeobj, port the three keys from
-`descriptor/writer/roadsign_writer.cc` (search for `is_platformsignal`, `station_boundary` and `is_blockpost`).
+ever built with its own patched makeobj, port the four keys from
+`descriptor/writer/roadsign_writer.cc` (search for `is_platformsignal`, `station_boundary`, `is_blockpost`
+and `is_autoblock`).

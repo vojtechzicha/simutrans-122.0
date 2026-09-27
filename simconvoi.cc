@@ -47,6 +47,7 @@
 
 #include "obj/crossing.h"
 #include "obj/roadsign.h"
+#include "obj/signal.h"
 #include "obj/wayobj.h"
 
 #include "vehicle/simroadtraffic.h"
@@ -2024,6 +2025,10 @@ void convoi_t::betrete_depot(depot_t *dep)
 		c->state = INITIAL;
 	}
 
+	// fork: the autoblocks of the blocks we leave into the depot
+	const koord3d ab_front = anz_vehikel>0 ? fahr[0]->get_pos() : koord3d::invalid;
+	const koord3d ab_rear = anz_vehikel>0 ? fahr[anz_vehikel-1]->get_pos() : koord3d::invalid;
+
 	// remove vehicles from world data structure
 	for(unsigned i=0; i<anz_vehikel; i++) {
 		vehicle_t* v = fahr[i];
@@ -2035,6 +2040,9 @@ void convoi_t::betrete_depot(depot_t *dep)
 			v->leave_tile();
 			v->set_flag( obj_t::not_on_map );
 		}
+	}
+	if(  anz_vehikel>0  ) {
+		signal_t::refresh_autoblocks_around( ab_front, ab_rear, fahr[0]->get_waytype() );
 	}
 
 	dep->convoi_arrived(self, get_schedule());
@@ -4764,6 +4772,12 @@ void convoi_t::destroy()
 	// pay the current value
 	owner->book_new_vehicle( calc_restwert(), get_pos().get_2d(), fahr[0] ? fahr[0]->get_desc()->get_waytype() : ignore_wt );
 
+	// fork: the autoblocks of the blocks we held
+	const bool ab_on_map = anz_vehikel>0  &&  !fahr[0]->get_flag( obj_t::not_on_map );
+	const koord3d ab_front = ab_on_map ? fahr[0]->get_pos() : koord3d::invalid;
+	const koord3d ab_rear = ab_on_map ? fahr[anz_vehikel-1]->get_pos() : koord3d::invalid;
+	const waytype_t ab_wt = anz_vehikel>0 ? fahr[0]->get_waytype() : ignore_wt;
+
 	for(  uint8 i = anz_vehikel;  i-- != 0;  ) {
 		if(  !fahr[i]->get_flag( obj_t::not_on_map )  ) {
 			// remove from rails/roads/crossings
@@ -4783,6 +4797,9 @@ void convoi_t::destroy()
 		delete fahr[i];
 	}
 	anz_vehikel = 0;
+	if(  ab_on_map  ) {
+		signal_t::refresh_autoblocks_around( ab_front, ab_rear, ab_wt );
+	}
 
 	delete this;
 }

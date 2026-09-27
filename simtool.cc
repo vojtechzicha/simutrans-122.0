@@ -5097,9 +5097,13 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					// signals have three options (fork: platform signals only the two one-way ones)
 					ribi_t::ribi sig_dir = rs->get_dir();
 					uint8 i = 0;
-					if(  desc->is_directional_signal()  &&  ribi_t::is_single(sig_dir)  &&  ribi_t::is_twoway(dir)  ) {
+					if(  (desc->is_directional_signal()  ||  desc->is_autoblock())  &&  ribi_t::is_single(sig_dir)  &&  ribi_t::is_twoway(dir)  ) {
 						dir &= ~sig_dir;
 						rs->set_dir(dir);
+						if(  desc->is_autoblock()  ) {
+							// fork: the block ahead is now on the other side
+							((signal_t *)rs)->refresh_autoblock();
+						}
 						return NULL;
 					}
 					if (!ribi_t::is_twoway(sig_dir)) {
@@ -5119,10 +5123,14 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					}
 					// if nothing found, we have two ways again ...
 					rs->set_dir(dir);
+					if(  desc->is_autoblock()  ) {
+						// fork: the block ahead is now on the other side
+						((signal_t *)rs)->refresh_autoblock();
+					}
 				}
 				else {
-					if(  desc->is_directional_signal()  ) {
-						// fork: platform signals and block posts are one-way only
+					if(  desc->is_directional_signal()  ||  desc->is_autoblock()  ) {
+						// fork: platform signals, block posts and autoblocks are one-way only
 						for(  int i=0;  i<4;  i++  ) {
 							if(  (dir & ribi_t::nsew[i]) != 0  ) {
 								dir = ribi_t::nsew[i];
@@ -5167,6 +5175,10 @@ built_sign:
 					gr->obj_add(rs);
 					rs->finish_rd(); // to make them visible
 					weg->count_sign();
+					if(  desc->is_autoblock()  ) {
+						// fork: green unless its block is taken
+						signal_t::refresh_loaded_autoblocks();
+					}
 					player_t::book_construction_costs(player, -desc->get_price(), gr->get_pos().get_2d(), weg->get_waytype());
 				}
 			}

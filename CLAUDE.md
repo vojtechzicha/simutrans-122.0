@@ -535,6 +535,31 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   `waiting_for.held_at_platform` and reason `exit_signal`. Trains whose first stop point is not such
   a `P` behave as before.
 
+## Autoblock signals (fork feature, no save change)
+
+Signal flag `AUTOBLOCK` (makeobj `is_autoblock=1` with `is_signal=1`, 8 or 16 images like a plain
+signal); the owner's `VZ-Signals-D1-{New,Old,Dwarf}-Block` become autoblocks (new plain
+`-Main` objects take their old art). Display only: it drives, reserves and makes the track one-way
+exactly like a stock signal (`is_simple_signal` stays true), since trains stop when `block_reserver`
+fails, never on a signal's state; the tool places it one-way only (like `P`). Aspect
+(`signal_t::refresh_autoblock`, obj/signal.cc): green when the train holding the signal's own tile
+has reserved on into the block (as stock sets it), else green unless a tile of its block, from the
+signal in the direction it applies to up to and including the next signal or station boundary that
+applies (every switch branch except legs against a one-way signal, at most 256 tiles), is reserved
+by another train (so a train standing in a siding of the block keeps it red until one passes). Event-driven, nothing per step: the last vehicle leaving an autoblock refreshes it
+and leaving any signal or `LT` walks back to the autoblocks whose block ends there
+(`refresh_autoblocks_behind`, `rail_vehicle_t::leave_tile`); `block_reserver` refreshes the autoblocks
+whose reservation it frees (instead of setting them red) and, after reserving over a switch, the
+autoblocks on its other branches; a train entering a depot or deleted (`refresh_autoblocks_around`
+from its front and rear tiles); placing or turning one; after loading, `refresh_loaded_autoblocks`
+once the convoys reserved their routes again (`finish_rd` lists them). `signal_t::any_autoblock` keeps
+all of it off until one exists. Stale until the next train: coupling, a train leaving a depot inside
+a block, reservations made by `reserve_route`. No yellow (the next plain signal is red most of the
+time). A stock exe reads them as plain signals. Tested headless (harness with an `abcheck` that
+recomputes every aspect each step): chains, following trains, a branch joining, sidings, depot,
+deletion, save/load, the real pak; driving identical to plain signals, about 2% slower with 110
+autoblocks on a line, the rail regression set byte-identical.
+
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 
 A passenger vehicle (`vehicle_t::can_carry_crowd`) takes up to its seats (`get_cargo_max`, stock),
