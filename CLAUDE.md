@@ -498,6 +498,22 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   3+ directions, zigzags of a diagonal line excepted). Nothing reads the state for driving. The
   state byte is saved as for every road sign and kept on load for these signs. Art: the D1
   `VZ-Signals-D1-{New,Old,Dwarf}-LT` and `-Choose` objects of the pakset (two yellows on New/Old).
+- Held at the platform (no save change): a train starting from a halt whose first stop point on the
+  route is a `P` applying to it, reached over its own track (no switch, crossing, depot or other halt
+  in between, `rail_vehicle_t::get_platform_exit_signal`; the head may stand on the `P` tile), asks
+  that `P` (`is_signal_clear`) from its stop position in the CAN_START branch of `can_enter_tile`
+  instead of creeping up to it. Red: it stays there in CAN_START with `convoi_t::platform_hold`
+  (not saved, cleared at every poll, set again while red) and keeps boarding for the next stops it
+  loaded for (`load_while_held`: `leaving_halts`, vehicles on halt tiles only, seats then standing if
+  allowed, never overcrowded, capacity statistic corrected); if that filled it, `mark_missed_after_hold`
+  flags who is left at the real start. Other trains leaving first may take over its boarded passengers
+  (`take_boarded_passengers` also scans held trains, departure unknown = "we are sooner"). Not while
+  leaving a depot or handing the platform over after uncoupling (`may_hold_at_platform`). Displays:
+  "Held at the platform, boarding (62%): <section reason>" or "...: Exit signal red" over the train and
+  in the convoy window (`append_wait_reason`), route bar "waiting", the stop's departure board lists
+  it "(held at the platform)" (`add_held_departure`, it left the stop by its schedule), export
+  `waiting_for.held_at_platform` and reason `exit_signal`. Trains whose first stop point is not such
+  a `P` behave as before.
 
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 

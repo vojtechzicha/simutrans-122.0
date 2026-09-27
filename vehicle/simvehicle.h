@@ -702,6 +702,10 @@ private:
 	bool route_through(route_t *route, uint32 start, const route_t &path, bool stops);
 
 	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
+	// route index of the platform signal at the end of the station track the train stands on at a halt,
+	// if it is the first stop point from here on (no switch, crossing, depot or other halt before it);
+	// else INVALID_INDEX. The train waits for it at its stop position (convoi_t::platform_hold)
+	uint32 get_platform_exit_signal(uint32 here) const;
 	bool is_station_boundary_clear(uint16 next_block, sint32 &restart_speed);
 	bool is_block_post_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
 

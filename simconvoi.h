@@ -305,6 +305,20 @@ private:
 	vector_tpl<halthandle_t> leaving_halts[2];
 
 	/**
+	 * Fork, rail: the platform signal at the end of the station track the train stands on is red, so it
+	 * waits at its stop position (CAN_START) instead of creeping up to the signal, and goes on boarding
+	 * for its next stops (load_while_held). Set by rail_vehicle_t::can_enter_tile; only meaningful in
+	 * CAN_START*. Not saved: the first step after loading sets it again.
+	 * platform_boarded: something boarded while held (whoever is left then missed a full train).
+	 */
+	bool platform_hold;
+	bool platform_boarded;
+
+	// fork: at the real start after boarding while held, as at departure in hat_gehalten: a full
+	// passenger train leaves those still waiting for its next stops behind (mark_missed_connection)
+	void mark_missed_after_hold();
+
+	/**
 	 * Fork, coupling: running late after the primary left without us; late_slot is the slot
 	 * inherited for the current stop (-1 = none), see simline_t::get_late_departure_slot.
 	 */
@@ -552,6 +566,24 @@ public:
 	 * train would (departure, top speed and intermediate stops; see estimate_arrival).
 	 */
 	void take_boarded_passengers();
+
+	/**
+	 * Fork, rail: held at the platform by its exit platform signal (see platform_hold): passengers and
+	 * cargo for the next stops keep boarding the vehicles at the platform, seats first, then standing
+	 * places if the schedule allows, never overcrowded places.
+	 */
+	void load_while_held();
+
+	// fork, rail: waiting at the stop position until the platform signal ahead is green
+	bool is_platform_held() const { return platform_hold  &&  (state==CAN_START  ||  state==CAN_START_ONE_MONTH  ||  state==CAN_START_TWO_MONTHS); }
+	void set_platform_hold(bool on) { platform_hold = on; }
+	// fork: the stop it finished loading at and still stands at (see leaving_halt)
+	halthandle_t get_leaving_halt() const { return leaving_halt; }
+	// fork, rail: may wait at the platform for its exit signal (not leaving a depot, not handing the
+	// platform over to the train just uncoupled from it)
+	bool may_hold_at_platform() const { return steps_driven<0  &&  !handover_to.is_bound(); }
+	// fork: goes on boarding at leaving_halt while held there
+	bool boards_while_held() const { return leaving_halt.is_bound()  &&  (!leaving_halts[0].empty()  ||  (is_coupled_primary()  &&  !leaving_halts[1].empty())); }
 
 	/**
 	 * loading rules satisfied: the minimum load is reached, the maximum waiting time is over,

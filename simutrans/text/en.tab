@@ -1583,6 +1583,14 @@ No free track at %s
 No free track at %s
 Keeping the last track at %s free
 Keeping the last track at %s free
+Held at the platform, boarding (%i%%)
+Held at the platform, boarding (%i%%)
+Held at the platform
+Held at the platform
+Exit signal red
+Exit signal red
+held at the platform
+held at the platform
 Trains are locked up at %s: these stations are full and every train there waits for a track at another of them.
 Trains are locked up at %s: these stations are full and every train there waits for a track at another of them.
 Waiting to enter the station

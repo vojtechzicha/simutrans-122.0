@@ -4063,6 +4063,36 @@ bool rail_vehicle_t::route_through(route_t *route, uint32 start, const route_t &
 }
 
 
+uint32 rail_vehicle_t::get_platform_exit_signal(uint32 here) const
+{
+	if(  !cnv->may_hold_at_platform()  ) {
+		return INVALID_INDEX;
+	}
+	grund_t const* const gr_here = welt->lookup( get_pos() );
+	if(  gr_here==NULL  ||  !gr_here->is_halt()  ) {
+		return INVALID_INDEX;
+	}
+	const halthandle_t halt = gr_here->get_halt();
+	const route_t *route = cnv->get_route();
+	for(  uint32 i=here;  i+1<route->get_count();  i++  ) {
+		grund_t const* const gr = welt->lookup( route->at(i) );
+		weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
+		if(  way==NULL  ||  gr->get_depot()  ||  way->is_crossing()  ||  ribi_t::is_threeway( way->get_ribi_unmasked() )  ) {
+			// not the track the train stands on any more
+			return INVALID_INDEX;
+		}
+		if(  gr->is_halt()  &&  gr->get_halt()!=halt  ) {
+			return INVALID_INDEX;
+		}
+		if(  is_stop_point( route, i )  ) {
+			signal_t const* const sig = gr->find<signal_t>();
+			return sig  &&  sig->get_desc()->is_platform_signal()  &&  signal_applies( gr, ribi_type( route->at(i), route->at(i+1) ) ) ? i : INVALID_INDEX;
+		}
+	}
+	return INVALID_INDEX;
+}
+
+
 /* fork: exit signal of a station track. An ordinary signal, unless the train leaves the station through a
  * station boundary onto a single-track line: then the line up to the next station must be free and a track
  * there is claimed, see documentation/fork-rail-signalling-plan.md
@@ -5713,6 +5743,8 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 	assert(leading);
 	uint16 next_signal, next_crossing;
 	if(  cnv->get_state()==convoi_t::CAN_START  ||  cnv->get_state()==convoi_t::CAN_START_ONE_MONTH  ||  cnv->get_state()==convoi_t::CAN_START_TWO_MONTHS  ) {
+		// fork: set again below while the platform signal ahead keeps us at the stop
+		cnv->set_platform_hold( false );
 		// fork: a train that does not stop here may overtake us first
 		if(  is_held_for_passing_train()  ) {
 			restart_speed = 0;
@@ -5722,6 +5754,35 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 		grund_t *gr_current = welt->lookup( get_pos() );
 		weg_t *w = gr_current ? gr_current->get_weg(get_waytype()) : NULL;
 		const uint32 here = max(route_index,1)-1;
+		// fork: the platform signal at the end of the track we stand on: wait for it here at the stop
+		// position (boarding on, convoi_t::load_while_held) instead of creeping up to it
+		const uint32 exit_signal = w ? get_platform_exit_signal( here ) : INVALID_INDEX;
+		if(  exit_signal!=INVALID_INDEX  ) {
+			if(  exit_signal>here  ) {
+				// the platform up to it
+				if(  !block_reserver( cnv->get_route(), here, next_signal, next_crossing, 0, true, false )  ) {
+					restart_speed = 0;
+					return false;
+				}
+				if(  next_signal!=exit_signal  ||  next_crossing<next_signal  ) {
+					// (cannot happen, the way there was checked) as stock: drive up to it
+					cnv->set_next_stop_index( next_crossing<next_signal ? next_crossing : next_signal );
+					cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+					return true;
+				}
+			}
+			else {
+				// standing on it: reserved up to here (a save while held must not reserve beyond it on load)
+				cnv->set_next_reservation_index( here+1 );
+			}
+			cnv->set_next_stop_index( exit_signal );
+			if(  !is_signal_clear( exit_signal, restart_speed )  ) {
+				cnv->set_platform_hold( true );
+				restart_speed = 0;
+				return false;
+			}
+			return true;
+		}
 		if(  w==NULL  ||  !((here<cnv->get_route()->get_count()  &&  is_stop_point( cnv->get_route(), here ))  ||  w->is_crossing())  ) {
 			// free track => reserve up to next signal
 			if(  !block_reserver(cnv->get_route(), max(route_index,1)-1, next_signal, next_crossing, 0, true, false )  ) {

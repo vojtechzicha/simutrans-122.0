@@ -942,6 +942,10 @@ static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t 
 		}
 		at_halt = driver->get_section_wait_halt();
 	}
+	else if(  driver->is_platform_held()  ) {
+		// an ordinary exit signal keeps it at the platform: the block after it is taken
+		reason = "exit_signal";
+	}
 	else if(  cnv->is_waiting_for_coupling()  ) {
 		reason = "coupling_partner";
 	}
@@ -955,6 +959,10 @@ static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t 
 		}
 		if(  at_halt.is_bound()  ) {
 			w.kv_int( "halt_id", at_halt.get_id() );
+		}
+		if(  driver->is_platform_held()  ) {
+			// still at its stop position, boarding, until the platform signal ahead clears
+			w.kv_bool( "held_at_platform", true );
 		}
 		w.end_object();
 	}

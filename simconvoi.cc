@@ -158,6 +158,8 @@ void convoi_t::init(player_t *player)
 	couple_wait_since = 0;
 	couple_hold_slot = -1;
 	leaving_loadable = 0;
+	platform_hold = false;
+	platform_boarded = false;
 	running_late = false;
 	late_slot = -1;
 	uncouple_since = 0;
@@ -1450,6 +1452,7 @@ bool convoi_t::drive_to()
 	hold_divert = false;
 	// fork: nor a wait at a platform signal for the old one (it is checked again there)
 	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
+	platform_hold = false;
 
 	if(  anz_vehikel>0  ) {
 
@@ -1782,12 +1785,18 @@ void convoi_t::step()
 						play_start_sound();
 					}
 					if(  leaving_halt.is_bound()  ) {
+						// fork: boarded full while held at the platform: who is left missed us
+						mark_missed_after_hold();
 						// fork: we leave first, those who boarded later trains here may change to us
 						if(  state == DRIVING  ) {
 							take_boarded_passengers();
 						}
 						leaving_halt = halthandle_t();
 					}
+				}
+				else if(  is_platform_held()  ) {
+					// fork: the exit signal keeps us at the platform, boarding goes on
+					load_while_held();
 				}
 				else if(  steps_driven==0  ) {
 					// on rail depot tile, do not reserve this
@@ -3921,6 +3930,7 @@ station_tile_search_ready: ;
 		// (a joined train that stays here takes no part, so after uncouple_here)
 		leaving_halt = halt;
 		leaving_loadable = min( vehicles_loading, anz_vehikel );
+		platform_boarded = false;
 		for(  int p=0;  p<2;  p++  ) {
 			leaving_halts[p].clear();
 			if(  portions[p].may_load()  &&  (p==0  ||  is_coupled_primary())  ) {
@@ -4007,6 +4017,19 @@ void convoi_t::take_boarded_passengers()
 	const sint64 per_stop = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 2 ) : (sint64)(welt->ticks_per_world_month >> 8);
 	uint32 moved_total = 0;
 
+	// the trains loading there, and those held at the platform by their exit signal
+	vector_tpl<convoi_t *> others;
+	FOR( slist_tpl<convoihandle_t>, const &other_h, halt->get_loading_convois() ) {
+		if(  other_h.is_bound()  &&  other_h != self  &&  other_h->get_state() == LOADING  &&  other_h->get_owner() == owner  ) {
+			others.append( other_h.get_rep() );
+		}
+	}
+	FOR( vector_tpl<convoihandle_t>, const other_h, welt->convoys() ) {
+		if(  other_h != self  &&  other_h->get_owner() == owner  &&  other_h->is_platform_held()  &&  other_h->leaving_halt == halt  ) {
+			others.append( other_h.get_rep() );
+		}
+	}
+
 	for(  int p=0;  p<2;  p++  ) {
 		const vector_tpl<halthandle_t> &ours = leaving_halts[p];
 		if(  ours.empty()  ||  (p==1  &&  !is_coupled_primary())  ) {
@@ -4018,11 +4041,9 @@ void convoi_t::take_boarded_passengers()
 		const uint8 first = p==0 ? 0 : coupled_first;
 		const uint8 end = (uint8)min( leaving_loadable, p==0  &&  is_coupled_primary() ? coupled_first : anz_vehikel );
 
-		FOR( slist_tpl<convoihandle_t>, const &other_h, halt->get_loading_convois() ) {
-			if(  !other_h.is_bound()  ||  other_h == self  ||  other_h->get_state() != LOADING  ||  other_h->get_owner() != owner  ) {
-				continue;
-			}
-			convoi_t *const other = other_h.get_rep();
+		FOR( vector_tpl<convoi_t *>, const other, others ) {
+			// held at the platform: its schedule has moved on, and nobody knows when its signal clears
+			const bool other_held = other->get_state() != LOADING;
 
 			// when does it leave? (worked out once it matters)
 			bool other_known = false, other_leaves = false;
@@ -4053,19 +4074,23 @@ void convoi_t::take_boarded_passengers()
 					}
 
 					// no later than with their own train
-					if(  !other_halts_done[op]  ) {
+					if(  !other_halts_done[op]  &&  !other_held  ) {
 						other_halts_done[op] = true;
 						const convoi_t *const c = op==0 ? other : other->coupled_convoi.get_rep();
 						bool next_depot = false;
 						collect_destination_halts( c->schedule, halt, owner, other_halts[op], next_depot );
 					}
-					const sint32 their_idx = find_halt( other_halts[op], via );
+					// (held at the platform: the halts it loaded for when it finished loading)
+					const sint32 their_idx = find_halt( other_held ? other->leaving_halts[op] : other_halts[op], via );
 					if(  their_idx >= 0  ) {
 						if(  !other_known  ) {
 							other_known = true;
 							sint64 minutes;
 							bool latest;
-							if(  other->get_planned_departure( minutes, latest )  ) {
+							if(  other_held  ) {
+								// waits for its signal, no telling how long: we are sooner
+							}
+							else if(  other->get_planned_departure( minutes, latest )  ) {
 								other_leaves = true;
 								const sint64 now = welt->get_calendar_minutes();
 								other_dep = minutes > now ? welt->calendar_minutes_to_ticks( minutes - now ) : 0;
@@ -4110,6 +4135,7 @@ void convoi_t::take_boarded_passengers()
 					}
 
 					slist_tpl<ware_t> moving;
+					const uint16 sv_free_before = sv->get_cargo_max() > sv->get_total_cargo() ? sv->get_cargo_max() - sv->get_total_cargo() : 0;
 					const uint16 taken = sv->take_boarded( via, (uint16)min( room, 65535u ), moving );
 					if(  taken == 0  ) {
 						continue;
@@ -4153,6 +4179,11 @@ void convoi_t::take_boarded_passengers()
 						back += sv->add_cargo( w, 65535 );
 					}
 					moved_total += taken - back;
+					if(  other_held  ) {
+						// its free capacity was booked when it finished loading
+						const uint16 sv_free_after = sv->get_cargo_max() > sv->get_total_cargo() ? sv->get_cargo_max() - sv->get_total_cargo() : 0;
+						other->get_vehicle_owner(i)->book( (sint64)sv_free_after - (sint64)sv_free_before, CONVOI_CAPACITY );
+					}
 					sv->calc_image();
 					other_changed = true;
 				}
@@ -4176,6 +4207,102 @@ void convoi_t::take_boarded_passengers()
 		if(  is_coupled_primary()  ) {
 			coupled_convoi->calc_loading();
 			coupled_convoi->freight_info_resort = true;
+		}
+	}
+}
+
+
+void convoi_t::load_while_held()
+{
+	if(  !boards_while_held()  ) {
+		return;
+	}
+	const halthandle_t halt = leaving_halt;
+	convoi_t *const joined = is_coupled_primary() ? coupled_convoi.get_rep() : NULL;
+	bool changed = false;
+	uint32 time = 0;
+
+	// the vehicles at the platform: seats first, standing places once no seat of that part of the train is free
+	bool seat_left[2] = { false, false };
+	for(  uint8 layer=0;  layer<2;  layer++  ) {
+		// as in hat_gehalten: once a vehicle was left unfilled, the stop has no more of that kind for this part
+		const goods_desc_t *unfilled[2] = { NULL, NULL };
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			const int p = (joined  &&  i>=coupled_first) ? 1 : 0;
+			vehicle_t *v = fahr[i];
+			if(  leaving_halts[p].empty()  ||  haltestelle_t::get_halt( v->get_pos(), owner ) != halt  ) {
+				continue;
+			}
+			uint16 limit = v->get_cargo_max();
+			if(  layer==1  ) {
+				const convoi_t *const part = p==0 ? this : joined;
+				if(  seat_left[p]  ||  !v->can_carry_crowd()  ||  !part->get_schedule()->allows_standing()  ) {
+					continue;
+				}
+				limit = v->get_standing_max();
+			}
+			if(  v->get_total_cargo() < limit  &&  (unfilled[p]==NULL  ||  !unfilled[p]->is_interchangeable( v->get_cargo_type() ))  ) {
+				const uint16 free_before = v->get_cargo_max() > v->get_total_cargo() ? v->get_cargo_max() - v->get_total_cargo() : 0;
+				const uint16 amount = v->load_cargo( halt, leaving_halts[p], limit );
+				if(  amount  ) {
+					// the free capacity was booked at departure already
+					const uint16 free_after = v->get_cargo_max() > v->get_total_cargo() ? v->get_cargo_max() - v->get_total_cargo() : 0;
+					get_vehicle_owner(i)->book( (sint64)free_after - (sint64)free_before, CONVOI_CAPACITY );
+					time = max( time, (amount*v->get_desc()->get_loading_time()) / max(v->get_cargo_max(), 1) );
+					v->mark_image_dirty( v->get_image(), 0 );
+					v->calc_image();
+					changed = true;
+				}
+				if(  v->get_total_cargo() < limit  ) {
+					unfilled[p] = v->get_cargo_type();
+				}
+			}
+			if(  layer==0  &&  v->can_carry_crowd()  &&  v->get_total_cargo() < v->get_cargo_max()  ) {
+				seat_left[p] = true;
+			}
+		}
+	}
+
+	if(  changed  ) {
+		platform_boarded = true;
+		// boarding takes its time, as while loading
+		wait_lock = max( wait_lock, (sint32)time );
+		halt->recalc_status();
+		calc_loading();
+		freight_info_resort = true;
+		if(  joined  ) {
+			joined->calc_loading();
+			joined->freight_info_resort = true;
+		}
+	}
+}
+
+
+void convoi_t::mark_missed_after_hold()
+{
+	const halthandle_t halt = leaving_halt;
+	if(  !platform_boarded  ||  !halt.is_bound()  ) {
+		return;
+	}
+	platform_boarded = false;
+	const bool joined = is_coupled_primary();
+	for(  int p=0;  p<(joined ? 2 : 1);  p++  ) {
+		if(  leaving_halts[p].empty()  ) {
+			continue;
+		}
+		const schedule_t *const sched = p==0 ? schedule : coupled_convoi->get_schedule();
+		bool has_crowd = false, seat_left = false, standing_left = false;
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			const vehicle_t *v = fahr[i];
+			if(  (joined  &&  i>=coupled_first ? 1 : 0) != p  ||  !v->can_carry_crowd()  ||  haltestelle_t::get_halt( v->get_pos(), owner ) != halt  ) {
+				continue;
+			}
+			has_crowd = true;
+			seat_left |= v->get_total_cargo() < v->get_cargo_max();
+			standing_left |= v->get_total_cargo() < v->get_standing_max();
+		}
+		if(  has_crowd  &&  !seat_left  &&  (!sched->allows_standing()  ||  !standing_left)  ) {
+			halt->mark_missed_connection( goods_manager_t::passengers, leaving_halts[p] );
 		}
 	}
 }
@@ -4285,7 +4412,22 @@ bool convoi_t::append_wait_reason(cbuffer_t &buf) const
 		return true;
 	}
 	const bool waiting = state>=WAITING_FOR_CLEARANCE  &&  state<=CAN_START_TWO_MONTHS  &&  state!=SELF_DESTRUCT;
-	if(  section_wait == SECTION_WAIT_NONE  ||  !waiting  ) {
+	if(  is_platform_held()  ) {
+		// still at the stop position until the platform signal ahead clears, boarding meanwhile
+		if(  boards_while_held()  ) {
+			buf.printf( translator::translate("Held at the platform, boarding (%i%%)"), loading_level );
+		}
+		else {
+			buf.append( translator::translate("Held at the platform") );
+		}
+		buf.append( ": " );
+		if(  section_wait == SECTION_WAIT_NONE  ) {
+			// an ordinary exit signal: the block after it is taken
+			buf.append( translator::translate("Exit signal red") );
+			return true;
+		}
+	}
+	else if(  section_wait == SECTION_WAIT_NONE  ||  !waiting  ) {
 		return false;
 	}
 	// at a platform signal or station boundary of a single-track line

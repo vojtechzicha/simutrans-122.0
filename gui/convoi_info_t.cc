@@ -367,7 +367,8 @@ void convoi_info_t::update_labels()
 			route_bar.set_state(3);
 			break;
 		default:
-			route_bar.set_state(1);
+			// fork: held at the platform by its exit signal counts as waiting
+			route_bar.set_state( cnv->is_platform_held() ? 2 : 1 );
 			break;
 	}
 	// use median speed to avoid flickering

@@ -67,6 +67,9 @@ class gui_departure_board_t : public gui_aligned_container_t
 	// fork, coupling: adds the stop the train coupled behind cnv goes to, if it differs from next_halt
 	void add_coupled_destination( halthandle_t halt, convoihandle_t cnv, halthandle_t next_halt, sint32 delta_ticks );
 
+	// fork: adds cnv if it is held at the platform of halt by its exit signal
+	void add_held_departure( halthandle_t halt, convoihandle_t cnv );
+
 	void insert_image(convoihandle_t cnv);
 
 public:
@@ -756,6 +759,25 @@ void gui_departure_board_t::add_coupled_destination(halthandle_t halt, convoihan
 }
 
 
+// fork: a train held at the platform by its exit signal leaves for the first stop of its schedule
+// that is not this one (its schedule points past this stop already)
+void gui_departure_board_t::add_held_departure(halthandle_t halt, convoihandle_t cnv)
+{
+	if(  !cnv.is_bound()  ||  !cnv->is_platform_held()  ||  cnv->get_leaving_halt() != halt  ) {
+		return;
+	}
+	const schedule_t *sched = cnv->get_schedule();
+	for(  uint8 i = 0;  i < sched->get_count();  i++  ) {
+		const halthandle_t next_halt = haltestelle_t::get_halt( sched->entries[ (sched->get_current_stop()+i) % sched->get_count() ].pos, cnv->get_owner() );
+		if(  next_halt.is_bound()  &&  next_halt != halt  ) {
+			// (a coupled pair left together, so the joined train goes there too)
+			destinations.append_unique( dest_info_t( next_halt, 0, cnv ) );
+			return;
+		}
+	}
+}
+
+
 // refreshes the departure string
 void gui_departure_board_t::update_departures(halthandle_t halt)
 {
@@ -810,6 +832,17 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 				}
 			}
 		}
+	}
+
+	// fork: trains held at the platform by their exit signal have left the stop by their schedule (it
+	// points to the next stop already), but they still stand here and board
+	FOR(  vector_tpl<linehandle_t>, line, halt->registered_lines ) {
+		for(  uint j = 0;  j < line->count_convoys();  j++  ) {
+			add_held_departure( halt, line->get_convoy(j) );
+		}
+	}
+	FOR( vector_tpl<convoihandle_t>, cnv, halt->registered_convoys ) {
+		add_held_departure( halt, cnv );
 	}
 
 	// now exactly the same for convoys en route; the only change is that we estimate their arrival time too
@@ -885,7 +918,9 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 				const bool entry_here = haltestelle_t::get_halt( entry.pos, hi.cnv->get_owner() ) == halt;
 				const bool timetable_here = entry_here  &&  entry.has_timetable()  &&  welt->has_calendar()  &&  hi.cnv->get_line().is_bound();
 				const bool no_boarding = entry_here  &&  !entry.loads();
-				if(  timetable_here  ||  no_boarding  ) {
+				// fork: still at the platform, its exit signal red
+				const bool held_here = hi.cnv->is_platform_held()  &&  hi.cnv->get_leaving_halt() == halt;
+				if(  timetable_here  ||  no_boarding  ||  held_here  ) {
 					gui_label_buf_t *name = new_component<gui_label_buf_t>();
 					name->buf().printf( "%s  ", hi.halt->get_name() );
 					if(  timetable_here  ) {
@@ -893,6 +928,9 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 					}
 					if(  no_boarding  ) {
 						name->buf().printf( "(%s)", translator::translate("no boarding") );
+					}
+					if(  held_here  ) {
+						name->buf().printf( "(%s)", translator::translate("held at the platform") );
 					}
 					name->update();
 				}

@@ -1084,8 +1084,15 @@ function couplingMarks(l, couplings) {
 /* what the convoy window shows under the destination (fork): why it waits, or when it leaves */
 function waitText(c, links) {
   var w = obj(c.waiting_for);
+  var t = waitReasonText(w, links);
+  /* still at its stop position, boarding, until the platform signal ahead clears */
+  if (t && w.held_at_platform) return "Held at the platform: " + t;
+  return t || departureText(c);
+}
+function waitReasonText(w, links) {
   var stop = function (id) { return links ? stopLink(id) : esc(str(obj(IDX.stop[id]).name, "?")); };
   switch (w.reason) {
+    case "exit_signal": return "Exit signal red";
     case "passing_train": return "Waiting for " + (links ? convoyLink(w.convoy_id) : esc(str(w.convoy_name, "a train"))) + " to pass";
     case "no_free_track": return "No free track at " + stop(w.halt_id);
     case "last_free_track": return "Keeping the last track at " + stop(w.halt_id) + " free";
@@ -1097,6 +1104,9 @@ function waitText(c, links) {
     case "platform_after_uncoupling": return "Uncoupled, waiting for the platform";
   }
   if (w.reason) return esc(titleOf(w.reason));
+  return "";
+}
+function departureText(c) {
   var d = c.departure;
   if (!d) return "";
   var t = "Departure: " + (d.latest ? "by " : "") + pad2(num(d.hour)) + ":" + pad2(num(d.minute)) +
