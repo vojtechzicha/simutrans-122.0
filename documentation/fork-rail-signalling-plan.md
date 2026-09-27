@@ -232,6 +232,27 @@ Tested headless (throwaway harness, pak128.cs):
   passing trains (today only trains that entered through a choose signal count), so a local at
   Zabreh waits for a branch express to Olomouc too.
 
+### 3.10 Bay platforms
+A bay is a platform whose track ends in a buffer stop (or a depot) on one side before any switch or
+station boundary, at most 32 tiles past the platform (`is_bay_tile`, found from the track, no sign,
+no save change). Only a train that turns back at the stop may use one.
+- Turning back (`reverses_at_stop`): the shortest way on from the planned stop to the next schedule
+  entry starts back the way the train came. From a planned stop in a bay it always does, so there
+  the way on is judged from the last switch before it: a train that could go on from there without
+  turning back runs through. Without a next stop any platform will do.
+- Every platform choice (stock choose search, `find_station_track` at `P` and `LT`,
+  `is_planned_platform_suitable`) goes through `is_platform_suitable`, which with `bay_search` 1
+  refuses bays for a train that runs through, even a planned (clicked) bay that is free. A station
+  with only bays (a terminus) restricts nothing.
+- Preference, the soft variant (owner's choice): a train turning back keeps its planned platform
+  when that is free, through track or not; otherwise it searches the bays first (`bay_search` 2),
+  then any track.
+- Last free track (3.8): a free bay counts only where every track is a bay. `keeps_last_track`
+  checks as soon as no other track stays free; in `station_can_release` a free bay at a train's
+  next station counts only if that train comes back from there (turns back there).
+- Passing trains, the PR #1 overtaking detour and the Hold diversion already need a way on forward,
+  so they never pick a bay.
+
 ## 4. Stations
 
 ### 4.1 Polom (double track, 4 pax + 2 freight, most trains pass, some terminate)
@@ -357,6 +378,7 @@ first. `C→` trains prefer pass 3, 4 and freight, `←C` trains pass 1, 2; bran
    runs (without the protection).
 8. `tools/windows/steam-fork.sh`: build makeobj and the add-on pak.
 8a. PR #1 hold walk bounded at `LT` and at the first signal after the own exit signal (3.9).
+8b. Bay platforms (3.10): `vehicle/simvehicle.cc` only.
 9. CLAUDE.md: the design.
 
 ## 6. Decisions (defaults until the owner says otherwise)
@@ -394,6 +416,16 @@ that builds the layouts in code (not committed):
   signal and takes its own platform once that is free (before the fix it took the westbound
   platform and then stood at the `P` there, on the westbound main's track, until the blocker left).
 - `lock`: the capacity limit of 3.8, see there.
+- Bay platforms (3.10), pak128.cs with a new harness run against the build before the change:
+  single-track A – B (through track, loop, bay facing west) – C, a bypass around B. With both
+  through tracks held, a through train waits at A's `P`; before, it went into the bay, turned
+  back and took the bypass. A train turning back at B takes its planned track when free, the
+  bay when not (before: the loop). B with one through track and a bay, C full of through trains
+  bound for B: a through train at A is held until they are through; before, it took B's through
+  track and all three locked. Double track with choose signals: the through train never takes
+  the bay, the turning train takes the bay when its platform is held (before: the westbound
+  platform, against the flow), and a through train whose stop was clicked into the bay stops on
+  a through track (before: it turned back in the bay and U-turned over the crossovers at A).
 
 Seen in the Windows game (2026-09-26, merged with coupling and mixed traction, savegame 122.7,
 pak128.cs with the owner's `VZ-Signals-rail.pak`), with a headless harness on Windows plus the GUI:

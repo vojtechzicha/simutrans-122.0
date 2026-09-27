@@ -430,6 +430,15 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   free when no tile is reserved, and a train counts as leaving only if it is alone on a track (short
   trains share platforms). After 30 calendar minutes at the `P` (1/8 month without the calendar)
   the look goes through all stations, so the rule never holds everyone up by itself.
+- Bay platforms (plan 3.10, no save change): a platform whose track ends in a buffer stop (or a
+  depot) before any switch or station boundary (`is_bay_tile`) is used only by trains that turn back
+  there (`reverses_at_stop`: the way on to the next stop starts back the way the train came, judged
+  from the last switch before the stop when the stop itself is a bay). `is_platform_suitable` refuses
+  bays to trains that run through (`bay_search` 1, also a clicked bay; a station with only bays is not
+  restricted). A train turning back keeps its planned platform when free, else searches bays first
+  (`bay_search` 2), then any track; stock choose search and `find_station_track` alike. In the last
+  free track rule a free bay counts only at a station of bays only, or in `station_can_release` for a
+  train that comes back from that station.
 - Lock warning: a train waiting 30 minutes for a track (`check_section_lock`) checks the same way
   whether the stations are really locked and posts one message naming them ("Trains are locked
   up at ..."). What still locks: more trains than a group of stations can hold, e.g. trains coming

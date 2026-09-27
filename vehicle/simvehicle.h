@@ -606,6 +606,19 @@ private:
 	// the stop position at the end of the planned route offers what platform_needs asks for
 	bool is_planned_platform_suitable() const;
 
+	// fork: bay platforms (ending in a buffer stop) during a stop search: 0 = any platform, 1 = no bay,
+	// 2 = only a bay; the bay tiles of the halt searched are kept in a list while the search runs
+	uint8 bay_search;
+
+	// fork: before a stop search at halt, for a stop at the end of route (searched from index start):
+	// a train that does not turn back there gets no bay (bay_search 1, unless halt has only bays);
+	// true when it turns back and halt has a bay, then bays go first after the planned platform
+	bool setup_bay_search(const route_t *route, uint32 start, halthandle_t halt, koord3d next_stop);
+
+	// fork: the train turns back at the stop at the end of route to go on to next_stop; judged from the
+	// last switch before it when the stop itself only leads back (a bay would always)
+	bool reverses_at_stop(const route_t *route, uint32 start, koord3d next_stop);
+
 	/* A train that should pass this one in the choose area ending at end_of_choose on our route:
 	 * it runs through the area without stopping, enters it through a choose signal, and would reach
 	 * the end of choose within passing_hold_minutes (passenger trains wait for passenger trains only).
