@@ -403,6 +403,11 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   the planned one only if its way on to the next stop is at most 1.5x + 8 tiles of the planned
   one's (`leads_on_like_planned`): `P` leaves tracks two-way, so without it a train could take the
   other side's platform of a station with a crossover in one throat only and have to go back.
+  A platform whose way on turns off at a switch and then runs over another platform of the same
+  stop (`runs_over_other_platform`, `ONWARD_CROSSING`; a far-side track whose line on leaves only
+  from the others, e.g. Olomouc hl.n. 5172 for trains turning back to Bystrovany) is taken only
+  when no other is free: a second pass inside each bay phase of the bays-first order, so no new
+  waits. Tram and road stops of a combined halt do not count as platforms there.
   `P` at both ends of every track is the normal exit signal of double-track stations too (plan 3.7.1).
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
 - Schedule waypoints: the route runs through the waypoints ahead up to the next stop (stock

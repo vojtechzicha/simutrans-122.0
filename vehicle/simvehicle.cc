@@ -3274,6 +3274,9 @@ skip_choose:
 		if(  prefer_bays  ) {
 			bay_search = 2;
 		}
+		// fork: a platform whose way on runs over another platform only when no other is free
+		vector_tpl<koord3d> crossing;
+		bool avoid_crossing = true;
 		for(  ;;  ) {
 			// every rejected platform is excluded, so this ends after at most as many tries as platforms
 			for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
@@ -3288,15 +3291,32 @@ skip_choose:
 				if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 					planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
 				}
-				found = next_stop==koord3d::invalid  ||  leads_on_like_planned( target_rt.back(), next_stop, planned_onward );
+				const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
+				found = onward==ONWARD_OK  ||  (onward==ONWARD_CROSSING  &&  !avoid_crossing);
 				if(  !found  ) {
 					track_search_excluded.append( target_rt.back() );
+					if(  onward==ONWARD_CROSSING  ) {
+						crossing.append( target_rt.back() );
+					}
 				}
 			}
-			if(  found  ||  bay_search!=2  ) {
+			if(  found  ) {
+				break;
+			}
+			if(  avoid_crossing  &&  !crossing.empty()  ) {
+				// nothing better: again with those
+				avoid_crossing = false;
+				FOR( vector_tpl<koord3d>, const &k, crossing ) {
+					track_search_excluded.remove( k );
+				}
+				crossing.clear();
+				continue;
+			}
+			if(  bay_search!=2  ) {
 				break;
 			}
 			bay_search = 0;
+			avoid_crossing = true;
 		}
 		bay_search = 0;
 		track_search_excluded.clear();
@@ -3533,6 +3553,9 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	if(  prefer_bays  ) {
 		bay_search = 2;
 	}
+	// a platform whose way on runs over another platform only when no other is free
+	vector_tpl<koord3d> crossing;
+	bool avoid_crossing = true;
 	for(  ;;  ) {
 		// every rejected track is excluded, so this ends after at most as many tries as tracks
 		for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
@@ -3543,6 +3566,7 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			// the way on from there may use any track
 			track_search = 3;
 			bool leads_on = false;
+			bool crosses = false;
 			if(  ok  &&  candidate.get_count()>=2  ) {
 				if(  halt.is_bound()  ) {
 					// never through the station and back in (a bay facing the other way)
@@ -3550,7 +3574,9 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 						if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 							planned_onward = get_onward_length( route->back(), next_stop );
 						}
-						leads_on = next_stop==koord3d::invalid  ||  leads_on_like_planned( candidate.back(), next_stop, planned_onward );
+						const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
+						crosses = onward==ONWARD_CROSSING;
+						leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
 					}
 				}
 				else {
@@ -3578,12 +3604,28 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 			}
 			else {
 				track_search_excluded.append( candidate.back() );
+				if(  crosses  ) {
+					crossing.append( candidate.back() );
+				}
 			}
 		}
-		if(  found  ||  bay_search!=2  ) {
+		if(  found  ) {
+			break;
+		}
+		if(  avoid_crossing  &&  !crossing.empty()  ) {
+			// nothing better: again with those
+			avoid_crossing = false;
+			FOR( vector_tpl<koord3d>, const &k, crossing ) {
+				track_search_excluded.remove( k );
+			}
+			crossing.clear();
+			continue;
+		}
+		if(  bay_search!=2  ) {
 			break;
 		}
 		bay_search = 0;
+		avoid_crossing = true;
 	}
 	bay_search = 0;
 	track_search_excluded.clear();
@@ -3653,25 +3695,67 @@ static bool leads_to_convoi(koord3d pos, convoihandle_t c, waytype_t wt)
 }
 
 
-uint32 rail_vehicle_t::get_onward_length(koord3d from, koord3d next_stop)
+// fork: the way on from a platform of halt runs over another platform of halt: past the tiles of its own
+// platform it turns off onto another track at a switch and then comes to a platform of halt (a next stop
+// at halt itself does not count; a platform split by a switch it runs straight through is one track)
+static bool runs_over_other_platform(const route_t &on, halthandle_t halt, waytype_t wt)
+{
+	karte_t *welt = world();
+	const uint32 n = on.get_count();
+	grund_t const* const last = n>0 ? welt->lookup( on.at(n-1) ) : NULL;
+	if(  !halt.is_bound()  ||  last==NULL  ||  last->get_halt()==halt  ) {
+		return false;
+	}
+	// the tiles of its own platform
+	uint32 i = 0;
+	while(  i<n  &&  welt->lookup( on.at(i) )  &&  welt->lookup( on.at(i) )->get_halt()==halt  ) {
+		i++;
+	}
+	bool turned = false;
+	for(  ;  i<n;  i++  ) {
+		grund_t const* const gr = welt->lookup( on.at(i) );
+		if(  gr==NULL  ) {
+			continue;
+		}
+		if(  turned  &&  gr->get_halt()==halt  ) {
+			// a platform for us (not a tram or road stop of the same halt on a crossing)
+			gebaeude_t const* const gb = gr->find<gebaeude_t>();
+			if(  gb  &&  gb->get_tile()->get_desc()->get_extra()==(uint32)wt  ) {
+				return true;
+			}
+		}
+		weg_t const* const way = gr->get_weg( wt );
+		if(  i>0  &&  i+1<n  &&  way  &&  ribi_t::is_threeway( way->get_ribi_unmasked() )  &&  ribi_type( on.at(i-1), on.at(i) )!=ribi_type( on.at(i), on.at(i+1) )  ) {
+			turned = true;
+		}
+	}
+	return false;
+}
+
+
+uint32 rail_vehicle_t::get_onward_length(koord3d from, koord3d next_stop, halthandle_t halt, bool *crosses)
 {
 	route_t on;
 	const uint8 old_search = track_search;
 	track_search = 3;
 	const bool ok = on.calc_route( welt, from, next_stop, this, speed_to_kmh( cnv->get_min_top_speed() ), 0 )!=route_t::no_route;
 	track_search = old_search;
+	if(  crosses  ) {
+		*crosses = ok  &&  runs_over_other_platform( on, halt, get_waytype() );
+	}
 	return ok ? max( on.get_count(), 1u ) : 0;
 }
 
 
-bool rail_vehicle_t::leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length)
+uint8 rail_vehicle_t::leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length, halthandle_t halt)
 {
-	const uint32 length = get_onward_length( from, next_stop );
-	if(  length==0  ) {
-		return false;
-	}
+	bool crosses = false;
+	const uint32 length = get_onward_length( from, next_stop, halt, &crosses );
 	// as for a way through a station (find_station_track): at most half as long again, plus a few tiles
-	return planned_length==0  ||  length <= planned_length + planned_length/2 + 8;
+	if(  length==0  ||  (planned_length!=0  &&  length > planned_length + planned_length/2 + 8)  ) {
+		return ONWARD_NONE;
+	}
+	return crosses ? ONWARD_CROSSING : ONWARD_OK;
 }
 
 

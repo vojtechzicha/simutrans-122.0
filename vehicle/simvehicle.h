@@ -664,13 +664,19 @@ private:
 	// on the planned track allows only that track, the way on from another one goes through the rest
 	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path, uint32 keep_to);
 
-	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none
-	uint32 get_onward_length(koord3d from, koord3d next_stop);
+	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none;
+	// crosses (if given): that way turns off onto another track and runs over a platform of halt there
+	uint32 get_onward_length(koord3d from, koord3d next_stop, halthandle_t halt = halthandle_t(), bool *crosses = NULL);
+
+	// how a platform other than the planned one leads on (leads_on_like_planned)
+	enum { ONWARD_NONE, ONWARD_OK, ONWARD_CROSSING };
 
 	// a platform other than the planned one: the way on from it to next_stop exists and is not much
 	// longer than planned_length (from the planned platform, 0 = unknown); a platform on the other side
-	// with no crossover after it would only lead back
-	bool leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length);
+	// with no crossover after it would only lead back. ONWARD_CROSSING: it leads on, but over another
+	// platform of halt (a far side track whose line on leaves only from the others); the searches take
+	// such a platform only when no other is free
+	uint8 leads_on_like_planned(koord3d from, koord3d next_stop, uint32 planned_length, halthandle_t halt);
 
 	// path (from find_station_track, starting at route index start) in place of the route from there on;
 	// when the train passes (!stops), on from the end of path to the end of the route (through the
