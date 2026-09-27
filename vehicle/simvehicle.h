@@ -662,6 +662,15 @@ private:
 	// is_target found a signal that applies but is no target: do not search on from there
 	mutable bool track_search_block;
 
+	/* fork: while bound, a stop search does not run on out of the far end of a platform of this halt
+	 * (get_ribi). The route search enters each tile only once, from whichever side it reaches it
+	 * first: through one platform, round the throat and back, it could reach another platform from
+	 * behind and take its tiles before the way in from the front got there. When nothing is found
+	 * that way, the search runs again without it (a platform only reached through a short one)
+	 */
+	halthandle_t stop_search_halt;
+	koord3d stop_search_start; // the search may leave this tile (a signal on a platform end)
+
 	// the signal on this tile applies to a train leaving it in direction dir (never a block post:
 	// those count only for a train in a single-track section, see is_stop_point)
 	bool signal_applies(const grund_t *gr, ribi_t::ribi dir) const;
@@ -779,6 +788,9 @@ public:
 
 	// returns true for the way search to an unknown target.
 	bool is_target(const grund_t *,const grund_t *) const OVERRIDE;
+
+	// fork: the way's directions; during a stop search not out of a platform of stop_search_halt
+	ribi_t::ribi get_ribi(const grund_t *gr) const OVERRIDE;
 
 	// handles all block stuff and route choosing ...
 	bool can_enter_tile(const grund_t *gr_next, sint32 &restart_speed, uint8) OVERRIDE;

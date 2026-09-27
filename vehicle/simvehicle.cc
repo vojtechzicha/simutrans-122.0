@@ -2702,6 +2702,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	stop_search_start = koord3d::invalid;
 	couple_in_station = false;
 	section_after_pos = koord3d::invalid;
 	section_after_stop = 0;
@@ -2763,6 +2764,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	track_search_block = false;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
+	stop_search_start = koord3d::invalid;
 	couple_in_station = false;
 	section_after_pos = koord3d::invalid;
 	section_after_stop = 0;
@@ -2968,6 +2970,23 @@ int rail_vehicle_t::get_cost(const grund_t *gr, const weg_t *w, const sint32 max
 	}
 
 	return costs;
+}
+
+
+// fork: during a stop search at stop_search_halt, never on from a platform of it to a tile that is not
+// (its far end; the way in is behind the search anyway)
+ribi_t::ribi rail_vehicle_t::get_ribi(const grund_t *gr) const
+{
+	ribi_t::ribi ribi = gr->get_weg_ribi( get_waytype() );
+	if(  stop_search_halt.is_bound()  &&  gr->get_halt()==stop_search_halt  &&  gr->get_pos()!=stop_search_start  ) {
+		for(  int r=0;  r<4;  r++  ) {
+			grund_t *to;
+			if(  (ribi & ribi_t::nsew[r])  &&  gr->get_neighbour( to, get_waytype(), ribi_t::nsew[r] )  &&  to->get_halt()!=stop_search_halt  ) {
+				ribi &= ~ribi_t::nsew[r];
+			}
+		}
+	}
+	return ribi;
 }
 
 
@@ -3356,55 +3375,64 @@ skip_choose:
 		const int richtung = ribi_type(get_pos(), pos_next); // to avoid confusion at diagonals
 		uint32 planned_onward = 0xFFFFFFFFul; // measured when a platform is found
 		bool found = false;
-		track_search_excluded.clear();
-		// a train turning back here tries the bays first, then any platform
-		if(  prefer_bays  ) {
-			bay_search = 2;
-		}
-		// fork: a platform whose way on runs over another platform only when no other is free
-		vector_tpl<koord3d> crossing;
-		bool avoid_crossing = true;
-		for(  ;;  ) {
-			// every rejected platform is excluded, so this ends after at most as many tries as platforms
-			for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
-				if(  !target_rt.find_route( welt, cnv->get_route()->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), richtung, welt->get_settings().get_max_choose_route_steps() )  ) {
-					break;
-				}
-				if(  turns_round_through( target_rt, 0, target_halt )  ) {
-					// fork: never through the station and back in (a bay facing the other way)
-					track_search_excluded.append( target_rt.back() );
-					continue;
-				}
-				if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
-					planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
-				}
-				const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
-				found = onward==ONWARD_OK  ||  (onward==ONWARD_CROSSING  &&  !avoid_crossing);
-				if(  !found  ) {
-					track_search_excluded.append( target_rt.back() );
-					if(  onward==ONWARD_CROSSING  ) {
-						crossing.append( target_rt.back() );
+		// fork: first never on out of a platform of the halt (see stop_search_halt), then the search as before
+		const uint8 bay_mode = bay_search;
+		for(  uint8 pass=0;  !found  &&  pass<2;  pass++  ) {
+			const halthandle_t no_through = pass==0 ? target_halt : halthandle_t();
+			stop_search_start = cnv->get_route()->at(start_block);
+			track_search_excluded.clear();
+			// a train turning back here tries the bays first, then any platform
+			bay_search = prefer_bays ? 2 : bay_mode;
+			// fork: a platform whose way on runs over another platform only when no other is free
+			vector_tpl<koord3d> crossing;
+			bool avoid_crossing = true;
+			for(  ;;  ) {
+				// every rejected platform is excluded, so this ends after at most as many tries as platforms
+				for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+					// (only this search: the way on from a platform below leaves it)
+					stop_search_halt = no_through;
+					const bool ok = target_rt.find_route( welt, cnv->get_route()->at(start_block), this, speed_to_kmh(cnv->get_min_top_speed()), richtung, welt->get_settings().get_max_choose_route_steps() );
+					stop_search_halt = halthandle_t();
+					if(  !ok  ) {
+						break;
+					}
+					if(  turns_round_through( target_rt, 0, target_halt )  ) {
+						// fork: never through the station and back in (a bay facing the other way)
+						track_search_excluded.append( target_rt.back() );
+						continue;
+					}
+					if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+						planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
+					}
+					const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
+					found = onward==ONWARD_OK  ||  (onward==ONWARD_CROSSING  &&  !avoid_crossing);
+					if(  !found  ) {
+						track_search_excluded.append( target_rt.back() );
+						if(  onward==ONWARD_CROSSING  ) {
+							crossing.append( target_rt.back() );
+						}
 					}
 				}
-			}
-			if(  found  ) {
-				break;
-			}
-			if(  avoid_crossing  &&  !crossing.empty()  ) {
-				// nothing better: again with those
-				avoid_crossing = false;
-				FOR( vector_tpl<koord3d>, const &k, crossing ) {
-					track_search_excluded.remove( k );
+				if(  found  ) {
+					break;
 				}
-				crossing.clear();
-				continue;
+				if(  avoid_crossing  &&  !crossing.empty()  ) {
+					// nothing better: again with those
+					avoid_crossing = false;
+					FOR( vector_tpl<koord3d>, const &k, crossing ) {
+						track_search_excluded.remove( k );
+					}
+					crossing.clear();
+					continue;
+				}
+				if(  bay_search!=2  ) {
+					break;
+				}
+				bay_search = 0;
+				avoid_crossing = true;
 			}
-			if(  bay_search!=2  ) {
-				break;
-			}
-			bay_search = 0;
-			avoid_crossing = true;
 		}
+		stop_search_start = koord3d::invalid;
 		bay_search = 0;
 		track_search_excluded.clear();
 		if(  !found  ) {
@@ -3804,87 +3832,94 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	// search a free track (stopping: a stop position of halt, passing: up to a signal that applies)
 	track_search_halt = halt;
 	track_search_start = route->at(from);
-	track_search_excluded.clear();
 	const ribi_t::ribi start_dir = ribi_type( route->at(from), route->at(from+1) );
 	bool found = false;
-	// a train turning back there tries the bays first, then any track
-	if(  prefer_bays  ) {
-		bay_search = 2;
-	}
-	// a platform whose way on runs over another platform only when no other is free
-	vector_tpl<koord3d> crossing;
-	bool avoid_crossing = true;
-	for(  ;;  ) {
-		// every rejected track is excluded, so this ends after at most as many tries as tracks
-		for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
-			route_t candidate;
-			track_search = halt.is_bound() ? 1 : 2;
-			track_search_block = false;
-			const bool ok = candidate.find_route( welt, route->at(from), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
-			// the way on from there may use any track
-			track_search = 3;
-			bool leads_on = false;
-			bool crosses = false;
-			if(  ok  &&  candidate.get_count()>=2  ) {
-				if(  halt.is_bound()  ) {
-					// never through the station and back in (a bay facing the other way)
-					if(  !turns_round_through( candidate, 0, halt )  ) {
-						if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
-							planned_onward = get_onward_length( route->back(), next_stop );
+	// fork: stopping, first never on out of a platform of halt (see stop_search_halt), then as before
+	const uint8 bay_mode = bay_search;
+	for(  uint8 pass=halt.is_bound() ? 0 : 1;  !found  &&  pass<2;  pass++  ) {
+		const halthandle_t no_through = pass==0 ? halt : halthandle_t();
+		stop_search_start = route->at(from);
+		track_search_excluded.clear();
+		// a train turning back there tries the bays first, then any track
+		bay_search = prefer_bays ? 2 : bay_mode;
+		// a platform whose way on runs over another platform only when no other is free
+		vector_tpl<koord3d> crossing;
+		bool avoid_crossing = true;
+		for(  ;;  ) {
+			// every rejected track is excluded, so this ends after at most as many tries as tracks
+			for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+				route_t candidate;
+				track_search = halt.is_bound() ? 1 : 2;
+				track_search_block = false;
+				stop_search_halt = no_through;
+				const bool ok = candidate.find_route( welt, route->at(from), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
+				stop_search_halt = halthandle_t();
+				// the way on from there may use any track
+				track_search = 3;
+				bool leads_on = false;
+				bool crosses = false;
+				if(  ok  &&  candidate.get_count()>=2  ) {
+					if(  halt.is_bound()  ) {
+						// never through the station and back in (a bay facing the other way)
+						if(  !turns_round_through( candidate, 0, halt )  ) {
+							if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+								planned_onward = get_onward_length( route->back(), next_stop );
+							}
+							const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
+							crosses = onward==ONWARD_CROSSING;
+							leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
 						}
-						const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
-						crosses = onward==ONWARD_CROSSING;
-						leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
 					}
+					else {
+						route_t on;
+						leads_on = cnv->calc_route_on( candidate.back(), *route, start, candidate.get_route(), on )
+							&&  on.at(1)!=candidate.at( candidate.get_count()-2 );
+						if(  leads_on  ) {
+							// not much longer than the planned way
+							const uint32 planned_len = count-1-start;
+							const uint32 new_len = candidate.get_count()-1 + on.get_count()-1;
+							leads_on = new_len <= planned_len + (planned_end-start)/2 + 4;
+						}
+					}
+				}
+				track_search = 0;
+				if(  !ok  ||  candidate.get_count()<2  ) {
+					break;
+				}
+				if(  leads_on  ) {
+					for(  uint32 i=start;  i<from;  i++  ) {
+						path.append( route->at(i) );
+					}
+					path.append( &candidate );
+					found = true;
 				}
 				else {
-					route_t on;
-					leads_on = cnv->calc_route_on( candidate.back(), *route, start, candidate.get_route(), on )
-						&&  on.at(1)!=candidate.at( candidate.get_count()-2 );
-					if(  leads_on  ) {
-						// not much longer than the planned way
-						const uint32 planned_len = count-1-start;
-						const uint32 new_len = candidate.get_count()-1 + on.get_count()-1;
-						leads_on = new_len <= planned_len + (planned_end-start)/2 + 4;
+					track_search_excluded.append( candidate.back() );
+					if(  crosses  ) {
+						crossing.append( candidate.back() );
 					}
 				}
 			}
-			track_search = 0;
-			if(  !ok  ||  candidate.get_count()<2  ) {
+			if(  found  ) {
 				break;
 			}
-			if(  leads_on  ) {
-				for(  uint32 i=start;  i<from;  i++  ) {
-					path.append( route->at(i) );
+			if(  avoid_crossing  &&  !crossing.empty()  ) {
+				// nothing better: again with those
+				avoid_crossing = false;
+				FOR( vector_tpl<koord3d>, const &k, crossing ) {
+					track_search_excluded.remove( k );
 				}
-				path.append( &candidate );
-				found = true;
+				crossing.clear();
+				continue;
 			}
-			else {
-				track_search_excluded.append( candidate.back() );
-				if(  crosses  ) {
-					crossing.append( candidate.back() );
-				}
+			if(  bay_search!=2  ) {
+				break;
 			}
+			bay_search = 0;
+			avoid_crossing = true;
 		}
-		if(  found  ) {
-			break;
-		}
-		if(  avoid_crossing  &&  !crossing.empty()  ) {
-			// nothing better: again with those
-			avoid_crossing = false;
-			FOR( vector_tpl<koord3d>, const &k, crossing ) {
-				track_search_excluded.remove( k );
-			}
-			crossing.clear();
-			continue;
-		}
-		if(  bay_search!=2  ) {
-			break;
-		}
-		bay_search = 0;
-		avoid_crossing = true;
 	}
+	stop_search_start = koord3d::invalid;
 	bay_search = 0;
 	track_search_excluded.clear();
 	track_search = 0;
