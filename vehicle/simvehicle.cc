@@ -2990,6 +2990,18 @@ ribi_t::ribi rail_vehicle_t::get_ribi(const grund_t *gr) const
 }
 
 
+// fork: the direction a train leaves gr in, coming from prev_gr: the other end of the way (signals never
+// stand on a switch; on one, e.g. a station boundary from a dat without is_single_way, the direction it
+// came in). roadsign_t::applies_to takes this exit direction; on a curve it differs from the entry
+static ribi_t::ribi get_exit_dir(const grund_t *gr, const grund_t *prev_gr, waytype_t wt)
+{
+	const ribi_t::ribi in = ribi_type( prev_gr->get_pos(), gr->get_pos() );
+	weg_t const* const way = gr->get_weg( wt );
+	const ribi_t::ribi out = way ? way->get_ribi_unmasked() & ~ribi_t::backward( in ) : ribi_t::none;
+	return ribi_t::is_single( out ) ? out : in;
+}
+
+
 // this routine is called by find_route, to determined if we reached a destination
 bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 {
@@ -3000,7 +3012,7 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		if(  prev_gr==NULL  ||  gr->get_pos()==track_search_start  ) {
 			return false;
 		}
-		const ribi_t::ribi dir = ribi_type( prev_gr->get_pos(), gr->get_pos() );
+		const ribi_t::ribi dir = get_exit_dir( gr, prev_gr, get_waytype() );
 		if(  track_search==1  &&  is_stop_position( gr, prev_gr, track_search_halt )  ) {
 			return true;
 		}
@@ -3021,7 +3033,7 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 			// in a station (find_partner_track): never search on past a signal or boundary that applies
 			track_search_block = false;
 			if(  prev_gr  ) {
-				const ribi_t::ribi dir = ribi_type( prev_gr->get_pos(), gr->get_pos() );
+				const ribi_t::ribi dir = get_exit_dir( gr, prev_gr, get_waytype() );
 				const roadsign_t *lt = get_station_boundary( gr );
 				track_search_block = signal_applies( gr, dir )  ||  (lt  &&  lt->applies_to( dir ));
 			}

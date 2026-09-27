@@ -424,6 +424,10 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   throat and back could reach a free platform from behind and close its stop tile before the way in
   from the front got there (Bylnice: a train red at a choose signal beside a free platform). If that
   finds nothing, the old search runs (a platform reached only through another one).
+  Those searches judge a signal or boundary by the direction the train leaves its tile
+  (`get_exit_dir`), as `is_stop_point` and `roadsign_t::applies_to` do; on a curve that is not the
+  direction it came in (Holubice: a passing train took a `P` on a throat curve as its track's end,
+  its way on ran into an occupied platform and it stood at the `LT` for good).
   `P` at both ends of every track is the normal exit signal of double-track stations too (plan 3.7.1).
   The PR #1 hold walk stops at an `LT` and after the first signal past the train's exit signal.
 - Schedule waypoints: the route runs through the waypoints ahead up to the next stop (stock
