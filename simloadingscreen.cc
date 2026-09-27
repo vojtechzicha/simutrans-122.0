@@ -16,6 +16,11 @@
 #include "gui/simwin.h"
 #include "gui/gui_theme.h"
 #include "tpl/slist_tpl.h"
+#include "dataobj/translator.h"
+
+#ifdef FORK_BUILD_INFO
+#include "fork_build_info.h"
+#endif
 
 
 loadingscreen_t::loadingscreen_t( const char *w, uint32 max_p, bool logo, bool continueflag )
@@ -57,7 +62,47 @@ void loadingscreen_t::display_logo()
 		display_color_img(skinverwaltung_t::biglogosymbol->get_image_id(2), x, y+h, 0, false, true);
 		display_color_img(skinverwaltung_t::biglogosymbol->get_image_id(3), x+w, y+h, 0, false, true);
 	}
+#ifdef FORK_BUILD_INFO
+	if(  show_logo  ) {
+		display_build_info();
+	}
+#endif
 }
+
+
+#ifdef FORK_BUILD_INFO
+// fork: the build and its new commits under the progress bar, as on the welcome screen
+void loadingscreen_t::display_build_info()
+{
+	const int width = display_get_width();
+	const int half_height = display_get_height()>>1;
+	KOORD_VAL const bar_height = max(LINESPACE + 10, 20);
+	scr_rect r( width/8, half_height + bar_height/2 + LINESPACE, width - width/4, LINESPACE );
+
+	char buf[256];
+	sprintf( buf, translator::translate("Fork build %s, built %s"), FORK_BUILD_VERSION, FORK_BUILD_DATE );
+	display_proportional_ellipsis_rgb( r, buf, ALIGN_CENTER_H, SYSCOL_TEXT_HIGHLIGHT, true );
+	r.y += LINESPACE + 4;
+
+	if(  FORK_BUILD_SINCE[0]  ) {
+		sprintf( buf, translator::translate("New since build %s:"), FORK_BUILD_SINCE );
+	}
+	else {
+		sprintf( buf, "%s", translator::translate("Latest changes:") );
+	}
+	display_proportional_ellipsis_rgb( r, buf, ALIGN_CENTER_H, color_idx_to_rgb(COL_WHITE), true );
+	r.y += LINESPACE + 2;
+
+	for(  int i = 0;  fork_build_commits[i]  &&  r.y + LINESPACE < display_get_height();  i++  ) {
+		display_proportional_ellipsis_rgb( r, fork_build_commits[i], ALIGN_LEFT, color_idx_to_rgb(COL_GREY5), true );
+		r.y += LINESPACE;
+	}
+	if(  FORK_BUILD_MORE > 0  ) {
+		sprintf( buf, translator::translate("... and %d older ones"), FORK_BUILD_MORE );
+		display_proportional_ellipsis_rgb( r, buf, ALIGN_LEFT, color_idx_to_rgb(COL_GREY5), true );
+	}
+}
+#endif
 
 
 // show everything but the logo

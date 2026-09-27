@@ -39,6 +39,9 @@ MAKEOBJ="$REPO/build/default/makeobj/makeobj.exe"
 STEAM_EXE="$STEAM_DIR/simutrans.exe"
 STOCK_EXE="$STEAM_DIR/simutrans-stock.exe"
 FORK_HASH="$STEAM_DIR/simutrans-fork.sha256"
+# commit of the installed fork build and of the last build, for the welcome screen's list of new commits
+FORK_COMMIT="$STEAM_DIR/simutrans-fork.commit"
+BUILT_COMMIT="$REPO/build/default/sim.commit"
 STEAM_EN_TAB="$STEAM_DIR/text/en.tab"
 STOCK_EN_TAB="$STEAM_DIR/text/en.tab-stock"
 FORK_TEXT_MARK="# fork texts, added by tools/windows/steam-fork.sh"
@@ -68,8 +71,12 @@ ensure_config() {
 do_build() {
 	ensure_config
 	[ -x "$MSYS_BASH" ] || die "MSYS2 not found at $MSYS_BASH (winget install MSYS2.MSYS2)"
+	# version and the commits since the installed build, for the welcome screen; the MSYS2 shell
+	# has no git, so the Makefile keeps this header
+	FORK_SINCE="$(cat "$FORK_COMMIT" 2>/dev/null || true)" sh "$REPO/tools/fork-build-info.sh" "$REPO/fork_build_info.h"
 	MSYSTEM=MINGW64 "$MSYS_BASH" -lc "cd '$REPO' && make -j$JOBS"
 	[ -f "$BUILT" ] || die "build produced no $BUILT"
+	git -C "$REPO" rev-parse HEAD > "$BUILT_COMMIT"
 	echo "built $BUILT"
 }
 
@@ -100,6 +107,7 @@ do_install() {
 	backup_stock
 	cp -f "$BUILT" "$STEAM_EXE"
 	sha "$STEAM_EXE" > "$FORK_HASH"
+	[ -f "$BUILT_COMMIT" ] && cp -f "$BUILT_COMMIT" "$FORK_COMMIT"
 	echo "installed fork as $STEAM_EXE"
 	install_texts
 }
@@ -164,6 +172,7 @@ do_status() {
 	local cur; cur="$(sha "$STEAM_EXE")"
 	if [ -f "$FORK_HASH" ] && [ "$cur" = "$(cat "$FORK_HASH")" ]; then
 		echo "Steam runs the fork ($(date -r "$STEAM_EXE" '+%Y-%m-%d %H:%M'))"
+		[ -f "$FORK_COMMIT" ] && echo "built from:   $(git -C "$REPO" log -1 --format='%h %s' "$(cat "$FORK_COMMIT")" 2>/dev/null || cat "$FORK_COMMIT")"
 	elif [ -f "$STOCK_EXE" ] && [ "$cur" = "$(sha "$STOCK_EXE")" ]; then
 		echo "Steam runs the stock exe"
 	else

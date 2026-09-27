@@ -1697,3 +1697,11 @@ New line with the same schedule and no convois
 New line with the same schedule and no convois
 %s (copy)
 %s (copy)
+Fork build %s, built %s
+Fork build %s, built %s
+New since build %s:
+New since build %s:
+Latest changes:
+Latest changes:
+... and %d older ones
+... and %d older ones

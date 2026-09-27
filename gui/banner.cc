@@ -21,6 +21,12 @@
 #include "scenario_frame.h"
 #include "server_frame.h"
 #include "components/gui_image.h"
+#include "components/gui_fixedwidth_textarea.h"
+#include "../dataobj/translator.h"
+
+#ifdef FORK_BUILD_INFO
+#include "../fork_build_info.h"
+#endif
 
 #define L_LINESPACE_EXTRA_2  ( LINESPACE + 2 )
 #define L_LINESPACE_EXTRA_5  ( LINESPACE + 5 )
@@ -72,6 +78,32 @@ banner_t::banner_t() : gui_frame_t("")
 	new_component<gui_label_t>("Version " VERSION_NUMBER " " VERSION_DATE " r" QUOTEME(REVISION) L_DEBUG_TEXT, SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
 #else
 	new_component<gui_label_t>("Version " VERSION_NUMBER " " VERSION_DATE L_DEBUG_TEXT, SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left)->set_shadow(SYSCOL_TEXT_SHADOW, true);
+#endif
+
+#ifdef FORK_BUILD_INFO
+	// fork: which build this is and what came in with it (tools/fork-build-info.sh)
+	gui_label_buf_t *lb = new_component<gui_label_buf_t>(SYSCOL_TEXT_HIGHLIGHT, gui_label_t::left);
+	lb->buf().printf(translator::translate("Fork build %s, built %s"), FORK_BUILD_VERSION, FORK_BUILD_DATE);
+	lb->update();
+	lb->set_shadow(SYSCOL_TEXT_SHADOW, true);
+
+	lb = new_component<gui_label_buf_t>(SYSCOL_TEXT_TITLE, gui_label_t::left);
+	if(  FORK_BUILD_SINCE[0]  ) {
+		lb->buf().printf(translator::translate("New since build %s:"), FORK_BUILD_SINCE);
+	}
+	else {
+		lb->buf().append(translator::translate("Latest changes:"));
+	}
+	lb->update();
+	lb->set_shadow(SYSCOL_TEXT_SHADOW, true);
+
+	for(  int i = 0;  fork_build_commits[i];  i++  ) {
+		fork_commits.printf("- %s\n", fork_build_commits[i]);
+	}
+	if(  FORK_BUILD_MORE > 0  ) {
+		fork_commits.printf(translator::translate("... and %d older ones"), FORK_BUILD_MORE);
+	}
+	new_component<gui_fixedwidth_textarea_t>(&fork_commits, D_BUTTON_WIDTH*3 + D_H_SPACE*2);
 #endif
 
 	add_table(5,0);

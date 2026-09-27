@@ -10,6 +10,7 @@
 #include "../dataobj/environment.h"
 #include "components/gui_button.h"
 #include "gui_frame.h"
+#include "../utils/cbuffer_t.h"
 
 
 /*
@@ -26,6 +27,9 @@ private:
 		load_scenario,
 		join_map,
 		quit;
+
+	/// fork: commits of this build, shown under the version
+	cbuffer_t fork_commits;
 
 public:
 	banner_t();

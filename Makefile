@@ -223,6 +223,15 @@ ifdef WITH_REVISION
   endif
 endif
 
+# fork: version and latest commits for the welcome screen (gui/banner.cc). Without git (the MSYS2
+# shell of tools/windows/steam-fork.sh) the header the caller wrote is kept.
+ifneq ($(shell command -v git 2>/dev/null),)
+  $(shell sh tools/fork-build-info.sh fork_build_info.h)
+endif
+ifneq ($(wildcard fork_build_info.h),)
+  CFLAGS += -DFORK_BUILD_INFO
+endif
+
 CFLAGS   += -Wall -Wextra -Wcast-qual -Wpointer-arith -Wcast-align $(FLAGS)
 CCFLAGS  += -ansi -Wstrict-prototypes -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 

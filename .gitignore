@@ -39,3 +39,6 @@
 
 # dependency file windres writes into the repo root on the MinGW build
 /simres.d
+
+# build info header written by tools/fork-build-info.sh
+/fork_build_info.h

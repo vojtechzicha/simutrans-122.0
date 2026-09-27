@@ -35,6 +35,11 @@ private:
 	// show everything but the logo
 	void display();
 
+#ifdef FORK_BUILD_INFO
+	// fork: build version and new commits, drawn with the logo
+	void display_build_info();
+#endif
+
 public:
 	loadingscreen_t( const char *what, uint32 max_progress, bool show_logo = false, bool continueflag = false );
 

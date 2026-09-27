@@ -621,6 +621,14 @@ saving the game. To test the viewer with the real file, serve `tools/saveviewer/
 over http (see `tools/saveviewer/README.md`); Playwright for Python is installed and drives the
 installed Chrome (`channel="chrome"`).
 
+Welcome screen build info: `tools/fork-build-info.sh` writes `fork_build_info.h` (ignored) with the
+version (`122.0+N (hash)`, commits since the tag), build date and up to 12 commit subjects, which
+`gui/banner.cc` shows under the version. `build` passes the commit installed in Steam
+(`simutrans-fork.commit`, written by `install` from `build/default/sim.commit`) as `FORK_SINCE`, so
+the list is what is new since the installed build (the latest commits when nothing is). The MSYS2
+shell has no git, so the script runs from Git Bash before `make`; the Makefile runs it itself only
+where git exists (macOS) and defines `FORK_BUILD_INFO` when the header is there.
+
 GUI checks on Windows: `tools/win-test/win.ps1` screenshots the GDI window and sends clicks and
 keys (`pwsh tools/win-test/win.ps1 shot out.png`, `click X Y [left|right|middle]`, `keys "{ESC}"`).
 Coordinates are client-relative like the macOS helpers.
