@@ -1098,6 +1098,9 @@ public:
 	bool has_claim() const { return !claim_path.empty(); }
 	koord3d get_claim_boundary() const { return claim_path.empty() ? koord3d::invalid : claim_path[0]; }
 	koord3d get_claim_end() const { return claim_path.empty() ? koord3d::invalid : claim_path.back(); }
+	const vector_tpl<koord3d> &get_claim_path() const { return claim_path; }
+	bool get_claim_stops() const { return claim_stops; }
+	koord3d get_claim_stop() const { return claim_stop; }
 	bool is_claimed_tile(koord3d pos) const;
 	// path: from the station boundary through the track; reserves its tiles from first on;
 	// for_stop: the schedule stop whose way enters that station

@@ -67,7 +67,12 @@ public:
 	bool is_private_way() const { return (flags & PRIVATE_ROAD) != 0; }
 
 	//  return true for a traffic light
-	bool is_traffic_light() const { return (get_count() > 4); }
+	// (fork: a station boundary with more images is an entry signal showing aspects, see roadsign_t::shows_aspects)
+	bool is_traffic_light() const { return (get_count() > 4)  &&  !is_station_boundary(); }
+
+	// fork: red, green and yellow images for N,S,W,E: a choose signal with exactly 12 images (stock uses
+	// 16 or more for track with catenary, pak128.cs has 20 and 24), a station boundary with 12 or 24
+	bool has_yellow_aspect() const { return get_count()==12  ||  (is_station_boundary()  &&  get_count()==24); }
 
 	bool is_choose_sign() const { return (flags & CHOOSE_SIGN) != 0; }
 

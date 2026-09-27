@@ -167,6 +167,10 @@ public:
 	/// fork: show the modal list of doubled pak objects at start (simuconf warn_doubled_objects)
 	static bool warn_doubled_objects;
 
+	/// fork: when an entry signal (station boundary) or choose signal shows yellow (simuconf yellow_aspect_rule):
+	/// 0 = sent to another platform than scheduled, 1 = its way takes a switch to the side
+	static uint8 yellow_aspect_rule;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 

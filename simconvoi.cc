@@ -307,6 +307,9 @@ void convoi_t::set_claim(const route_t &path, uint16 first, bool stops, koord3d 
 	claim_stops = stops;
 	claim_stop = for_stop;
 	reserve_claim();
+	if(  !claim_path.empty()  ) {
+		rail_vehicle_t::update_boundary_aspect( claim_path[0] );
+	}
 }
 
 
@@ -362,10 +365,14 @@ void convoi_t::release_claim(bool unreserve)
 			}
 		}
 	}
+	const koord3d boundary = get_claim_boundary();
 	claim_path.clear();
 	claim_first = 0;
 	claim_stops = false;
 	claim_stop = koord3d::invalid;
+	if(  boundary!=koord3d::invalid  ) {
+		rail_vehicle_t::update_boundary_aspect( boundary );
+	}
 }
 
 
@@ -883,6 +890,10 @@ DBG_MESSAGE("convoi_t::finish_rd()","next_stop_index=%d", next_stop_index );
 
 	// fork: the track claimed at the next station of a single-track section
 	reserve_claim();
+	if(  !claim_path.empty()  ) {
+		// (saves from before entry signal aspects show red there otherwise)
+		rail_vehicle_t::update_boundary_aspect( claim_path[0] );
+	}
 
 	calc_speedbonus_kmh();
 }

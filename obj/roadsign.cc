@@ -57,7 +57,10 @@ roadsign_t::roadsign_t(loadsave_t *file) : obj_t ()
 	}
 	// some sve had rather strange entries in state
 	if(  !automatic  ||  desc==NULL  ) {
-		state = 0;
+		// fork: an entry signal keeps its aspect (red, green or yellow)
+		if(  !shows_aspects()  ||  state>naechste_rot  ) {
+			state = 0;
+		}
 	}
 	// only traffic light need switches
 	if(  automatic  ) {
@@ -261,7 +264,19 @@ void roadsign_t::calc_image()
 
 	image_id tmp_image=IMG_EMPTY;
 	if(!automatic) {
-		assert( state==0 );
+		assert( state==0  ||  shows_aspects() );
+
+		// fork: a station boundary with aspects has sets of four images: red, green (yellow), then the same
+		// for track with catenary; without yellow images it shows green instead
+		uint16 base = 0;
+		if(  shows_aspects()  ) {
+			const uint16 set = desc->has_yellow_aspect() ? 12 : 8;
+			base = (state==naechste_rot  &&  set==8 ? (uint16)gruen : (uint16)state) * 4;
+			const weg_t *way = gr->get_weg( desc->get_wtyp()!=tram_wt ? desc->get_wtyp() : track_wt );
+			if(  way  &&  way->is_electrified()  &&  desc->get_count()>=2*set  ) {
+				base += set;
+			}
+		}
 
 		foreground_image = IMG_EMPTY;
 		ribi_t::ribi temp_dir = dir;
@@ -284,38 +299,38 @@ void roadsign_t::calc_image()
 			const sint16 YOFF = desc->get_offset_left();
 
 			if(temp_dir&ribi_t::east) {
-				tmp_image = desc->get_image_id(3);
+				tmp_image = desc->get_image_id(3+base);
 				xoff += XOFF;
 				yoff += -YOFF;
 			}
 
 			if(temp_dir&ribi_t::north) {
 				if(tmp_image!=IMG_EMPTY) {
-					foreground_image = desc->get_image_id(0);
+					foreground_image = desc->get_image_id(0+base);
 					after_xoffset += -XOFF;
 					after_yoffset += -YOFF;
 				}
 				else {
-					tmp_image = desc->get_image_id(0);
+					tmp_image = desc->get_image_id(0+base);
 					xoff += -XOFF;
 					yoff += -YOFF;
 				}
 			}
 
 			if(temp_dir&ribi_t::west) {
-				foreground_image = desc->get_image_id(2);
+				foreground_image = desc->get_image_id(2+base);
 				after_xoffset += -XOFF;
 				after_yoffset += YOFF;
 			}
 
 			if(temp_dir&ribi_t::south) {
 				if(foreground_image!=IMG_EMPTY) {
-					tmp_image = desc->get_image_id(1);
+					tmp_image = desc->get_image_id(1+base);
 					xoff += XOFF;
 					yoff += YOFF;
 				}
 				else {
-					foreground_image = desc->get_image_id(1);
+					foreground_image = desc->get_image_id(1+base);
 					after_xoffset += XOFF;
 					after_yoffset += YOFF;
 				}
@@ -324,28 +339,28 @@ void roadsign_t::calc_image()
 		else {
 
 			if(temp_dir&ribi_t::east) {
-				foreground_image = desc->get_image_id(3);
+				foreground_image = desc->get_image_id(3+base);
 			}
 
 			if(temp_dir&ribi_t::north) {
 				if(foreground_image!=IMG_EMPTY) {
-					tmp_image = desc->get_image_id(0);
+					tmp_image = desc->get_image_id(0+base);
 				}
 				else {
-					foreground_image = desc->get_image_id(0);
+					foreground_image = desc->get_image_id(0+base);
 				}
 			}
 
 			if(temp_dir&ribi_t::west) {
-				tmp_image = desc->get_image_id(2);
+				tmp_image = desc->get_image_id(2+base);
 			}
 
 			if(temp_dir&ribi_t::south) {
 				if(tmp_image!=IMG_EMPTY) {
-					foreground_image = desc->get_image_id(1);
+					foreground_image = desc->get_image_id(1+base);
 				}
 				else {
-					tmp_image = desc->get_image_id(1);
+					tmp_image = desc->get_image_id(1+base);
 				}
 			}
 		}

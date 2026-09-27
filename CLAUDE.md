@@ -481,6 +481,23 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   either block, long dwell in block 2, coupling in both orders, a junction in block 2, save/load,
   downgrades; the 33 earlier rail scenarios unchanged except for ordering by the fairness rule.
   Export: `waiting_for.reason` `block_post`, `yielding` (with `halt_id`).
+- Entry signal aspects (no save change, display only): an `LT` object with 8 images (red, green)
+  or 12 (red, green, yellow; 16/24 add a set for catenary) is drawn as an entry signal
+  (`roadsign_t::shows_aspects`, still a road sign, not a traffic light: `is_traffic_light` excludes
+  station boundaries); a choose signal with exactly 12 images gets yellow too (`has_yellow_aspect`;
+  pak128.cs's 20/24-image choose signals keep the stock layout). `rail_vehicle_t::update_boundary_aspect`
+  sets an `LT` from the train that reserved its tile (let in: its reserved way; coming with a claim
+  at this `LT` and not waiting: its claim), else from the nearest train holding a claim there, else
+  red; called from `set_claim`/`release_claim`, after `is_station_boundary_clear`, when the last
+  vehicle leaves the tile, on unreserving it and in `convoi_t::finish_rd`. So it turns green when
+  the train gets its `P` at the previous station, red while it waits at the `LT` and after it.
+  A choose signal gets its aspect after `is_choose_signal_clear`. Yellow (`get_way_aspect`):
+  simuconf `yellow_aspect_rule` 0 (default, `env_t`, not saved) = a stopping train goes to another
+  platform than its schedule stop (`reaches_stop_platform`); 1, and trains that do not stop at the
+  end of the way = it takes a switch to the side (`takes_diverging_switch`, a turn at a tile with
+  3+ directions, zigzags of a diagonal line excepted). Nothing reads the state for driving. The
+  state byte is saved as for every road sign and kept on load for these signs. Art: the D1
+  `VZ-Signals-D1-{New,Old,Dwarf}-LT` and `-Choose` objects of the pakset (two yellows on New/Old).
 
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 

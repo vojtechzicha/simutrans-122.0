@@ -3448,6 +3448,159 @@ const roadsign_t *rail_vehicle_t::get_station_boundary(const grund_t *gr)
 }
 
 
+/* fork: aspects of station boundaries drawn as entry signals and of choose signals with a yellow
+ * aspect, display only. Yellow: the train goes to another platform than the one in its schedule
+ * (yellow_aspect_rule 0), or its way takes a switch to the side (rule 1, and trains that do not stop
+ * at the end of the way).
+ */
+
+// true when the way over path[from..to] takes a switch to the side
+static bool takes_diverging_switch(const vector_tpl<koord3d> &path, uint32 from, uint32 to, waytype_t wt)
+{
+	for(  uint32 k=from+1;  k<=to  &&  k+1<path.get_count();  k++  ) {
+		grund_t const* const gr = world()->lookup( path[k] );
+		weg_t const* const way = gr ? gr->get_weg( wt ) : NULL;
+		if(  way==NULL  ||  !ribi_t::is_threeway( way->get_ribi_unmasked() )  ) {
+			continue;
+		}
+		const ribi_t::ribi in = ribi_type( path[k-1], path[k] );
+		const ribi_t::ribi out = ribi_type( path[k], path[k+1] );
+		if(  in==out  ) {
+			continue;
+		}
+		// on a diagonal line the heading alternates from tile to tile: that is straight on too
+		// (a single step aside between two tiles of the same heading is the switch to the next track)
+		if(  k>=2  &&  k+2<path.get_count()  &&  ribi_type( path[k-2], path[k-1] )==out  &&  ribi_type( path[k+1], path[k+2] )==in  ) {
+			continue;
+		}
+		return true;
+	}
+	return false;
+}
+
+
+// true when the way from path[from] on runs over the stop tile, or ends on its platform in front of it
+// (e.g. behind a coupling partner)
+static bool reaches_stop_platform(const vector_tpl<koord3d> &path, uint32 from, koord3d stop, waytype_t wt)
+{
+	for(  uint32 k=from;  k<path.get_count();  k++  ) {
+		if(  path[k]==stop  ) {
+			return true;
+		}
+	}
+	grund_t const* gr = path.get_count()>=2 ? world()->lookup( path.back() ) : NULL;
+	grund_t const* const stop_gr = world()->lookup( stop );
+	if(  gr==NULL  ||  stop_gr==NULL  ||  !stop_gr->get_halt().is_bound()  ||  gr->get_halt()!=stop_gr->get_halt()  ) {
+		return false;
+	}
+	const ribi_t::ribi dir = ribi_type( path[path.get_count()-2], path.back() );
+	for(  uint16 n=0;  n<256;  n++  ) {
+		grund_t *to;
+		if(  !gr->get_neighbour( to, wt, dir )  ||  to->get_halt()!=stop_gr->get_halt()  ) {
+			return false;
+		}
+		if(  to->get_pos()==stop  ) {
+			return true;
+		}
+		gr = to;
+	}
+	return false;
+}
+
+
+static roadsign_t::signalstate get_way_aspect(const vector_tpl<koord3d> &path, uint32 from, uint32 to, bool stops, koord3d stop, waytype_t wt)
+{
+	bool side;
+	if(  stops  &&  env_t::yellow_aspect_rule==0  &&  stop!=koord3d::invalid  ) {
+		side = !reaches_stop_platform( path, from, stop, wt );
+	}
+	else {
+		side = takes_diverging_switch( path, from, to, wt );
+	}
+	return side ? roadsign_t::naechste_rot : roadsign_t::gruen;
+}
+
+
+// the train was let past the signal at route index from: its reserved way from there
+static roadsign_t::signalstate get_route_aspect(const convoi_t *cnv, uint32 from, waytype_t wt)
+{
+	const vector_tpl<koord3d> &path = cnv->get_route()->get_route();
+	if(  from+1>=path.get_count()  ) {
+		return roadsign_t::gruen;
+	}
+	const uint32 reserved_to = cnv->get_next_reservation_index();
+	// the reservation reaches the end of the route: the train stops there
+	const bool stops = reserved_to>=path.get_count();
+	const koord3d stop = cnv->get_schedule()->entries[ cnv->get_route_entry() ].pos;
+	return get_way_aspect( path, from, min( reserved_to, path.get_count() )-1, stops, stop, wt );
+}
+
+
+static roadsign_t::signalstate get_claim_aspect(const convoi_t *cnv, waytype_t wt)
+{
+	const vector_tpl<koord3d> &path = cnv->get_claim_path();
+	return get_way_aspect( path, 0, path.get_count()-1, cnv->get_claim_stops(), cnv->get_claim_stop(), wt );
+}
+
+
+void rail_vehicle_t::update_boundary_aspect(koord3d pos)
+{
+	karte_t *welt = world();
+	if(  welt->is_destroying()  ) {
+		return;
+	}
+	grund_t *gr = welt->lookup( pos );
+	roadsign_t *rs = gr ? const_cast<roadsign_t *>( get_station_boundary( gr ) ) : NULL;
+	if(  rs==NULL  ||  !rs->shows_aspects()  ) {
+		return;
+	}
+	const waytype_t wt = rs->get_desc()->get_wtyp()!=tram_wt ? rs->get_desc()->get_wtyp() : track_wt;
+	roadsign_t::signalstate aspect = roadsign_t::rot;
+	schiene_t const* const sch = (schiene_t const*)gr->get_weg( wt );
+	const convoihandle_t res = sch ? sch->get_reserved_convoi() : convoihandle_t();
+	if(  res.is_bound()  &&  res->get_vehicle_count()>0  ) {
+		// the train coming here, let in here, or leaving the station here
+		const route_t *r = res->get_route();
+		uint32 idx = INVALID_INDEX;
+		const uint32 front_at = res->front()->get_route_index();
+		for(  uint32 i=front_at>0 ? front_at-1 : 0;  i+1<r->get_count();  i++  ) {
+			if(  r->at(i)==pos  ) {
+				idx = i;
+				break;
+			}
+		}
+		if(  idx!=INVALID_INDEX  &&  rs->applies_to( ribi_type( r->at(idx), r->at(idx+1) ) )  ) {
+			grund_t const* const next = welt->lookup( r->at(idx+1) );
+			schiene_t const* const next_sch = next ? (schiene_t const*)next->get_weg( wt ) : NULL;
+			if(  next_sch  &&  next_sch->get_reserved_convoi()==res  ) {
+				// let in
+				aspect = get_route_aspect( res.get_rep(), idx, wt );
+			}
+			else if(  res->get_claim_boundary()==pos  &&  res->get_section_wait()==convoi_t::SECTION_WAIT_NONE  ) {
+				// on its way here, it holds its track in the station
+				aspect = get_claim_aspect( res.get_rep(), wt );
+			}
+		}
+	}
+	else {
+		// the nearest train holding a track behind this boundary
+		uint32 best = 0xFFFFFFFFu;
+		FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
+			if(  cnv->get_claim_boundary()==pos  &&  cnv->get_section_wait()!=convoi_t::SECTION_WAIT_ENTRY  ) {
+				const uint32 dist = koord_distance( cnv->get_pos().get_2d(), pos.get_2d() );
+				if(  dist<best  ) {
+					best = dist;
+					aspect = get_claim_aspect( cnv.get_rep(), wt );
+				}
+			}
+		}
+	}
+	if(  rs->get_state()!=aspect  ) {
+		rs->set_state( aspect );
+	}
+}
+
+
 bool rail_vehicle_t::signal_applies(const grund_t *gr, ribi_t::ribi dir) const
 {
 	weg_t const* const way = gr->get_weg( get_waytype() );
@@ -5493,7 +5646,9 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 	if(  sig==NULL  ) {
 		if(  get_station_boundary( gr_next_block )  ) {
 			// fork: entering a station from a single-track line
-			return is_station_boundary_clear( next_block, restart_speed );
+			const bool clear = is_station_boundary_clear( next_block, restart_speed );
+			update_boundary_aspect( gr_next_block->get_pos() );
+			return clear;
 		}
 		dbg->error( "rail_vehicle_t::is_signal_clear()", "called at %s without a signal!", cnv->get_route()->at(next_block).get_str() );
 		return true;
@@ -5540,7 +5695,12 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 	}
 
 	if(  sig_desc->is_choose_sign()  ) {
-		return is_choose_signal_clear( sig, next_block, restart_speed );
+		const bool clear = is_choose_signal_clear( sig, next_block, restart_speed );
+		if(  clear  &&  sig_desc->has_yellow_aspect()  ) {
+			// fork: green or yellow for the way chosen
+			sig->set_state( get_route_aspect( cnv, next_block, get_waytype() ) );
+		}
+		return clear;
 	}
 
 	dbg->error( "rail_vehicle_t::is_signal_clear()", "felt through at signal at %s", cnv->get_route()->at(next_block).get_str() );
@@ -5756,6 +5916,10 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 					signal->set_state(roadsign_t::rot);
 				}
 			}
+			else if(  sch1->has_sign()  ) {
+				// fork: an entry signal we no longer go past
+				update_boundary_aspect( pos );
+			}
 			if(sch1->is_crossing()) {
 				gr->find<crossing_t>()->release_crossing(this);
 			}
@@ -5818,6 +5982,10 @@ void rail_vehicle_t::leave_tile()
 					if(sig) {
 						sig->set_state(roadsign_t::rot);
 					}
+				}
+				else if(  sch0->has_sign()  ) {
+					// fork: an entry signal turns red behind the train, or shows the next train's aspect
+					update_boundary_aspect( get_pos() );
 				}
 			}
 		}

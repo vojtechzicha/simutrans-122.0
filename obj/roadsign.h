@@ -70,6 +70,12 @@ public:
 	void set_dir(ribi_t::ribi dir);
 
 	void set_state(signalstate z) {state = z; calc_image();}
+
+	/**
+	 * fork: a station boundary drawn as an entry signal (8 or 12 images: red, green, yellow) shows
+	 * aspects; display only, set by rail_vehicle_t::update_boundary_aspect
+	 */
+	bool shows_aspects() const { return desc  &&  desc->is_station_boundary()  &&  desc->get_count()>=8; }
 	signalstate get_state() { return (signalstate)state; }
 
 	typ get_typ() const OVERRIDE { return roadsign; }

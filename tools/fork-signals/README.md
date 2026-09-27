@@ -46,6 +46,14 @@ not as the blocked one like a stock one-way sign. Do not reorder the images to c
 per-image offsets, the foreground/background layer and the height on slopes belong to the slot, so
 reordered art stands on the wrong side and floats on slopes.
 
+A station boundary drawn as an entry signal shows aspects (display only; the stock game shows the
+first four images). Give it 8 images, red N,S,W,E then green N,S,W,E, or 12 with yellow N,S,W,E
+after them; 16 or 24 add the same set again for track with catenary. Red: no train let in; green:
+the train goes to its scheduled platform (or, passing, straight over every switch); yellow: another
+platform (or a switch to the side). A choose signal with exactly 12 images (red, green, yellow) gets
+the same yellow; choose signals with 8, 16, 20 or 24 images keep the stock layout. With 4 images a
+station boundary stays a plain board (D3).
+
 The fastest way to real art is to copy the dat entry of an existing signal and of the end-of-choose
 sign in the pakset, give them new names and add the flag line. The pak node format is unchanged, so
 the stock game still reads the objects: the platform signal as a plain one-way signal, the station

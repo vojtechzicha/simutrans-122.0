@@ -79,6 +79,7 @@ scr_size env_t::iconsize( 32, 32 );
 uint8 env_t::chat_window_transparency = 75;
 bool env_t::hide_rail_return_ticket = true;
 bool env_t::warn_doubled_objects = true;
+uint8 env_t::yellow_aspect_rule = 0;
 bool env_t::show_delete_buttons = false;
 
 // only used internally => do not touch further

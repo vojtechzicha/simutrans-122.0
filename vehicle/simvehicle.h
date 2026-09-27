@@ -759,6 +759,10 @@ public:
 	// fork: the station boundary sign (lichobeznikova tabulka) on this tile, if any
 	static const roadsign_t *get_station_boundary(const grund_t *gr);
 
+	// fork: sets the aspect of the station boundary at pos when it is drawn as an entry signal: green or
+	// yellow for the train let in there or holding a track behind it, else red (display only)
+	static void update_boundary_aspect(koord3d pos);
+
 	waytype_t get_waytype() const OVERRIDE { return track_wt; }
 
 	// since we might need to un-reserve previously used blocks, we must do this before calculation a new route
