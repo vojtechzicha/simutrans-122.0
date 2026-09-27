@@ -1037,6 +1037,8 @@ void objlist_t::rdwr(loadsave_t *file, koord3d current_pos)
 				// things with convoi will not be saved
 				||  (new_obj->get_typ()>=66  &&  new_obj->get_typ()<82)
 				||  (env_t::server  &&  new_obj->get_typ()==obj_t::baum  &&  file->is_version_atleast(110, 1))
+				// fork: older builds would make a block post a one-way signal (the pair closes the line)
+				||  (new_obj->get_typ()==obj_t::signal  &&  ((signal_t *)new_obj)->get_desc()->is_block_post()  &&  file->is_version_less(122, 10))
 			) {
 				// these objects are simply not saved
 			}

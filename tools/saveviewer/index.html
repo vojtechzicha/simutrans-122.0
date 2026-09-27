@@ -1091,6 +1091,8 @@ function waitText(c, links) {
     case "last_free_track": return "Keeping the last track at " + stop(w.halt_id) + " free";
     case "station_entry": return "Waiting to enter the station";
     case "single_track": return "Waiting for the single track";
+    case "block_post": return "Waiting at the block post";
+    case "yielding": return "Letting a train from " + stop(w.halt_id) + " through";
     case "coupling_partner": return "Waiting for the train to couple with";
     case "platform_after_uncoupling": return "Uncoupled, waiting for the platform";
   }

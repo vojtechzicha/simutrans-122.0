@@ -55,7 +55,7 @@ signals two-way so the stock game can still drive through the stations.
 ## Building
 
 - pak64 placeholder art (for tests): `python3 make_placeholder_png.py`, then
-  `makeobj pak64 ./ fork_signals_pak64.dat` with the fork's makeobj (`make makeobj`), and copy the two
+  `makeobj pak64 ./ fork_signals_pak64.dat` with the fork's makeobj (`make makeobj`), and copy the
   `roadsign.*.pak` files into the pakset folder.
 - pak128.cs on Windows: put the dat and the images in a folder and run
   `tools/windows/steam-fork.sh signals FOLDER/FILE.dat` (builds the fork's makeobj and writes the paks

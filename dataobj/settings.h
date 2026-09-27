@@ -178,6 +178,12 @@ private:
 	uint16 passing_hold_minutes;
 	uint16 passing_hold_max_minutes;
 
+	/**
+	 * Fork, block posts on single-track lines: trains follow each other onto the line until a train
+	 * at the other end has waited this many calendar minutes for it (0 = no following while one waits)
+	 */
+	uint16 block_yield_minutes;
+
 	std::string filename;
 
 	bool beginner_mode;
@@ -450,6 +456,7 @@ public:
 	bool get_calendar_seasons() const { return calendar_seasons; }
 	uint16 get_passing_hold_minutes() const { return passing_hold_minutes; }
 	uint16 get_passing_hold_max_minutes() const { return passing_hold_max_minutes; }
+	uint16 get_block_yield_minutes() const { return block_yield_minutes; }
 
 	void set_filename(const char *n) {filename=n;}
 	const char* get_filename() const { return filename.c_str(); }

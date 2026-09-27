@@ -254,12 +254,24 @@ private:
 	// the schedule stop whose way enters that station (the claim is out of date without it)
 	koord3d claim_stop;
 
-	// fork, rail: why the convoi waits at a platform signal or station boundary (not saved)
+	// fork, rail: why the convoi waits at a platform signal, block post or station boundary
+	// (reason, since and boundary saved 122.10: the yield at a block post depends on them)
 	uint8 section_wait;
 	halthandle_t section_wait_halt;
 	// since this tick (0 = not waiting); warned once that the stations are locked
 	uint32 section_wait_since;
 	bool section_lock_warned;
+	// SECTION_WAIT_LINE: the station boundary it waits to enter at the far end of the line, the one
+	// it leaves through, and the tile of the line that is taken
+	koord3d section_wait_boundary, section_wait_from, section_wait_tile;
+
+	/**
+	 * Fork, rail: the single-track section this convoi entered at a platform signal, from the
+	 * station boundary it left through (section_from) to the one it enters next (section_to);
+	 * both the same for a train that turns back on the line. Block posts stop it only while it is
+	 * set. Cleared at that station boundary. Saved (122.10).
+	 */
+	koord3d section_from, section_to;
 
 	/**
 	 * Fork, coupling (rail). A primary train carries the vehicles of the train that joined it at
@@ -1095,10 +1107,22 @@ public:
 	bool calc_route_on(koord3d from, const route_t &r, uint32 after, const vector_tpl<koord3d> &covered, route_t &on);
 
 	// SECTION_WAIT_LAST_TRACK: the last free track there is kept, taking it could lock the stations up
-	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK };
-	void set_section_wait(uint8 why, halthandle_t halt);
+	// SECTION_WAIT_BLOCK: at a block post, the next block is taken
+	// SECTION_WAIT_YIELD: could follow a train onto the line, but one waits at the other end
+	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK, SECTION_WAIT_BLOCK, SECTION_WAIT_YIELD };
+	void set_section_wait(uint8 why, halthandle_t halt, koord3d boundary = koord3d::invalid, koord3d from = koord3d::invalid, koord3d tile = koord3d::invalid);
 	uint8 get_section_wait() const { return section_wait; }
 	halthandle_t get_section_wait_halt() const { return section_wait_halt; }
+	koord3d get_section_wait_boundary() const { return section_wait_boundary; }
+	koord3d get_section_wait_from() const { return section_wait_from; }
+	koord3d get_section_wait_tile() const { return section_wait_tile; }
+
+	// fork, rail: the single-track section it runs in (see section_from)
+	void set_section(koord3d from, koord3d to) { section_from = from; section_to = to; }
+	void clear_section() { section_from = section_to = koord3d::invalid; }
+	bool in_section() const { return section_to!=koord3d::invalid; }
+	koord3d get_section_from() const { return section_from; }
+	koord3d get_section_to() const { return section_to; }
 	uint32 get_section_wait_since() const { return section_wait_since; }
 	bool is_section_lock_warned() const { return section_lock_warned; }
 	void set_section_lock_warned() { section_lock_warned = true; }

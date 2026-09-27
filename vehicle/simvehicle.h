@@ -649,10 +649,15 @@ private:
 	// is_target found a signal that applies but is no target: do not search on from there
 	mutable bool track_search_block;
 
-	// the signal on this tile applies to a train leaving it in direction dir
+	// the signal on this tile applies to a train leaving it in direction dir (never a block post:
+	// those count only for a train in a single-track section, see is_stop_point)
 	bool signal_applies(const grund_t *gr, ribi_t::ribi dir) const;
 
-	// a signal that applies, or a station boundary entered here: a train must be cleared to go on
+	// the block post on this tile applies to a train leaving it in direction dir
+	static bool block_post_applies(const grund_t *gr, ribi_t::ribi dir);
+
+	// a signal that applies, a block post that applies to a train in a single-track section, or a
+	// station boundary entered here: a train must be cleared to go on
 	bool is_stop_point(const route_t *route, uint32 index) const;
 
 	// a free track in the station ahead, searched from route index start (a station boundary or a
@@ -685,6 +690,16 @@ private:
 
 	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
 	bool is_station_boundary_clear(uint16 next_block, sint32 &restart_speed);
+	bool is_block_post_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
+
+	// fork, block posts: c is on the single-track line ahead going the same way into station
+	// boundary to, with its track there claimed, so we may follow it once the first block is free
+	bool may_follow(convoihandle_t c, koord3d to) const;
+	// another train has waited long for the single-track line we would leave onto through station
+	// boundary from (it enters through it, or leaves through it too): the longest waiter goes first.
+	// who: the station it waits at
+	// A train from our side counts only if the tile that keeps it waiting is on our way (ahead up to last)
+	bool yields_to_waiting(koord3d from, bool follows, const vector_tpl<koord3d> &ahead, uint32 last, halthandle_t &who) const;
 
 	/* fork: keeping stations of single-track lines from locking up. A station's tracks are its
 	 * platform rows plus the plain track on to the next switch (where its platform signals stand);

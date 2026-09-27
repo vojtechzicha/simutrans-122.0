@@ -5097,7 +5097,7 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					// signals have three options (fork: platform signals only the two one-way ones)
 					ribi_t::ribi sig_dir = rs->get_dir();
 					uint8 i = 0;
-					if(  desc->is_platform_signal()  &&  ribi_t::is_single(sig_dir)  &&  ribi_t::is_twoway(dir)  ) {
+					if(  desc->is_directional_signal()  &&  ribi_t::is_single(sig_dir)  &&  ribi_t::is_twoway(dir)  ) {
 						dir &= ~sig_dir;
 						rs->set_dir(dir);
 						return NULL;
@@ -5121,8 +5121,8 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 					rs->set_dir(dir);
 				}
 				else {
-					if(  desc->is_platform_signal()  ) {
-						// fork: platform signals are one-way only
+					if(  desc->is_directional_signal()  ) {
+						// fork: platform signals and block posts are one-way only
 						for(  int i=0;  i<4;  i++  ) {
 							if(  (dir & ribi_t::nsew[i]) != 0  ) {
 								dir = ribi_t::nsew[i];

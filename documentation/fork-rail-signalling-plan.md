@@ -263,6 +263,67 @@ no save change). Only a train that turns back at the stop may use one.
   rarely offered such a way anyway (the searches stop at a signal that applies); stations with
   choose signals did.
 
+### 3.11 Block posts (hradlo) on single-track lines (savegame 122.10)
+A block post `H` splits a single-track line between two stations into blocks, so a second train
+may follow the first in the same direction once the first has passed the post, instead of waiting
+until it has reached the next station.
+
+```
+ A                          block 1                 block 2                          B
+ ═══ P→ ──┬── ←LT ───────────────────────── H→ ←H ──────────── halt ────────── LT→ ──┬── ←P ═══
+```
+
+- Object: a signal with the new flag `is_blockpost=1` (roadsign flag `BLOCK_POST`), one-way,
+  applies only in its direction and never makes the track one-way (like `P`). Placed as a pair on
+  two neighbouring tiles of the open line, one per direction. The owner's objects:
+  `VZ-Signals-D1-New-AH` (automatic hradlo) and `VZ-Signals-D1-Old-Hradlo` (manual, with the hut).
+  Block 1 (from the station's `P` to the post) must hold the longest train, or a train waiting at
+  the post stands with its tail in the station throat.
+- Section record: a train that gets green at a `P` in section mode stores the station boundary it
+  leaves through and the one it enters (`convoi_t::section_from`, `section_to`; the same tile for a
+  train that turns back on the line). Cleared when it passes that boundary (3.6), at a depot and
+  when it is deleted.
+- A post stops only trains with a section record (`is_stop_point`); for them the line up to the
+  post is the first block and the train reserves only up to it. To every other train (a stock,
+  long-block or depot exit, a train from an old save) a post is not there: it holds the whole line
+  as before. `signal_applies` is false for posts, so every search and walk (section scan, choose
+  walk, overtaking detour, Hold, station track and coupling searches, `get_section_after`) ignores
+  them.
+- At a `P` (`is_platform_signal_clear`): the line up to the first post that applies must be free,
+  as before. Beyond it, a tile may be reserved only by a train we may follow (`may_follow`): it has
+  the same `section_to`, did not start the section at that boundary (no turning back on the line),
+  and holds its claim with that boundary, so it never waits on the line for a track. Anything else
+  there keeps the `P` red. A train that follows must claim its own track at the next station (the
+  last free track rule 3.8.1 unchanged; the trains ahead count through their claimed tracks). A
+  train whose front has already passed the next station's boundary is not followed until its tail
+  has left the line (it could turn back at that station).
+- At a post (`is_block_post_clear`): reserve the next block (up to the next post, the train's stop
+  or the station boundary); else wait ("Waiting at the block post"). No route search, so it also
+  answers a pre-signal or priority cascade. Opposite trains cannot be in that block: they enter
+  only through a `P` whose check covers the whole line.
+- Junctions on the open line: trains from different origins that enter the same station boundary
+  may follow each other (they share only track on which both run towards that boundary).
+- Coupling: a train at a station boundary does not wait for a partner that runs behind it on the
+  same line (`find_partner_at`), since that one may wait at the post for it. Partners coming in on
+  other lines are waited for as before.
+- Known limit: editing the schedule of a train on the line so that it turns back there, with a
+  follower behind it, locks both (the same happens on one-way double track in the stock game).
+
+### 3.12 Longest waiter first on single-track lines
+Without a rule, whichever train checks first when the line gets free takes it, and trains with a
+short way (turning back at a halt on the line, or following through a block post) can keep a
+train that needs the whole line waiting for hours (tests: 900 to 1500 minutes). Now a train about
+to enter a line at a `P` waits ("Letting a train from X through") while another train has waited
+at least `block_yield_minutes` (simuconf.tab, default 10 calendar minutes, saved) for the line
+itself (not for a track at the next station), started waiting before it, and would enter through
+the boundary we leave by (the other end) or leave through it too with the tile that keeps it
+waiting on our way (our side; a train blocked on another branch after a junction does not count).
+A follower that cannot claim a track waits as "no free track", not for the line. A train that has
+waited `block_yield_minutes` + 4 hours is no longer waited for (something that does not move
+holds its way), except that followers never go while a train waits at the other end. The waiting
+reason, its start and the boundaries are saved (122.10): network clients must agree on them.
+This applies to every single-track line, with or without block posts.
+
 ## 4. Stations
 
 ### 4.1 Polom (double track, 4 pax + 2 freight, most trains pass, some terminate)
@@ -389,6 +450,7 @@ first. `C→` trains prefer pass 3, 4 and freight, `←C` trains pass 1, 2; bran
 8. `tools/windows/steam-fork.sh`: build makeobj and the add-on pak.
 8a. PR #1 hold walk bounded at `LT` and at the first signal after the own exit signal (3.9).
 8b. Bay platforms (3.10): `vehicle/simvehicle.cc` only.
+8c. Block posts and longest waiter first (3.11, 3.12): roadsign flag and makeobj key, section record and wait reason in `simconvoi.*` (122.10), `vehicle/simvehicle.cc`, `block_yield_minutes` in the settings, posts left out of saves for older versions (`objlist_t::rdwr`).
 9. CLAUDE.md: the design.
 
 ## 6. Decisions (defaults until the owner says otherwise)
@@ -400,7 +462,7 @@ first. `C→` trains prefer pass 3, 4 and freight, `←C` trains pass 1, 2; bran
 3. Main-line trains may use the tracks the branch uses at Zabreh; only the schedule click steers.
 4. Zabreh and Polom use the owner's layout (4.1, 4.3). Trains may use the other side's tracks
    when their own are full (owner's decision).
-5. Later: several trains following in one direction (direction lock per section, block signals);
+5. Done (3.11): several trains following in one direction through block posts. Later:
    a local at a single-track station waiting for a faster train (the `LT` gives the area PR #1
    needed `E` for).
 
@@ -442,6 +504,28 @@ that builds the layouts in code (not committed):
   turning back takes the east bay when its platform is held. A train from the west with its stop
   clicked into the east bay turns back in the west bay (15 min a round instead of 20), and with all
   its tracks held on the westbound platform. The earlier bay scenarios run unchanged.
+
+- Block posts and longest waiter first (3.11, 3.12), headless on pak128.cs with a placeholder post
+  as an add-on. Layout: terminus A (3 tracks), a single line with the post pair in the middle
+  (halts before and after it in some runs), terminus B (3 tracks), depot on a spur. Stops in the
+  same time, without posts -> with posts:
+  - two trains A-B: 13 -> 16, the second leaves A 10 minutes after the first instead of when it
+    arrives; two post pairs, three trains: 120 stops, the longest wait at a post 16 minutes;
+  - three trains with a 20 minute stop at a halt behind the post: 136 -> 192;
+  - a branch from a third station joining behind the post: 207 -> 332, trains from A and from
+    the branch follow each other into B;
+  - traffic both ways (4 or 5 trains): the same number of stops; the gain is where trains bunch;
+  - turners at halts in either block, a turner from B towards A's side, coupling with the joining
+    train behind the primary and the other way round, save/load mid-follow, downgrades (0.122.9:
+    posts left out, the previous exe drives; 0.122.0): no lock, no train standing on the line
+    except at a post;
+  - the longest wait for the line in the scenarios with many trains: 905 to 1497 minutes before,
+    at most about 130 with longest waiter first;
+  - the 33 earlier rail scenarios: identical, apart from the order of departures where the
+    fairness rule applies (`bay_t3` locks its through trains in both builds, as before);
+  - a code review (Fable) of the result; its findings are fixed (same-side yield only to trains
+    blocked on our way, the coupling wait kept for partners on other lines, the record cleared
+    before the reservation into the station, the wait reason reset when a train drives on).
 
 Seen in the Windows game (2026-09-26, merged with coupling and mixed traction, savegame 122.7,
 pak128.cs with the owner's `VZ-Signals-rail.pak`), with a headless harness on Windows plus the GUI:

@@ -78,6 +78,7 @@ public:
 		SIGN_PRIORITY_SIGNAL |
 		SIGN_LONGBLOCK_SIGNAL |
 		PLATFORM_SIGNAL |
+		BLOCK_POST |
 		CHOOSE_SIGN)) == SIGN_SIGNAL; }
 
 	//  return true for presignal

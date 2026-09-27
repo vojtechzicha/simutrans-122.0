@@ -152,6 +152,8 @@ void convoi_t::init(player_t *player)
 	section_wait = SECTION_WAIT_NONE;
 	section_wait_since = 0;
 	section_lock_warned = false;
+	section_wait_boundary = section_wait_from = section_wait_tile = koord3d::invalid;
+	section_from = section_to = koord3d::invalid;
 	coupled_first = 0;
 	couple_wait_since = 0;
 	couple_hold_slot = -1;
@@ -325,7 +327,7 @@ void convoi_t::reserve_claim()
 }
 
 
-void convoi_t::set_section_wait(uint8 why, halthandle_t halt)
+void convoi_t::set_section_wait(uint8 why, halthandle_t halt, koord3d boundary, koord3d from, koord3d tile)
 {
 	if(  (why==SECTION_WAIT_NONE) != (section_wait==SECTION_WAIT_NONE)  ) {
 		// the wait at this signal starts or ends (the reason may change while waiting)
@@ -334,6 +336,9 @@ void convoi_t::set_section_wait(uint8 why, halthandle_t halt)
 	}
 	section_wait = why;
 	section_wait_halt = halt;
+	section_wait_boundary = boundary;
+	section_wait_from = from;
+	section_wait_tile = tile;
 }
 
 
@@ -916,6 +921,19 @@ void convoi_t::rotate90( const sint16 y_size )
 	if(  claim_stop!=koord3d::invalid  ) {
 		claim_stop.rotate90( y_size );
 	}
+	if(  section_wait_boundary!=koord3d::invalid  ) {
+		section_wait_boundary.rotate90( y_size );
+	}
+	if(  section_wait_from!=koord3d::invalid  ) {
+		section_wait_from.rotate90( y_size );
+	}
+	if(  section_wait_tile!=koord3d::invalid  ) {
+		section_wait_tile.rotate90( y_size );
+	}
+	if(  in_section()  ) {
+		section_from.rotate90( y_size );
+		section_to.rotate90( y_size );
+	}
 	for(  int i=0;  i<get_own_vehicle_count();  i++  ) {
 		fahr[i]->rotate90_freight_destinations( y_size );
 	}
@@ -1418,6 +1436,8 @@ bool convoi_t::drive_to()
 {
 	// a new route to the schedule's next stop: no platform detour to let a train by any more
 	hold_divert = false;
+	// fork: nor a wait at a platform signal for the old one (it is checked again there)
+	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
 
 	if(  anz_vehikel>0  ) {
 
@@ -1947,6 +1967,8 @@ void convoi_t::betrete_depot(depot_t *dep)
 	// first remove reservation, if train is still on track
 	unreserve_route();
 	release_claim( true );
+	clear_section();
+	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
 
 	if(  is_coupled_primary()  ) {
 		// fork, coupling: the joined train enters the depot as a train of its own
@@ -3180,6 +3202,19 @@ void convoi_t::rdwr(loadsave_t *file)
 		file->rdwr_bool( claim_stops );
 		claim_stop.rdwr( file );
 	}
+	if(  file->is_version_atleast(122, 10)  ) {
+		// fork: the single-track section it runs in and why it waits (block posts)
+		section_from.rdwr( file );
+		section_to.rdwr( file );
+		file->rdwr_byte( section_wait );
+		file->rdwr_long( section_wait_since );
+		section_wait_boundary.rdwr( file );
+		section_wait_from.rdwr( file );
+		section_wait_tile.rdwr( file );
+	}
+	else if(  file->is_loading()  ) {
+		clear_section();
+	}
 
 	if(  file->is_loading()  ) {
 		reserve_route();
@@ -4006,6 +4041,12 @@ bool convoi_t::append_wait_reason(cbuffer_t &buf) const
 		case SECTION_WAIT_ENTRY:
 			buf.append( translator::translate("Waiting to enter the station") );
 			break;
+		case SECTION_WAIT_BLOCK:
+			buf.append( translator::translate("Waiting at the block post") );
+			break;
+		case SECTION_WAIT_YIELD:
+			buf.printf( translator::translate("Letting a train from %s through"), halt_name );
+			break;
 		default:
 			buf.append( translator::translate("Waiting for the single track") );
 			break;
@@ -4275,6 +4316,8 @@ void convoi_t::self_destruct()
 void convoi_t::destroy()
 {
 	release_claim( true );
+	clear_section();
+	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
 
 	// fork, coupling: part from the other train first
 	if(  coupled_convoi.is_bound()  ) {
@@ -5236,7 +5279,9 @@ convoihandle_t convoi_t::find_partner_at(halthandle_t halt, bool &standing) cons
 			// on its way in: its route is reserved into this stop
 			const grund_t *gr = welt->lookup( o->route.back() );
 			const schiene_t *sch = gr ? obj_cast<schiene_t>( gr->get_weg( o->fahr[0]->get_waytype() ) ) : NULL;
-			if(  sch  &&  sch->get_reserved_convoi()==other  &&  gr->get_halt()==halt  ) {
+			// (not one behind us on the same single-track line: it may wait at a block post for us to go on)
+			const bool behind_us = in_section()  &&  o->in_section()  &&  o->get_section_to()==section_to  &&  o->get_section_from()==section_from;
+			if(  sch  &&  sch->get_reserved_convoi()==other  &&  gr->get_halt()==halt  &&  !behind_us  ) {
 				heading = other;
 			}
 		}

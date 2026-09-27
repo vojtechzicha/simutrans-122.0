@@ -445,6 +445,7 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_bool( "calendar_seasons", s.get_calendar_seasons() );
 	w.kv_int( "passing_hold_minutes", s.get_passing_hold_minutes() );
 	w.kv_int( "passing_hold_max_minutes", s.get_passing_hold_max_minutes() );
+	w.kv_int( "block_yield_minutes", s.get_block_yield_minutes() );
 	w.kv_int( "use_timeline", s.get_use_timeline() );
 	w.kv_bool( "freeplay", s.is_freeplay() );
 	w.kv_money( "starting_money", s.get_starting_money( s.get_starting_year() ) );
@@ -935,6 +936,8 @@ static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t 
 			case convoi_t::SECTION_WAIT_TRACK:      reason = "no_free_track";   break;
 			case convoi_t::SECTION_WAIT_LAST_TRACK: reason = "last_free_track"; break;
 			case convoi_t::SECTION_WAIT_ENTRY:      reason = "station_entry";   break;
+			case convoi_t::SECTION_WAIT_BLOCK:      reason = "block_post";      break;
+			case convoi_t::SECTION_WAIT_YIELD:      reason = "yielding";        break;
 			default:                                reason = "single_track";    break;
 		}
 		at_halt = driver->get_section_wait_halt();

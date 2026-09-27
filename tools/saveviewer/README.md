@@ -64,7 +64,8 @@ timetable slot a train may still leave in it (null: half the gap to the next slo
 
 What the convoy window shows under the destination is in `waiting_for` (null, or an object with
 `reason`: `passing_train` with `convoy_id` and `convoy_name`, `no_free_track` / `last_free_track` with
-`halt_id`, `station_entry`, `single_track`, `coupling_partner`, `platform_after_uncoupling`) and
+`halt_id`, `station_entry`, `single_track`, `block_post`, `yielding` with `halt_id` (the station of the
+train it lets through), `coupling_partner`, `platform_after_uncoupling`) and
 `departure` (null, or `hour`, `minute`, `days_ahead`, `in_minutes`, `latest` when it is the end of the
 maximum wait, and `ahead`, the trains of its line that leave first). `hold_marker` and `hold_divert`
 are the Hold marker and a diversion to let a passing train by. Passenger vehicles have `seated`,

@@ -3368,11 +3368,24 @@ bool rail_vehicle_t::signal_applies(const grund_t *gr, ribi_t::ribi dir) const
 		return false;
 	}
 	signal_t const* const sig = gr->find<signal_t>();
-	if(  sig==NULL  ) {
+	if(  sig==NULL  ||  sig->get_desc()->is_block_post()  ) {
 		return false;
 	}
 	// a stock signal applies to every train that can pass it; a platform signal only in its direction
 	return !sig->get_desc()->is_platform_signal()  ||  sig->applies_to( dir );
+}
+
+
+bool rail_vehicle_t::block_post_applies(const grund_t *gr, ribi_t::ribi dir)
+{
+	for(  uint8 i=0;  i<2;  i++  ) {
+		weg_t const* const way = gr->get_weg_nr(i);
+		if(  way  &&  way->has_signal()  ) {
+			signal_t const* const sig = gr->find<signal_t>();
+			return sig  &&  sig->get_desc()->is_block_post()  &&  sig->applies_to( dir );
+		}
+	}
+	return false;
 }
 
 
@@ -3390,6 +3403,11 @@ bool rail_vehicle_t::is_stop_point(const route_t *route, uint32 index) const
 		dir = ribi_type( route->at(index-1), route->at(index) );
 	}
 	if(  signal_applies( gr, dir )  ) {
+		return true;
+	}
+	if(  cnv->in_section()  &&  block_post_applies( gr, dir )  ) {
+		// fork: a block post divides the single-track line for trains that entered it at a platform
+		// signal; to any other train it is not there (it holds the whole line, as before)
 		return true;
 	}
 	roadsign_t const* const lt = get_station_boundary( gr );
@@ -3814,8 +3832,12 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 	route_t *route = cnv->access_route();
 	uint16 next_signal, next_crossing;
 
+	// a train at a platform signal is in no single-track section (set again below when it enters one)
+	cnv->clear_section();
+
 	// leaving through a station boundary before any signal that applies?
 	bool section = false;
+	koord3d leave_boundary = koord3d::invalid;
 	for(  uint32 i=next_block+1;  i<route->get_count();  i++  ) {
 		grund_t const* const gr = welt->lookup( route->at(i) );
 		if(  gr==NULL  ) {
@@ -3824,6 +3846,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		if(  roadsign_t const* const lt = get_station_boundary( gr )  ) {
 			const ribi_t::ribi dir = i+1<route->get_count() ? ribi_type( route->at(i), route->at(i+1) ) : ribi_type( route->at(i-1), route->at(i) );
 			section = !lt->applies_to( dir );
+			leave_boundary = route->at(i);
 			break;
 		}
 		if(  is_stop_point( route, i )  ) {
@@ -3915,17 +3938,43 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		return false;
 	}
 
-	// the line must be free up to there
+	// the line must be free up to there; with a block post on the way, beyond it only trains we may
+	// follow (they go the same way into the same station, their track there claimed)
 	const uint32 last = enter>=0 ? (uint32)enter : (uint32)end_signal;
+	const koord3d enter_boundary = enter>=0 ? ahead[enter] : koord3d::invalid;
+	uint32 first_post = 0xFFFFFFFFul;
+	if(  enter>=0  &&  leave_boundary!=koord3d::invalid  &&  leave_boundary!=enter_boundary  ) {
+		for(  uint32 i=1;  i<(uint32)enter;  i++  ) {
+			grund_t const* const gr = welt->lookup( ahead[i] );
+			if(  gr  &&  block_post_applies( gr, ribi_type( ahead[i], ahead[i+1] ) )  ) {
+				first_post = i;
+				break;
+			}
+		}
+	}
+	bool follows = false;
 	for(  uint32 i=1;  i<=last;  i++  ) {
 		grund_t const* const gr = welt->lookup( ahead[i] );
 		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+		if(  sch  &&  !sch->can_reserve( cnv->self )  &&  i>first_post  &&  may_follow( sch->get_reserved_convoi(), enter_boundary )  ) {
+			follows = true;
+			continue;
+		}
 		if(  sch==NULL  ||  !sch->can_reserve( cnv->self )  ) {
 			sig->set_state( roadsign_t::rot );
-			cnv->set_section_wait( convoi_t::SECTION_WAIT_LINE, halthandle_t() );
+			cnv->set_section_wait( convoi_t::SECTION_WAIT_LINE, halthandle_t(), enter_boundary, leave_boundary, ahead[i] );
 			restart_speed = 0;
 			return false;
 		}
+	}
+
+	// the line is ours, unless another train has waited long for it (see yields_to_waiting)
+	halthandle_t waiting_halt;
+	if(  yields_to_waiting( leave_boundary, follows, ahead, last, waiting_halt )  ) {
+		sig->set_state( roadsign_t::rot );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_YIELD, waiting_halt );
+		restart_speed = 0;
+		return false;
 	}
 
 	if(  enter>=0  ) {
@@ -3994,11 +4043,30 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		}
 	}
 
-	// reserve the way to the first stop, or up to the station boundary
+	if(  follows  &&  !cnv->has_claim()  ) {
+		// a train following another onto the line needs its track there claimed (not a wait for the
+		// line: nobody gives way to it)
+		halthandle_t enter_halt;
+		for(  uint32 k=(uint32)enter+1;  !enter_halt.is_bound()  &&  k<ahead.get_count()  &&  k<(uint32)enter+64;  k++  ) {
+			if(  grund_t const* const gr = welt->lookup( ahead[k] )  ) {
+				enter_halt = gr->get_halt();
+			}
+		}
+		sig->set_state( roadsign_t::rot );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, enter_halt );
+		restart_speed = 0;
+		return false;
+	}
+	if(  enter>=0  ) {
+		// in the section now: its block posts stop us (reserve only up to the first one)
+		cnv->set_section( leave_boundary, enter_boundary );
+	}
+	// reserve the way to the first stop, or up to the first block post or the station boundary
 	if(  !block_reserver( route, next_block+1, next_signal, next_crossing, 0, true, false )  ) {
 		cnv->release_claim( true );
+		cnv->clear_section();
 		sig->set_state( roadsign_t::rot );
-		cnv->set_section_wait( convoi_t::SECTION_WAIT_LINE, halthandle_t() );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_LINE, halthandle_t(), enter_boundary, leave_boundary );
 		restart_speed = 0;
 		return false;
 	}
@@ -4098,8 +4166,13 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 			return false;
 		}
 	}
+	// out of the single-track section: block posts of a line after the station do not cut this
+	// reservation short (they count again from the next platform signal)
+	const koord3d sec_from = cnv->get_section_from(), sec_to = cnv->get_section_to();
+	cnv->clear_section();
 	if(  !block_reserver( route, next_block+1, next_signal, next_crossing, 0, true, false )  ) {
 		// the throat is in use for a moment
+		cnv->set_section( sec_from, sec_to );
 		cnv->set_section_wait( convoi_t::SECTION_WAIT_ENTRY, halthandle_t() );
 		restart_speed = 0;
 		return false;
@@ -4109,6 +4182,26 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 	cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
 	return true;
+}
+
+
+/* fork: block post on a single-track line. It stops only trains that entered the line at a platform
+ * signal (is_stop_point); those hold their track at the next station already, so the next block is
+ * all they need. The opposite direction is kept off the whole line at the platform signals.
+ */
+bool rail_vehicle_t::is_block_post_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed)
+{
+	uint16 next_signal, next_crossing;
+	if(  block_reserver( cnv->get_route(), next_block+1, next_signal, next_crossing, 0, true, false )  ) {
+		sig->set_state( roadsign_t::gruen );
+		cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+		return true;
+	}
+	sig->set_state( roadsign_t::rot );
+	cnv->set_section_wait( convoi_t::SECTION_WAIT_BLOCK, halthandle_t() );
+	restart_speed = 0;
+	return false;
 }
 
 
@@ -4221,6 +4314,81 @@ static bool section_waited_long(const convoi_t *c)
 	karte_t *const welt = world();
 	const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 3);
 	return (sint64)(uint32)(welt->get_ticks() - since) > limit;
+}
+
+
+bool rail_vehicle_t::may_follow(convoihandle_t c, koord3d to) const
+{
+	// in the same section direction (turning back on the line is no following), with its track at
+	// the station claimed: then it never waits on the line for a track there
+	return c.is_bound()  &&  c!=cnv->self  &&  to!=koord3d::invalid
+		&&  c->get_section_to()==to  &&  c->get_section_from()!=to
+		&&  c->has_claim()  &&  c->get_claim_boundary()==to;
+}
+
+
+/* Fork: the longest waiter gets a single-track line first. A train that could enter the line waits
+ * while another one has waited at least block_yield_minutes for it: from the other end (it would
+ * enter the station through the boundary we leave by) or from our side (it would leave through it
+ * too), and started waiting before us. Without this a train with a short way (turning back at a halt
+ * on the line, or following through a block post) can keep a train that needs the whole line out
+ * for ever. Only trains that wait for the line itself count (not for a track at the next station: a
+ * train that could go might free the track it waits for). A train that has waited
+ * block_yield_minutes + 4 hours is no longer waited for (something that does not move holds its way),
+ * except that followers never go while a train waits at the other end.
+ */
+bool rail_vehicle_t::yields_to_waiting(koord3d from, bool follows, const vector_tpl<koord3d> &ahead, uint32 last, halthandle_t &who) const
+{
+	if(  from==koord3d::invalid  ) {
+		return false;
+	}
+	const uint16 minutes = welt->get_settings().get_block_yield_minutes();
+	const bool cal = welt->has_calendar();
+	const sint64 limit = minutes==0 ? 0 : cal ? welt->calendar_minutes_to_ticks( minutes ) : (sint64)(welt->ticks_per_world_month >> 4);
+	const sint64 window = limit + (cal ? welt->calendar_minutes_to_ticks( 240 ) : (sint64)(welt->ticks_per_world_month >> 1));
+	const uint32 now = welt->get_ticks();
+	const bool we_wait = cnv->get_section_wait()!=convoi_t::SECTION_WAIT_NONE;
+	const uint32 our_since = cnv->get_section_wait_since();
+	FOR( vector_tpl<convoihandle_t>, const c, welt->convoys() ) {
+		if(  c==cnv->self  ||  c->get_section_wait()!=convoi_t::SECTION_WAIT_LINE  ||  c->get_vehicle_count()==0  ) {
+			continue;
+		}
+		// still standing at its signal (not gone to a depot or elsewhere since)
+		const int st = c->get_state();
+		if(  st<convoi_t::WAITING_FOR_CLEARANCE  ||  st>convoi_t::CAN_START_TWO_MONTHS  ||  st==convoi_t::SELF_DESTRUCT  ) {
+			continue;
+		}
+		const bool opposite = c->get_section_wait_boundary()==from;
+		if(  !opposite  ) {
+			// from our side: only if what keeps it waiting is on our way too (not on another branch)
+			if(  c->get_section_wait_from()!=from  ) {
+				continue;
+			}
+			bool on_our_way = false;
+			for(  uint32 i=1;  !on_our_way  &&  i<=last  &&  i<ahead.get_count();  i++  ) {
+				on_our_way = ahead[i]==c->get_section_wait_tile();
+			}
+			if(  !on_our_way  ) {
+				continue;
+			}
+		}
+		const sint64 waited = (sint64)(uint32)(now - c->get_section_wait_since());
+		if(  waited < limit  ||  (waited >= window  &&  !(follows  &&  opposite))  ) {
+			continue;
+		}
+		// it waits longer than we do (the same tick: the older convoy)
+		const sint32 diff = (sint32)(our_since - c->get_section_wait_since());
+		if(  we_wait  &&  !(diff > 0  ||  (diff==0  &&  c.get_id() < cnv->self.get_id()))  ) {
+			continue;
+		}
+		// the station it waits at: where its route starts (its front stands past the platform)
+		who = c->get_route()->empty() ? halthandle_t() : haltestelle_t::get_halt( c->get_route()->front(), c->get_owner() );
+		if(  !who.is_bound()  ) {
+			who = haltestelle_t::get_halt( c->front()->get_pos(), c->get_owner() );
+		}
+		return true;
+	}
+	return false;
 }
 
 
@@ -5249,6 +5417,11 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 		return is_platform_signal_clear( sig, next_block, restart_speed );
 	}
 
+	if(  sig->get_desc()->is_block_post()  ) {
+		// fork: block post on a single-track line
+		return is_block_post_clear( sig, next_block, restart_speed );
+	}
+
 	// action depend on the next signal
 	const roadsign_desc_t *sig_desc=sig->get_desc();
 
@@ -5309,6 +5482,7 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 				return false;
 			}
 			cnv->set_next_stop_index( next_crossing<next_signal ? next_crossing : next_signal );
+			cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 			return true;
 		}
 		cnv->set_next_stop_index( max(route_index,1)-1 );
@@ -5351,6 +5525,8 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 		bool ok = block_reserver( cnv->get_route(), route_index, next_signal, next_crossing, 0, true, false );
 		if (ok) {
 			cnv->set_next_stop_index( min( next_crossing, next_signal ) );
+			// fork: no longer waiting at the signal that was there
+			cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 		}
 		return ok;
 		// if reservation was not possible the train will wait on the track until block is free

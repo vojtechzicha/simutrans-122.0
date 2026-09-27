@@ -99,6 +99,7 @@ settings_t::settings_t() :
 	calendar_seasons = true;
 	passing_hold_minutes = 5;
 	passing_hold_max_minutes = 20;
+	block_yield_minutes = 10;
 
 	beginner_mode = false;
 	beginner_price_factor = 1500;
@@ -904,6 +905,10 @@ void settings_t::rdwr(loadsave_t *file)
 			file->rdwr_short(passing_hold_minutes);
 			file->rdwr_short(passing_hold_max_minutes);
 		}
+		if(  file->is_version_atleast(122, 10)  ) {
+			// fork: block posts on single-track lines
+			file->rdwr_short(block_yield_minutes);
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1374,6 +1379,7 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	calendar_seasons = contents.get_int( "calendar_seasons", calendar_seasons ) != 0;
 	passing_hold_minutes = contents.get_int( "passing_hold_minutes", passing_hold_minutes );
 	passing_hold_max_minutes = contents.get_int( "passing_hold_max_minutes", passing_hold_max_minutes );
+	block_yield_minutes = contents.get_int( "block_yield_minutes", block_yield_minutes );
 	use_timeline = contents.get_int( "use_timeline", use_timeline );
 	starting_year = contents.get_int( "starting_year", starting_year );
 	starting_month = contents.get_int( "starting_month", starting_month + 1 ) - 1;

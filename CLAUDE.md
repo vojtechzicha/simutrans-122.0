@@ -451,6 +451,36 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   whether the stations are really locked and posts one message naming them ("Trains are locked
   up at ..."). What still locks: more trains than a group of stations can hold, e.g. trains coming
   out of a depot inside a station; timetable, fewer trains or more tracks.
+- Block posts (hradlo, savegame 122.10, plan 3.11): signal flag `BLOCK_POST` (makeobj
+  `is_blockpost=1`, owner's objects `VZ-Signals-D1-New-AH` and `VZ-Signals-D1-Old-Hradlo`, test
+  placeholder `BlockPost` in `tools/fork-signals`), one-way like `P`, placed as a pair on the open
+  single track. A train that gets green at a `P` in section mode keeps a section record
+  (`convoi_t::section_from`/`section_to`, the boundaries it leaves and enters, saved, cleared at that
+  `LT`, depot, deletion); only then does a post stop it (`is_stop_point`, `is_block_post_clear`:
+  reserve the next block). `signal_applies` is false for posts, so every search ignores them, and
+  trains without a record (stock/long-block/depot exits, old saves) hold the whole line as before.
+  At a `P` the line up to the first post must be free; beyond it only trains `may_follow` accepts
+  (same `section_to`, not turning back on the line, claim held at that boundary); the follower
+  claims its own track (last free track rule unchanged). A train partly past the far `LT` is not
+  followed. Trains from a junction on the line into the same `LT` follow each other too.
+  `find_partner_at` does not wait for a partner behind us in the same section (it may wait at the
+  post for us). The record is cleared at the `LT` before reserving into the station. Block 1 must
+  hold the longest train.
+- Longest waiter first (plan 3.12, every single-track line): a train about to enter at a `P` waits
+  ("Letting a train from X through", `SECTION_WAIT_YIELD`) while another train still standing at its
+  signal has waited `block_yield_minutes` (simuconf, default 10, saved) for the line itself
+  (`SECTION_WAIT_LINE`, not for a track), started first, and would enter through our exit boundary or
+  leave through it with the tile that stops it on our way (`section_wait_tile`, so not a train
+  blocked on another branch) (`yields_to_waiting`, loops over all convoys only when a train is about
+  to get green or is yielding). A follower that cannot claim waits as `SECTION_WAIT_TRACK`. Not after it waited 4 hours more, except followers never go while one waits
+  at the other end. `section_wait`, its start and boundaries are saved (122.10); `drive_to`, depot
+  and deletion reset them. Saves for < 122.10 leave the posts out (`objlist_t::rdwr`; an older exe
+  would make the pair one-way and close the line). `roadsign_t::rdwr` sets `dir` only when loading,
+  so writing a 0.122.0 copy no longer turns the live `P` two-way.
+  Tested headless (pak128.cs, placeholder post as an add-on): following, two posts, turners in
+  either block, long dwell in block 2, coupling in both orders, a junction in block 2, save/load,
+  downgrades; the 33 earlier rail scenarios unchanged except for ordering by the fairness rule.
+  Export: `waiting_for.reason` `block_post`, `yielding` (with `halt_id`).
 
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 

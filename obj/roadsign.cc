@@ -136,8 +136,8 @@ void roadsign_t::set_dir(ribi_t::ribi dir)
 		if(desc->is_single_way()  ||  desc->is_signal_type()) {
 			// set mask, if it is a single way ...
 			weg->count_sign();
-			// fork: a platform signal applies to one direction only, but never makes the track one-way
-			weg->set_ribi_maske( desc->is_platform_signal() ? (ribi_t::ribi)ribi_t::none : calc_mask() );
+			// fork: a platform signal or block post applies to one direction only, but never makes the track one-way
+			weg->set_ribi_maske( desc->is_directional_signal() ? (ribi_t::ribi)ribi_t::none : calc_mask() );
 DBG_MESSAGE("roadsign_t::set_dir()","ribi %i",dir);
 		}
 	}
@@ -562,9 +562,12 @@ void roadsign_t::rdwr(loadsave_t *file)
 		}
 	}
 	file->rdwr_byte(dummy);
-	dir = dummy;
-	if(file->is_version_less(89, 0)) {
-		dir = ribi_t::backward(dir);
+	if(  file->is_loading()  ) {
+		// fork: only when loading, a platform signal saved two-way for an older version stays one-way here
+		dir = dummy;
+		if(file->is_version_less(89, 0)) {
+			dir = ribi_t::backward(dir);
+		}
 	}
 
 	if(file->is_saving()) {
