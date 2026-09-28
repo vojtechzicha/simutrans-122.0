@@ -214,6 +214,24 @@ signal as the entry signal, end-of-choose sign after the exit switches where the
 headless on pak64 (standing, running-stopping, running-through, both tracks taken, exit blocked,
 save/load mid-detour, waypoints) with a throwaway harness; re-verify in the Windows game.
 
+Stepping aside (no save change): a stopping train at a choose signal whose planned platform lies on
+the way of a train that will pass it there takes a free platform off that way instead, so the fast
+train runs straight through on its main track (`get_overtaker_ways`, `is_choose_signal_clear`). Such
+a train is running (a train standing at a stop has no route past it yet), has our signal tile and our
+next tile ahead on its route, then an end of choose or the next signal that applies with its route
+going on (it does not stop in the area), and reaches it before we would leave: our arrival plus the
+maximum wait (with a minimum load; a month without one) or the timetable slot, plus `passing_hold_minutes`; needs the
+calendar. Its way from the signal to there must miss every tile we would stand on. A candidate must
+also be a track of our direction (`leads_back_to_overtaker`): every branch walked forward from its
+stop position, never back towards the entry, runs back into that train's way or its next 128 route
+tiles, or ends; a one-way signal or `LT` against us, another halt or 128 tiles means the other
+direction's main track of a double-track station, which is never taken. Types, bays, the way on and
+the shortest-fit rule apply as before. Nothing off its way free: exactly as before (planned platform,
+then any), and the train overtakes through the other track. The search needs a step, so such a
+train pauses at the signal for one. Tested headless (pak128.cs): main plus loop, a ladder with two
+loops, double track with crossovers only (keeps its main), express too far behind, timetable dwell
+alone, loop taken; the 33 rail regression and 12 overtaking scenarios unchanged.
+
 ## Platform types, Hold and waiting for passing trains (fork feature, savegame 122.5)
 
 All rail only, in `vehicle/simvehicle.cc` unless noted.

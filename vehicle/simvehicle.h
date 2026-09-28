@@ -656,6 +656,22 @@ private:
 	// at a stop: wait for a passing train to go by first; keeps the convoi's hold state
 	bool is_held_for_passing_train();
 
+	/* fork: before choosing a platform at the choose signal at start_block: the ways of the trains that
+	 * will come by while we stand at our stop. Such a train passes that signal after us without stopping
+	 * in the area and reaches the end of its way through it (an end of choose, or the next signal that
+	 * applies) before we would leave: our arrival plus a timetable slot or maximum wait, plus
+	 * passing_hold_minutes (once there we wait for it anyway). Its way goes to way, the next tiles of its
+	 * route after it to onward; false when there is no such train (or no calendar)
+	 */
+	bool get_overtaker_ways(uint16 start_block, vector_tpl<koord3d> &way, vector_tpl<koord3d> &onward) const;
+
+	/* fork: stepping aside, the platform at the end of rt is one of our direction: every track on from it
+	 * runs back into the way or route of a train passing us (see get_overtaker_ways) or ends; not one that
+	 * runs on to a signal or station boundary against us, into another station or far away (the other
+	 * direction's main track of a double-track line)
+	 */
+	bool leads_back_to_overtaker(const route_t &rt) const;
+
 	/* fork: platform signals and station boundaries (see documentation/fork-rail-signalling-plan.md)
 	 * track_search: 0 = none, 1 = a stop position of track_search_halt, 2 = a signal that applies at the
 	 * end of a track, 3 = any track (way on after a choice); only free tiles in modes 1 and 2
