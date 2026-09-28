@@ -616,6 +616,10 @@ private:
 	// the platform at this tile offers what platform_needs asks for
 	bool is_platform_suitable(const grund_t *gr) const;
 
+	// fork: length of the platform a stop search found (rt ends at its stop position): suitable tiles
+	// of the halt in a row back from there, up to a tile that masks the way in (a signal against us)
+	uint16 get_found_platform_length(const route_t &rt) const;
+
 	// the stop position at the end of the planned route offers what platform_needs asks for
 	bool is_planned_platform_suitable() const;
 

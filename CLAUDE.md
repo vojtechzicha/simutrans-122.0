@@ -418,11 +418,17 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   when no other is free: a second pass inside each bay phase of the bays-first order, so no new
   waits. Tram and road stops of a combined halt do not count as platforms there.
   Within each of those passes a stopping train takes the shortest free platform that fits it, not
-  the nearest (`get_found_platform_length`: halt tiles in a row back from the stop position; ties
-  go to the first found), so long platforms stay free for long trains. Each accepted platform is
-  excluded and the search runs again until none is left or one is exactly the train's length.
-  Only when the planned platform is not free or not suitable; tested headless (base took the first
-  8-tile platform, new the 6- or 2-tile one), the regression set unchanged.
+  the nearest (`get_found_platform_length`: suitable halt tiles in a row back from the stop
+  position; ties go to the first found), so long platforms stay free for long trains. "Fits" is
+  `convoi_t::get_platform_length_needed`: its own length, plus its coupling partner's when it
+  couples at that stop (the partner at the stop or on its way in, else the longest train of the
+  lines it couples with there); if no platform holds both, the longest one. Each found platform
+  goes to `track_search_taken` (no target any more, but the search still runs through it, unlike
+  `track_search_excluded`) and the search runs again until none is left or one fits exactly; a
+  platform no better than the best so far skips the way-on check. Only when the planned platform
+  is not free or not suitable. Tested headless (base took the first 8-tile platform, new the 6-,
+  3- or 2-tile one; a coupling pair of 2+2 tiles the 8-tile one, not the 3-tile one), the
+  regression set unchanged.
   Both platform searches (stock choose, `find_station_track` for a stopping train) and the
   `can_enter_without_turning` probe first run with
   `stop_search_halt` set: `rail_vehicle_t::get_ribi` never lets them run on out of a platform's far

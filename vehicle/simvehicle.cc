@@ -2587,27 +2587,17 @@ static vector_tpl<koord3d> track_search_excluded;
 // fork: bay platform tiles of the halt of the current stop search (see rail_vehicle_t::bay_search)
 static vector_tpl<koord3d> bay_search_tiles;
 
-/* fork: length of the platform a stop search found (route ends at its stop position): tiles of the
- * halt in a row back from there, up to a tile that masks the way in (a signal against us). The
- * searches take the shortest platform that fits, so the long ones stay free for long trains
+// fork: stop positions of platforms a stop search found and keeps as candidates: no target any more,
+// but the search may still run through them (unlike track_search_excluded)
+static vector_tpl<koord3d> track_search_taken;
+
+/* fork: the stop searches take the shortest platform that fits (get_found_platform_length), so the
+ * long ones stay free for long trains; fit is the length the train needs there (with a coupling
+ * partner, both). Smaller is better: platforms that fit by length, then those too short, longest first
  */
-static uint16 get_found_platform_length(const route_t &rt, waytype_t wt)
+static uint16 get_platform_rank(uint16 length, uint16 fit)
 {
-	const uint32 count = rt.get_count();
-	const grund_t *gr = world()->lookup( rt.back() );
-	if(  count<2  ||  gr==NULL  ||  !gr->is_halt()  ) {
-		return 0xFFFF;
-	}
-	const halthandle_t halt = gr->get_halt();
-	const ribi_t::ribi back = ribi_type( rt.back(), rt.at(count-2) );
-	const ribi_t::ribi forward = ribi_t::backward( back );
-	uint16 run = 1;
-	grund_t *to;
-	while(  run<1024  &&  gr->get_neighbour( to, wt, back )  &&  to->get_halt()==halt  &&  (to->get_weg( wt )->get_ribi_maske() & forward)==0  ) {
-		run ++;
-		gr = to;
-	}
-	return run;
+	return length>=fit ? length : 0x8000 - length;
 }
 
 /* fork: a bay platform. The track of this platform tile ends in a buffer stop (or a depot) on one side
@@ -3036,7 +3026,7 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 			return false;
 		}
 		const ribi_t::ribi dir = get_exit_dir( gr, prev_gr, get_waytype() );
-		if(  track_search==1  &&  is_stop_position( gr, prev_gr, track_search_halt )  ) {
+		if(  track_search==1  &&  !track_search_taken.is_contained( gr->get_pos() )  &&  is_stop_position( gr, prev_gr, track_search_halt )  ) {
 			return true;
 		}
 		const bool signal = signal_applies( gr, dir );
@@ -3094,11 +3084,32 @@ bool rail_vehicle_t::is_target(const grund_t *gr,const grund_t *prev_gr) const
 		return is_stop_position( gr, prev_gr, halt );
 	}
 	// first check blocks, if we can go there (fork: not a platform found not to lead on)
-	if(  (turn_probe  ||  sch1->can_reserve(cnv->self))  &&  !track_search_excluded.is_contained( gr->get_pos() )  ) {
+	if(  (turn_probe  ||  sch1->can_reserve(cnv->self))  &&  !track_search_excluded.is_contained( gr->get_pos() )  &&  !track_search_taken.is_contained( gr->get_pos() )  ) {
 		//  just check, if we reached a free stop position of this halt
 		return is_stop_position( gr, prev_gr, target_halt );
 	}
 	return false;
+}
+
+
+uint16 rail_vehicle_t::get_found_platform_length(const route_t &rt) const
+{
+	const uint32 count = rt.get_count();
+	const grund_t *gr = welt->lookup( rt.back() );
+	if(  count<2  ||  gr==NULL  ||  !gr->is_halt()  ) {
+		return 0;
+	}
+	const waytype_t wt = get_waytype();
+	const halthandle_t halt = gr->get_halt();
+	const ribi_t::ribi back = ribi_type( rt.back(), rt.at(count-2) );
+	const ribi_t::ribi forward = ribi_t::backward( back );
+	uint16 run = 1;
+	grund_t *to;
+	while(  run<1024  &&  gr->get_neighbour( to, wt, back )  &&  to->get_halt()==halt  &&  (to->get_weg( wt )->get_ribi_maske() & forward)==0  &&  is_platform_suitable( to )  ) {
+		run ++;
+		gr = to;
+	}
+	return run;
 }
 
 
@@ -3413,12 +3424,14 @@ skip_choose:
 		// fork: first never on out of a platform of the halt (see stop_search_halt), then the search as before
 		const uint8 bay_mode = bay_search;
 		// fork: of the platforms that do, the shortest that fits (the first found of those as long)
+		const uint16 fit = cnv->get_platform_length_needed( target_halt );
 		route_t best_rt;
-		uint16 best_length = 0xFFFF;
+		uint16 best_rank = 0xFFFF;
 		for(  uint8 pass=0;  !found  &&  pass<2;  pass++  ) {
 			const halthandle_t no_through = pass==0 ? target_halt : halthandle_t();
 			stop_search_start = cnv->get_route()->at(start_block);
 			track_search_excluded.clear();
+			track_search_taken.clear();
 			// a train turning back here tries the bays first, then any platform
 			bay_search = prefer_bays ? 2 : bay_mode;
 			// fork: a platform whose way on runs over another platform only when no other is free
@@ -3439,20 +3452,23 @@ skip_choose:
 						track_search_excluded.append( target_rt.back() );
 						continue;
 					}
+					const uint16 rank = get_platform_rank( get_found_platform_length( target_rt ), fit );
+					if(  rank>=best_rank  ) {
+						// no better than the one we have: not worth the way on
+						track_search_taken.append( target_rt.back() );
+						continue;
+					}
 					if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 						planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
 					}
 					const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
 					if(  onward==ONWARD_OK  ||  (onward==ONWARD_CROSSING  &&  !avoid_crossing)  ) {
-						const uint16 length = get_found_platform_length( target_rt, get_waytype() );
-						if(  length<best_length  ) {
-							best_rt.clear();
-							best_rt.append( &target_rt );
-							best_length = length;
-						}
-						// none can be shorter than the train: take it, else look for a shorter one
-						found = length<=cnv->get_tile_length();
-						track_search_excluded.append( target_rt.back() );
+						best_rt.clear();
+						best_rt.append( &target_rt );
+						best_rank = rank;
+						// none can fit better: take it, else look for a shorter one
+						found = rank<=fit;
+						track_search_taken.append( target_rt.back() );
 					}
 					else {
 						track_search_excluded.append( target_rt.back() );
@@ -3461,9 +3477,7 @@ skip_choose:
 						}
 					}
 				}
-				if(  !found  &&  best_length!=0xFFFF  ) {
-					found = true;
-				}
+				found |= best_rt.get_count()>=2;
 				if(  found  ) {
 					target_rt.clear();
 					target_rt.append( &best_rt );
@@ -3488,6 +3502,7 @@ skip_choose:
 		stop_search_start = koord3d::invalid;
 		bay_search = 0;
 		track_search_excluded.clear();
+		track_search_taken.clear();
 		if(  !found  ) {
 			// nothing empty or not route with less than get_max_choose_route_steps() tiles
 			target_halt = halthandle_t();
@@ -3890,12 +3905,14 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	// fork: stopping, first never on out of a platform of halt (see stop_search_halt), then as before
 	const uint8 bay_mode = bay_search;
 	// stopping: of the platforms that do, the shortest that fits (the first found of those as long)
+	const uint16 fit = halt.is_bound() ? cnv->get_platform_length_needed( halt ) : 0;
 	route_t best;
-	uint16 best_length = 0xFFFF;
+	uint16 best_rank = 0xFFFF;
 	for(  uint8 pass=halt.is_bound() ? 0 : 1;  !found  &&  pass<2;  pass++  ) {
 		const halthandle_t no_through = pass==0 ? halt : halthandle_t();
 		stop_search_start = route->at(from);
 		track_search_excluded.clear();
+		track_search_taken.clear();
 		// a train turning back there tries the bays first, then any track
 		bay_search = prefer_bays ? 2 : bay_mode;
 		// a platform whose way on runs over another platform only when no other is free
@@ -3914,8 +3931,16 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 				track_search = 3;
 				bool leads_on = false;
 				bool crosses = false;
+				uint16 rank = 0xFFFF;
 				if(  ok  &&  candidate.get_count()>=2  ) {
 					if(  halt.is_bound()  ) {
+						rank = get_platform_rank( get_found_platform_length( candidate ), fit );
+						if(  rank>=best_rank  ) {
+							// no better than the one we have: not worth the way on
+							track_search = 0;
+							track_search_taken.append( candidate.back() );
+							continue;
+						}
 						// never through the station and back in (a bay facing the other way)
 						if(  !turns_round_through( candidate, 0, halt )  ) {
 							if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
@@ -3943,15 +3968,12 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 					break;
 				}
 				if(  leads_on  &&  halt.is_bound()  ) {
-					const uint16 length = get_found_platform_length( candidate, get_waytype() );
-					if(  length<best_length  ) {
-						best.clear();
-						best.append( &candidate );
-						best_length = length;
-					}
-					// none can be shorter than the train: take it, else look for a shorter one
-					found = length<=cnv->get_tile_length();
-					track_search_excluded.append( candidate.back() );
+					best.clear();
+					best.append( &candidate );
+					best_rank = rank;
+					// none can fit better: take it, else look for a shorter one
+					found = rank<=fit;
+					track_search_taken.append( candidate.back() );
 				}
 				else if(  leads_on  ) {
 					best.clear();
@@ -3965,7 +3987,7 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 					}
 				}
 			}
-			found |= best_length!=0xFFFF;
+			found |= best.get_count()>=2;
 			if(  found  ) {
 				for(  uint32 i=start;  i<from;  i++  ) {
 					path.append( route->at(i) );
@@ -3992,6 +4014,7 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	stop_search_start = koord3d::invalid;
 	bay_search = 0;
 	track_search_excluded.clear();
+	track_search_taken.clear();
 	track_search = 0;
 	track_search_start = koord3d::invalid;
 	return found;

@@ -5649,6 +5649,48 @@ bool convoi_t::expects_partner(uint16 &max_wait, linehandle_t &partner_line, uin
 }
 
 
+uint16 convoi_t::get_platform_length_needed(halthandle_t halt) const
+{
+	const uint16 own = get_tile_length();
+	bool standing;
+	const convoihandle_t partner = find_partner_at( halt, standing );
+	if(  partner.is_bound()  ) {
+		return own + partner->get_tile_length();
+	}
+	if(  !halt.is_bound()  ||  schedule==NULL  ||  schedule->empty()  ||  coupled_convoi.is_bound()  ) {
+		return own;
+	}
+	const schedule_entry_t &entry = schedule->get_current_entry();
+	if(  haltestelle_t::get_halt( entry.pos, owner )!=halt  ) {
+		return own;
+	}
+	// a partner may still come: room for the longest train of the lines we couple with here
+	uint16 longest = 0;
+	FOR( vector_tpl<linehandle_t>, const l, halt->registered_lines ) {
+		if(  l==line  ||  l->get_owner()!=owner  ) {
+			continue;
+		}
+		bool couples = entry.couple_line_id==l.get_id();
+		if(  !couples  &&  line.is_bound()  ) {
+			FOR( minivec_tpl<schedule_entry_t>, const &e, l->get_schedule()->entries ) {
+				if(  e.couple_line_id==line.get_id()  &&  haltestelle_t::get_halt( e.pos, owner )==halt  ) {
+					couples = true;
+					break;
+				}
+			}
+		}
+		if(  couples  ) {
+			FOR( vector_tpl<convoihandle_t>, const c, l->get_convoys() ) {
+				if(  c->get_tile_length()>longest  ) {
+					longest = c->get_tile_length();
+				}
+			}
+		}
+	}
+	return own + longest;
+}
+
+
 convoihandle_t convoi_t::find_partner_at(halthandle_t halt, bool &standing) const
 {
 	standing = false;

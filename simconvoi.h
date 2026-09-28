@@ -1103,6 +1103,13 @@ public:
 	convoihandle_t find_partner_at(halthandle_t halt, bool &standing) const;
 
 	/**
+	 * Fork, coupling: tiles of platform this train wants at halt (the stop it heads for): its own
+	 * length, plus its partner's when it couples there (the partner at the stop or on its way in, else
+	 * the longest train of the lines it couples with there)
+	 */
+	uint16 get_platform_length_needed(halthandle_t halt) const;
+
+	/**
 	 * Fork, coupling, called when reserving: cut our route before the first tile of our partner
 	 * standing at our next stop, so we stop right behind it. Returns true if the route was cut.
 	 */
