@@ -421,6 +421,9 @@ void convoi_info_t::update_labels()
 	const convoihandle_t dep_cnv = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
 	// waiting for a passing train or at a single-track section, else the planned departure
 	const bool show_departure = dep_cnv->append_wait_reason( departure_label.buf() )  ||  dep_cnv->append_departure_text( departure_label.buf() );
+	if(  show_departure  &&  dep_cnv->has_missed_slot()  ) {
+		departure_label.buf().append( translator::translate(", missed its slot") );
+	}
 	departure_label.update();
 	if(  departure_label.is_visible() != show_departure  ) {
 		departure_label.set_visible( show_departure );
@@ -429,7 +432,8 @@ void convoi_info_t::update_labels()
 	}
 
 	// fork: how late it left the last stop with a timetable (kept over stops without one; a minute
-	// late counts as on time), or that it waits for the next slot after the last one closed unused
+	// late counts as on time), or that it waits for the next slot after the last one closed unused;
+	// not while the departure row is shown (it says that itself)
 	const sint32 delay = cnv->get_departure_delay();
 	const bool missed = cnv->has_missed_slot();
 	if(  missed  ) {
@@ -441,7 +445,7 @@ void convoi_info_t::update_labels()
 	else if(  delay >= 0  ) {
 		delay_label.buf().append( translator::translate("On time") );
 	}
-	const bool show_delay = (missed  ||  delay != convoi_t::NO_DEPARTURE_DELAY)  &&  welt->has_calendar();
+	const bool show_delay = !show_departure  &&  (missed  ||  delay != convoi_t::NO_DEPARTURE_DELAY)  &&  welt->has_calendar();
 	delay_label.update();
 	if(  delay_label.is_visible() != show_delay  ) {
 		delay_label.set_visible( show_delay );
