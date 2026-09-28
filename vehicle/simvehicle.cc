@@ -4694,11 +4694,28 @@ static bool section_waited_long(const convoi_t *c)
 
 bool rail_vehicle_t::may_follow(convoihandle_t c, koord3d to) const
 {
-	// in the same section direction (turning back on the line is no following), with its track at
-	// the station claimed: then it never waits on the line for a track there
-	return c.is_bound()  &&  c!=cnv->self  &&  to!=koord3d::invalid
-		&&  c->get_section_to()==to  &&  c->get_section_from()!=to
-		&&  c->has_claim()  &&  c->get_claim_boundary()==to;
+	// into the same station boundary, with its track at the station claimed: then it never waits on
+	// the line for a track there
+	if(  !c.is_bound()  ||  c==cnv->self  ||  to==koord3d::invalid  ||  c->get_section_to()!=to
+		||  !c->has_claim()  ||  c->get_claim_boundary()!=to  ||  c->get_vehicle_count()==0  ) {
+		return false;
+	}
+	if(  c->get_section_from()!=to  ) {
+		return true;
+	}
+	// it turns back at a halt on the line: only once it has turned, i.e. the rest of its route enters
+	// the station there (on its way out it comes towards us; a route never turns round within itself,
+	// drive_to ends it at a waypoint where it would)
+	route_t const* const r = c->get_route();
+	for(  uint32 i=max( c->front()->get_route_index(), 1 );  i<r->get_count();  i++  ) {
+		if(  r->at(i)==to  ) {
+			grund_t const* const gr = welt->lookup( to );
+			roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+			const ribi_t::ribi dir = i+1<r->get_count() ? ribi_type( r->at(i), r->at(i+1) ) : ribi_type( r->at(i-1), r->at(i) );
+			return lt  &&  lt->applies_to( dir );
+		}
+	}
+	return false;
 }
 
 

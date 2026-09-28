@@ -486,7 +486,8 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   reserve the next block). `signal_applies` is false for posts, so every search ignores them, and
   trains without a record (stock/long-block/depot exits, old saves) hold the whole line as before.
   At a `P` the line up to the first post must be free; beyond it only trains `may_follow` accepts
-  (same `section_to`, not turning back on the line, claim held at that boundary); the follower
+  (same `section_to`, claim held at that boundary; a train turning back at a halt on the line only
+  once it has turned, i.e. the rest of its route enters that boundary); the follower
   claims its own track (last free track rule unchanged). A train partly past the far `LT` is not
   followed. Trains from a junction on the line into the same `LT` follow each other too.
   `find_partner_at` does not wait for a partner behind us in the same section (it may wait at the

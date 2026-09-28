@@ -291,8 +291,10 @@ until it has reached the next station.
   them.
 - At a `P` (`is_platform_signal_clear`): the line up to the first post that applies must be free,
   as before. Beyond it, a tile may be reserved only by a train we may follow (`may_follow`): it has
-  the same `section_to`, did not start the section at that boundary (no turning back on the line),
-  and holds its claim with that boundary, so it never waits on the line for a track. Anything else
+  the same `section_to` and holds its claim with that boundary, so it never waits on the line for a
+  track. A train that started the section at that boundary (it turns back at a halt on the line) is
+  followed only once it has turned: the rest of its route passes that boundary in the direction it
+  applies; on its way out it comes towards us. Anything else
   there keeps the `P` red. A train that follows must claim its own track at the next station (the
   last free track rule 3.8.1 unchanged; the trains ahead count through their claimed tracks). A
   train whose front has already passed the next station's boundary is not followed until its tail
