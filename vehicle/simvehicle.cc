@@ -4751,16 +4751,26 @@ bool rail_vehicle_t::yields_to_waiting(koord3d from, bool follows, const vector_
 			continue;
 		}
 		const bool opposite = c->get_section_wait_boundary()==from;
-		if(  !opposite  ) {
-			// from our side: only if what keeps it waiting is on our way too (not on another branch)
-			if(  c->get_section_wait_from()!=from  ) {
+		if(  !opposite  &&  c->get_section_wait_from()!=from  ) {
+			continue;
+		}
+		bool on_our_way = false;
+		for(  uint32 i=1;  !on_our_way  &&  i<=last  &&  i<ahead.get_count();  i++  ) {
+			on_our_way = ahead[i]==c->get_section_wait_tile();
+		}
+		if(  !on_our_way  ) {
+			// what keeps it waiting is off our way (at its end of the line, or in the throat of our
+			// station, e.g. a train coming in over its switch): from our side it must go into the same
+			// station (not a train blocked on another branch); and not when that tile is held by us or
+			// by a train loading at its platform (it could not go first; a train standing at a signal or
+			// block post is about to move on)
+			if(  !opposite  &&  !(last<ahead.get_count()  &&  c->get_section_wait_boundary()==ahead[last])  ) {
 				continue;
 			}
-			bool on_our_way = false;
-			for(  uint32 i=1;  !on_our_way  &&  i<=last  &&  i<ahead.get_count();  i++  ) {
-				on_our_way = ahead[i]==c->get_section_wait_tile();
-			}
-			if(  !on_our_way  ) {
+			grund_t const* const gr = welt->lookup( c->get_section_wait_tile() );
+			schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+			const convoihandle_t holder = sch ? sch->get_reserved_convoi() : convoihandle_t();
+			if(  holder.is_bound()  &&  holder!=c  &&  (holder==cnv->self  ||  holder->get_state()==convoi_t::LOADING)  ) {
 				continue;
 			}
 		}

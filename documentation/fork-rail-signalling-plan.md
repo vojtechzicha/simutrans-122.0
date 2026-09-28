@@ -319,7 +319,16 @@ to enter a line at a `P` waits ("Letting a train from X through") while another 
 at least `block_yield_minutes` (simuconf.tab, default 10 calendar minutes, saved) for the line
 itself (not for a track at the next station), started waiting before it, and would enter through
 the boundary we leave by (the other end) or leave through it too with the tile that keeps it
-waiting on our way (our side; a train blocked on another branch after a junction does not count).
+waiting on our way or going into the same station boundary as we do (our side; a train blocked on
+another branch after a junction does not count). The tile is where its last check failed, and for a
+train on another platform of our station that is often in the throat, off our way (a train coming
+in over its switch); judged by the tile alone it did not count, the trains on the other platforms
+kept going first and it passed the 4 hour limit (test: 26 hours at the station). At either end a
+train whose tile is off our way does not count when that tile is ours or held by a train loading at
+its platform (it could not go first); a train standing at a signal or block post there does count,
+it is about to move (counting it only when that one moved gave the short turners the line and made
+the trains at the posts wait). Still open: a train kept for hours by a loading train passes the 4
+hour limit while it does not count, and is then only one of the racers again.
 A follower that cannot claim a track waits as "no free track", not for the line. A train that has
 waited `block_yield_minutes` + 4 hours is no longer waited for (something that does not move
 holds its way), except that followers never go while a train waits at the other end. The waiting

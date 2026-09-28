@@ -498,7 +498,10 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   signal has waited `block_yield_minutes` (simuconf, default 10, saved) for the line itself
   (`SECTION_WAIT_LINE`, not for a track), started first, and would enter through our exit boundary or
   leave through it with the tile that stops it on our way (`section_wait_tile`, so not a train
-  blocked on another branch) (`yields_to_waiting`, loops over all convoys only when a train is about
+  blocked on another branch) or into the same station boundary as we do (the tile may be in our
+  station's throat, off our way, e.g. a train coming in over the other platform's switch). A tile off
+  our way held by us or by a LOADING train does not count, at either end (it could not go first)
+  (`yields_to_waiting`, loops over all convoys only when a train is about
   to get green or is yielding). A follower that cannot claim waits as `SECTION_WAIT_TRACK`. Not after it waited 4 hours more, except followers never go while one waits
   at the other end. `section_wait`, its start and boundaries are saved (122.10); `drive_to`, depot
   and deletion reset them. Saves for < 122.10 leave the posts out (`objlist_t::rdwr`; an older exe
