@@ -239,11 +239,14 @@ no save change). Only a train that turns back at the stop may use one.
 - Turning back (`reverses_at_stop`): the shortest way on from the planned stop to the next schedule
   entry starts back the way the train came. From a planned stop in a bay it always does, so there
   the way on is judged from the last switch before it: a train that could go on from there without
-  turning back runs through. Without a next stop any platform will do.
+  turning back over another platform of the station runs through (one that leaves the station from
+  there, e.g. a train out of a depot on a spur at that switch, turns back). Without a next stop any
+  platform will do.
 - Every platform choice (stock choose search, `find_station_track` at `P` and `LT`,
   `is_planned_platform_suitable`) goes through `is_platform_suitable`, which with `bay_search` 1
   refuses bays for a train that runs through, even a planned (clicked) bay that is free. A station
-  with only bays (a terminus) restricts nothing.
+  with only bays (a terminus) restricts nothing; tram and road stops of the same halt do not count
+  as through platforms.
 - Preference, the soft variant (owner's choice): a train turning back keeps its planned platform
   when that is free, through track or not; otherwise it searches the bays first (`bay_search` 2),
   then any track.

@@ -2690,6 +2690,11 @@ static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &
 		if(  tile.grund->get_weg( wt )==NULL  ) {
 			continue;
 		}
+		gebaeude_t const* const gb = tile.grund->find<gebaeude_t>();
+		if(  gb  &&  gb->get_tile()->get_desc()->get_extra()!=(uint32)wt  ) {
+			// a tram or road stop of the same halt on tram track
+			continue;
+		}
 		if(  is_bay_tile( tile.grund, wt )  ) {
 			bays.append_unique( tile.grund->get_pos() );
 		}
@@ -2697,6 +2702,21 @@ static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &
 			has_through = true;
 		}
 	}
+}
+
+// fork: the path (after its first tile) runs over a platform of halt for waytype wt
+static bool passes_platform_of(const route_t &path, halthandle_t halt, waytype_t wt)
+{
+	for(  uint32 i=1;  i<path.get_count();  i++  ) {
+		grund_t const* const gr = world()->lookup( path.at(i) );
+		if(  gr  &&  gr->get_halt()==halt  ) {
+			gebaeude_t const* const gb = gr->find<gebaeude_t>();
+			if(  gb  &&  gb->get_tile()->get_desc()->get_extra()==(uint32)wt  ) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 /* fork: the path (from index from on) runs through a platform of halt the other way before it stops there:
@@ -5337,14 +5357,17 @@ bool rail_vehicle_t::reverses_at_stop(const route_t *route, uint32 start, koord3
 		reverses = on.at(1)==route->at(n-2);
 		if(  reverses  ) {
 			// maybe only because this platform leads nowhere else (a bay): does the way on from the last
-			// switch before it go on without turning back (through another track of the station)?
+			// switch before it go on without turning back through another track of the station? (Not
+			// when it leaves the station at once, e.g. a train coming out of a depot on a spur there.)
+			grund_t const* const stop_gr = welt->lookup( route->back() );
+			const halthandle_t halt = stop_gr ? stop_gr->get_halt() : halthandle_t();
 			for(  uint32 i=n-2;  i>start;  i--  ) {
 				grund_t const* const gr = welt->lookup( route->at(i) );
 				weg_t const* const way = gr ? gr->get_weg( get_waytype() ) : NULL;
 				if(  way  &&  ribi_t::is_threeway( way->get_ribi_unmasked() )  ) {
 					route_t from_switch;
 					if(  from_switch.calc_route( welt, route->at(i), next_stop, this, speed, 0 )!=route_t::no_route  &&  from_switch.get_count()>=2  ) {
-						reverses = from_switch.at(1)==route->at(i-1);
+						reverses = from_switch.at(1)==route->at(i-1)  ||  !passes_platform_of( from_switch, halt, get_waytype() );
 					}
 					break;
 				}

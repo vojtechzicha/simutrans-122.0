@@ -504,9 +504,11 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
 - Bay platforms (plan 3.10, no save change): a platform whose track ends in a buffer stop (or a
   depot) before any switch or station boundary (`is_bay_tile`) is used only by trains that turn back
   there (`reverses_at_stop`: the way on to the next stop starts back the way the train came, judged
-  from the last switch before the stop when the stop itself is a bay). `is_platform_suitable` refuses
-  bays to trains that run through (`bay_search` 1, also a clicked bay; a station with only bays is not
-  restricted). A train turning back keeps its planned platform when free, else searches bays first
+  from the last switch before the stop when the stop itself is a bay, and only if the way on from there
+  runs over another platform of the stop: a train out of a depot on a spur at that switch turns back).
+  `is_platform_suitable` refuses bays to trains that run through (`bay_search` 1, also a clicked bay; a
+  station with only bays is not restricted, and tram or road stops of the halt are no through
+  platforms). A train turning back keeps its planned platform when free, else searches bays first
   (`bay_search` 2), then any track; stock choose search and `find_station_track` alike. In the last
   free track rule a free bay counts only at a station of bays only, or in `station_can_release` for a
   train that comes back from that station. Directed bays: no platform choice takes a way in that runs
