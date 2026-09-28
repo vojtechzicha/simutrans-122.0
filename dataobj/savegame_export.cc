@@ -1034,6 +1034,13 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			w.kv_null( "coupled_with" );
 		}
 		w.kv_bool( "running_late", cnv->is_running_late() );
+		// fork, timetable: minutes late at the last stop with a timetable it left
+		if(  cnv->get_departure_delay() != convoi_t::NO_DEPARTURE_DELAY  ) {
+			w.kv_int( "departure_delay", cnv->get_departure_delay() );
+		}
+		else {
+			w.kv_null( "departure_delay" );
+		}
 		// fork, coupling: the primary drives both trains, so speed, power, departure and waits are its own
 		const convoihandle_t driver = cnv->is_coupled()  &&  cnv->get_coupled_convoi().is_bound() ? cnv->get_coupled_convoi() : cnv;
 		const halthandle_t uncouple_halt = driver->is_coupled_primary() ? driver->get_uncouple_halt() : halthandle_t();

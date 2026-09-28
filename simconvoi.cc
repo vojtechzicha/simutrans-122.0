@@ -77,6 +77,27 @@ static inline uint32 nonzero_ticks(uint32 ticks)
 	return ticks ? ticks : 1;
 }
 
+// fork, timetable: calendar minutes from the given slot until now, 0 if early (no max(): it takes ints)
+static sint32 minutes_after_slot(sint64 slot)
+{
+	const sint64 late = world()->get_calendar_minutes() - slot;
+	return late <= 0 ? 0 : late > 0x7FFFFFFF ? 0x7FFFFFFF : (sint32)late;
+}
+
+// fork, timetable: the same stops with the same settings (the current stop may differ)
+static bool same_schedule_entries(const schedule_t *a, const schedule_t *b)
+{
+	if(  a == NULL  ||  b == NULL  ||  a->get_count() != b->get_count()  ) {
+		return a == b;
+	}
+	for(  uint8 i=0;  i<a->get_count();  i++  ) {
+		if(  !(a->entries[i] == b->entries[i])  ) {
+			return false;
+		}
+	}
+	return true;
+}
+
 /*
  * Debugging helper - translate state value to human readable name
  */
@@ -163,6 +184,7 @@ void convoi_t::init(player_t *player)
 	platform_boarded = false;
 	running_late = false;
 	late_slot = -1;
+	departure_delay = NO_DEPARTURE_DELAY;
 	uncouple_since = 0;
 	uncouple_warned = false;
 	wait_lock = 0;
@@ -2384,6 +2406,10 @@ bool convoi_t::set_schedule(schedule_t * f)
 
 	// happens to be identical?
 	if(schedule!=f) {
+		// fork: the delay of the last timetabled departure belongs to the old schedule
+		if(  !same_schedule_entries( schedule, f )  ) {
+			departure_delay = NO_DEPARTURE_DELAY;
+		}
 		// now check, we we have been bond to a line we are about to lose:
 		bool changed = false;
 		if(  line.is_bound()  ) {
@@ -3261,6 +3287,14 @@ void convoi_t::rdwr(loadsave_t *file)
 		clear_section();
 	}
 
+	if(  file->is_version_atleast(122, 11)  ) {
+		// fork: how late it left the last stop with a timetable
+		file->rdwr_long( departure_delay );
+	}
+	else if(  file->is_loading()  ) {
+		departure_delay = NO_DEPARTURE_DELAY;
+	}
+
 	if(  file->is_loading()  ) {
 		reserve_route();
 		recalc_catg_index();
@@ -3907,6 +3941,8 @@ station_tile_search_ready: ;
 
 		if(  timetabled  &&  slot >= 0  ) {
 			line->book_departure_slot( schedule->get_current_stop(), slot );
+			// fork: how late we leave, shown in the convoy window until the next stop with a timetable
+			departure_delay = minutes_after_slot( slot );
 			if(  missed_partner  &&  partner_line.is_bound()  &&  partner_entry != 255  ) {
 				// fork, coupling: the train that should have joined us runs late with this slot
 				partner_line->add_missed_coupling( partner_entry, slot );
@@ -3929,6 +3965,11 @@ station_tile_search_ready: ;
 				if(  joined->line.is_bound()  &&  joined->schedule->get_current_entry().has_timetable()  &&  welt->has_calendar()
 					&&  joined->line->can_take_departure_slot( joined->self, joined_slot )  ) {
 					joined->line->book_departure_slot( joined->schedule->get_current_stop(), joined_slot );
+					joined->departure_delay = minutes_after_slot( joined_slot );
+				}
+				else if(  timetabled  &&  slot >= 0  &&  joined->schedule->get_current_entry().has_timetable()  ) {
+					// timetabled here, but no slot of its own: it is as late as we are
+					joined->departure_delay = departure_delay;
 				}
 				joined->schedule->advance();
 			}
@@ -5015,6 +5056,10 @@ void convoi_t::check_pending_updates()
 			schedule = create_schedule();
 		}
 		schedule_t* new_schedule = line_update_pending->get_schedule();
+		if(  line != line_update_pending  ||  !same_schedule_entries( schedule, new_schedule )  ) {
+			// fork: the delay of the last timetabled departure belongs to the old schedule
+			departure_delay = NO_DEPARTURE_DELAY;
+		}
 		int current_stop = schedule->get_current_stop(); // save current position of schedule
 		bool is_same = false;
 		bool is_depot = false;

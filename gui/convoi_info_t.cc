@@ -193,6 +193,8 @@ void convoi_info_t::init(convoihandle_t cnv)
 
 			departure_label.set_visible(false);
 			add_component(&departure_label);
+			delay_label.set_visible(false);
+			add_component(&delay_label);
 			coupling_label.set_visible(false);
 			add_component(&coupling_label);
 
@@ -422,6 +424,22 @@ void convoi_info_t::update_labels()
 	departure_label.update();
 	if(  departure_label.is_visible() != show_departure  ) {
 		departure_label.set_visible( show_departure );
+		reset_min_windowsize();
+		set_windowsize( get_windowsize() );
+	}
+
+	// fork: how late it left the last stop with a timetable (kept over stops without one)
+	const sint32 delay = cnv->get_departure_delay();
+	if(  delay > 0  ) {
+		delay_label.buf().printf( translator::translate("Delay: %d min"), (int)delay );
+	}
+	else if(  delay == 0  ) {
+		delay_label.buf().append( translator::translate("On time") );
+	}
+	const bool show_delay = delay != convoi_t::NO_DEPARTURE_DELAY  &&  welt->has_calendar();
+	delay_label.update();
+	if(  delay_label.is_visible() != show_delay  ) {
+		delay_label.set_visible( show_delay );
 		reset_min_windowsize();
 		set_windowsize( get_windowsize() );
 	}

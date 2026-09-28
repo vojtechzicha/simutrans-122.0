@@ -57,6 +57,8 @@ while it rides along and right after it was uncoupled. `max_speed`, `sum_power`,
 `waiting_for` and `departure` of a joined train are those of the primary, which drives both.
 `uncouples_at` is the stop where a coupled pair parts (null: not coupled, or they stay coupled).
 `running_late` is set for a train that missed its coupling.
+`departure_delay` is how many calendar minutes after its timetable slot the convoy left the last
+stop with a timetable (0 = on time, null: none since its schedule or line last changed).
 Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
 null) and `couple_max_wait` in calendar minutes, and `departure_window`: how many minutes after a
 timetable slot a train may still leave in it (null: half the gap to the next slot). Schedules have `no_standing` and `no_overcrowding`

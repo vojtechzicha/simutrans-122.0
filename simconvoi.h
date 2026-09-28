@@ -325,6 +325,13 @@ private:
 	bool running_late;
 	sint64 late_slot;
 
+	/**
+	 * Fork, timetable: calendar minutes after its slot the convoy left the last stop with a timetable
+	 * (NO_DEPARTURE_DELAY = none yet). Stops without a timetable keep it, a new schedule or line
+	 * clears it. Saved (122.11).
+	 */
+	sint32 departure_delay;
+
 	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
 	uint32 uncouple_since;
 	bool uncouple_warned;
@@ -1086,6 +1093,9 @@ public:
 	/// fork, coupling: the stop where a coupled primary will leave its joined train behind (unbound: none found)
 	halthandle_t get_uncouple_halt() const;
 	bool is_running_late() const { return running_late; }
+	enum { NO_DEPARTURE_DELAY = -1 };
+	/// fork, timetable: minutes late at the last timetabled departure, NO_DEPARTURE_DELAY if none
+	sint32 get_departure_delay() const { return departure_delay; }
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
 	/// fork, coupling: the primary hands the tile over to the train it just uncoupled
 	void handover_tile(koord3d pos);

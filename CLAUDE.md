@@ -152,6 +152,14 @@ calendar on and greys them out for line-less convoys; the entry list appends "(e
 A convoy that arrived after another convoy of its line at the same entry only unloads until
 that one has left (`count_earlier_waiting`), so passengers board the train that leaves first;
 the convoy window shows "Departure: HH:MM (in N min), K ahead" from `get_planned_departure`.
+Below it, "Delay: N min" or "On time": how many minutes after its slot the convoy left the last
+stop with a timetable (`convoi_t::departure_delay`, set where `hat_gehalten` books the slot, i.e. at
+the end of loading; a coupled joined train counts from its own line's slot, or takes the primary's
+delay when its entry has a timetable but no free slot). Stops without a timetable keep it; only a
+new schedule with other entries or a line change clears it (`set_schedule`,
+`check_pending_updates`). Since only an open slot can be booked, it stays within the departure
+window except when running late after a missed coupling. Saved (122.11), export and viewer
+`departure_delay`.
 The label over a train (`show_vehicle_states`, `vehicle_t::display_after`) shows the same texts:
 loading plus coupling wait or late running plus departure, and at a signal the passing-train or
 single-track reason instead of "Waiting for clearance" (`convoi_t::append_departure_text`,
