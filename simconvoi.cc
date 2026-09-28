@@ -4425,6 +4425,14 @@ bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
 }
 
 
+bool convoi_t::has_missed_slot() const
+{
+	// a train running late or holding a slot for its partner has a slot of its own
+	return state == LOADING  &&  line.is_bound()  &&  !no_load  &&  !running_late  &&  couple_hold_slot < 0
+		&&  line->is_last_slot_missed( self );
+}
+
+
 bool convoi_t::append_departure_text(cbuffer_t &buf) const
 {
 	sint64 slot = 0;

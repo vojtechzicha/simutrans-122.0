@@ -1514,7 +1514,7 @@ function viewConvoyDetail(host, id) {
     (waitText(c, true) ? "<dt>" + (c.waiting_for ? "Waiting" : "Departure") + "</dt><dd>" +
       waitText(c, true).replace(/^Departure: /, "") + "</dd>" : "") +
     (c.running_late ? '<dt>Running late</dt><dd>missed its coupling</dd>' : "") +
-    (c.departure_delay != null ? "<dt>Delay</dt><dd>" + (num(c.departure_delay) > 0 ? fmtInt(c.departure_delay) + " min" : "on time") +
+    (c.departure_delay != null ? "<dt>Delay</dt><dd>" + (num(c.departure_delay) > 1 ? fmtInt(c.departure_delay) + " min" : "on time") +
       ' <span class="dim">(left its last stop with a timetable)</span></dd>' : "") +
     (c.hold_marker ? "<dt>Hold marker</dt><dd>lets passing trains overtake</dd>" : "") +
     (c.hold_divert ? "<dt>Diverted</dt><dd>heading for a platform to let a passing train by</dd>" : "") +

@@ -159,7 +159,14 @@ delay when its entry has a timetable but no free slot). Stops without a timetabl
 new schedule with other entries or a line change clears it (`set_schedule`,
 `check_pending_updates`). Since only an open slot can be booked, it stays within the departure
 window except when running late after a missed coupling. Saved (122.11), export and viewer
-`departure_delay`.
+`departure_delay`. The window shows up to 1 min as "On time" (the value stays exact), and "Missed its
+slot" instead while the convoy waits at a timetabled stop whose last slot has closed with no train
+of the line leaving in it (`simline_t::is_last_slot_missed`, `convoi_t::has_missed_slot`; not for
+a train running late or holding a slot for its partner, nor before the line's first departure there).
+A train that came after the window cannot tell late for that slot from early for the next, so with
+more slots than trains every unused slot counts, e.g. one train on a 20 minute timetable shows it
+until the next slot opens. `book_departure_slot` only moves `last_departure_slot` forwards (a train
+that held an older slot for its partner used to make a later, used slot look free).
 The label over a train (`show_vehicle_states`, `vehicle_t::display_after`) shows the same texts:
 loading plus coupling wait or late running plus departure, and at a signal the passing-train or
 single-track reason instead of "Waiting for clearance" (`convoi_t::append_departure_text`,

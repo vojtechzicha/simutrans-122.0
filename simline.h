@@ -167,6 +167,12 @@ public:
 	void book_departure_slot(uint8 entry, sint64 slot);
 
 	/**
+	 * Timetable (fork): the last slot of the convoy's current entry has closed and no train of
+	 * this line left in it, so a convoy waiting there now missed it and waits for the next one.
+	 */
+	bool is_last_slot_missed(convoihandle_t cnv) const;
+
+	/**
 	 * Timetable (fork), a train running late after a missed coupling: the slot it may leave in
 	 * right away, the inherited one (if still unused) or else the oldest slot of this entry that
 	 * no train of the line used yet, as long as that one is due already. False when the train

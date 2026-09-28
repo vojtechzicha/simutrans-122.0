@@ -430,7 +430,11 @@ void simline_t::book_departure_slot(uint8 entry, sint64 slot)
 	while(  last_departure_slot.get_count() <= entry  ) {
 		last_departure_slot.append( -1 );
 	}
-	last_departure_slot[entry] = slot;
+	// only forwards: a train that held an older slot for its coupling partner leaves in it after a
+	// later one was taken, and must not make that later slot look unused again
+	if(  slot > last_departure_slot[entry]  ) {
+		last_departure_slot[entry] = slot;
+	}
 }
 
 
@@ -446,6 +450,41 @@ bool simline_t::take_departure_slot(convoihandle_t cnv)
 	}
 	book_departure_slot( cnv_schedule->get_current_stop(), slot );
 	return true;
+}
+
+
+bool simline_t::is_last_slot_missed(convoihandle_t cnv) const
+{
+	const schedule_t *cnv_schedule = cnv->get_schedule();
+	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ||  !welt->has_calendar()  ) {
+		return false;
+	}
+	const uint8 idx = cnv_schedule->get_current_stop();
+	const schedule_entry_t &entry = cnv_schedule->entries[idx];
+	if(  !entry.has_timetable()  ) {
+		return false;
+	}
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = entry.get_departure_offsets( offsets );
+	sint64 day, minute_of_day;
+	split_day( welt->get_calendar_minutes(), day, minute_of_day );
+	sint64 prev;
+	if(  !slot_at_or_before( entry, offsets, n, minute_of_day, prev )  ) {
+		// before the first slot of the day: the last one of yesterday
+		day --;
+		minute_of_day += 1440;
+		if(  !slot_at_or_before( entry, offsets, n, 1439, prev )  ) {
+			return false;
+		}
+	}
+	const sint64 gap = slot_after( entry, offsets, n, prev ) - prev;
+	if(  entry.is_slot_open( minute_of_day - prev, gap )  ) {
+		// still open, it may leave in it
+		return false;
+	}
+	const sint64 last = idx < last_departure_slot.get_count() ? last_departure_slot[idx] : -1;
+	// (no departure there yet, e.g. a new line or an edited timetable: nothing to compare with)
+	return last >= 0  &&  last < day * 1440 + prev;
 }
 
 

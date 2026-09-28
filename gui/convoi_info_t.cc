@@ -428,15 +428,20 @@ void convoi_info_t::update_labels()
 		set_windowsize( get_windowsize() );
 	}
 
-	// fork: how late it left the last stop with a timetable (kept over stops without one)
+	// fork: how late it left the last stop with a timetable (kept over stops without one; a minute
+	// late counts as on time), or that it waits for the next slot after the last one closed unused
 	const sint32 delay = cnv->get_departure_delay();
-	if(  delay > 0  ) {
+	const bool missed = cnv->has_missed_slot();
+	if(  missed  ) {
+		delay_label.buf().append( translator::translate("Missed its slot") );
+	}
+	else if(  delay > 1  ) {
 		delay_label.buf().printf( translator::translate("Delay: %d min"), (int)delay );
 	}
-	else if(  delay == 0  ) {
+	else if(  delay >= 0  ) {
 		delay_label.buf().append( translator::translate("On time") );
 	}
-	const bool show_delay = delay != convoi_t::NO_DEPARTURE_DELAY  &&  welt->has_calendar();
+	const bool show_delay = (missed  ||  delay != convoi_t::NO_DEPARTURE_DELAY)  &&  welt->has_calendar();
 	delay_label.update();
 	if(  delay_label.is_visible() != show_delay  ) {
 		delay_label.set_visible( show_delay );

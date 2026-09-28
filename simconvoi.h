@@ -1096,6 +1096,8 @@ public:
 	enum { NO_DEPARTURE_DELAY = -1 };
 	/// fork, timetable: minutes late at the last timetabled departure, NO_DEPARTURE_DELAY if none
 	sint32 get_departure_delay() const { return departure_delay; }
+	/// fork, timetable: waits at a stop with a timetable whose last slot closed unused (see simline_t::is_last_slot_missed)
+	bool has_missed_slot() const;
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
 	/// fork, coupling: the primary hands the tile over to the train it just uncoupled
 	void handover_tile(koord3d pos);
