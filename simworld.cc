@@ -5781,6 +5781,8 @@ DBG_MESSAGE("karte_t::load()", "init player");
 		}
 	}
 DBG_MESSAGE("karte_t::load()", "%d convois/trains loaded", convoi_array.get_count());
+	// fork: the id goes in front of a convoi name only when the owner has several with that name
+	convoi_t::refresh_all_name_ids();
 
 	// now the player can be loaded
 	for(int i=0; i<MAX_PLAYER_COUNT; i++) {

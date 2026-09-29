@@ -57,6 +57,7 @@
 #include "utils/simrandom.h"
 #include "utils/simstring.h"
 #include "utils/cbuffer_t.h"
+#include "tpl/stringhashtable_tpl.h"
 
 
 /*
@@ -243,8 +244,9 @@ convoi_t::convoi_t(player_t* player) : fahr(default_vehicle_length, NULL)
 	self = convoihandle_t(this);
 	player->book_convoi_number(1);
 	init(player);
-	set_name( "Unnamed" );
+	// fork: in the list first, so set_name counts it for the id in front of the name
 	welt->add_convoi( self );
+	set_name( "Unnamed" );
 	init_financial_history();
 }
 
@@ -267,6 +269,8 @@ DBG_MESSAGE("convoi_t::~convoi_t()", "destroying %d, %p", self.get_id(), this);
 
 	welt->sync.remove( this );
 	welt->rem_convoi( self );
+	// fork: the one left with this name no longer needs its id in front
+	refresh_name_ids( owner, get_internal_name() );
 
 	// if lineless convoy -> unregister from stops
 	if(  !line.is_bound()  ) {
@@ -998,25 +1002,133 @@ koord3d convoi_t::get_pos() const
 
 
 /**
+ * Fork: skips every "(number) " in front of a name. That is how the id is shown, so it is never part
+ * of the name (older games kept one when the shown name of another convoi was pasted in).
+ */
+static const char *skip_shown_ids(const char *name)
+{
+	while(  name[0]=='('  ) {
+		const char *p = name+1;
+		while(  *p>='0'  &&  *p<='9'  ) {
+			p++;
+		}
+		if(  p==name+1  ||  p[0]!=')'  ||  p[1]!=' '  ||  p[2]==0  ) {
+			break;
+		}
+		name = p+2;
+	}
+	return name;
+}
+
+
+/**
  * Sets the name. Creates a copy of name.
  */
-void convoi_t::set_name(const char *name, bool with_new_id)
+void convoi_t::set_name(const char *name, bool translate)
 {
-	if(  with_new_id  ) {
-		char buf[128];
-		name_offset = sprintf(buf,"(%i) ",self.get_id() );
-		tstrncpy(buf + name_offset, translator::translate(name, welt->get_settings().get_name_language_id()), lengthof(buf) - name_offset);
-		tstrncpy(name_and_id, buf, lengthof(name_and_id));
+	char old_name[128];
+	tstrncpy( old_name, get_internal_name(), lengthof(old_name) );
+
+	char buf[128];
+	if(  translate  ) {
+		tstrncpy( buf, translator::translate(name, welt->get_settings().get_name_language_id()), lengthof(buf) );
 	}
 	else {
-		char buf[128];
-		// check if there is a id in the name string
-		name_offset = sprintf(buf,"(%i) ",self.get_id() );
-		if(  strlen(name) < name_offset  ||  strncmp(buf,name,name_offset)!=0) {
-			name_offset = 0;
+		tstrncpy( buf, name, lengthof(buf) );
+	}
+	name_offset = 0;
+	tstrncpy( name_and_id, skip_shown_ids(buf), 128 );
+
+	// fork: the id is shown only while another convoi of the owner has the same name
+	if(  owner  ) {
+		refresh_name_ids( owner, old_name );
+		refresh_name_ids( owner, get_internal_name() );
+	}
+	notify_name_changed();
+}
+
+
+void convoi_t::show_name_id( bool show )
+{
+	if(  show == (name_offset>0)  ) {
+		return;
+	}
+	char buf[lengthof(name_and_id)];
+	if(  show  ) {
+		const int offset = sprintf( buf, "(%i) ", self.get_id() );
+		tstrncpy( buf+offset, get_internal_name(), lengthof(buf)-offset );
+		name_offset = offset;
+	}
+	else {
+		tstrncpy( buf, get_internal_name(), lengthof(buf) );
+		name_offset = 0;
+	}
+	tstrncpy( name_and_id, buf, lengthof(name_and_id) );
+	notify_name_changed();
+}
+
+
+void convoi_t::refresh_name_ids( const player_t *owner, const char *internal_name )
+{
+	if(  welt->is_destroying()  ) {
+		return;
+	}
+	// the name may belong to one of the convois changed below
+	char name[128];
+	tstrncpy( name, internal_name, lengthof(name) );
+	vector_tpl<convoi_t *> same;
+	FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
+		if(  cnv->get_owner()==owner  &&  strcmp( cnv->get_internal_name(), name )==0  ) {
+			same.append( cnv.get_rep() );
 		}
-		tstrncpy(buf+name_offset, name+name_offset, sizeof(buf)-name_offset);
-		tstrncpy(name_and_id, buf, lengthof(name_and_id));
+	}
+	FOR( vector_tpl<convoi_t *>, const cnv, same ) {
+		cnv->show_name_id( same.get_count()>1 );
+	}
+}
+
+
+void convoi_t::refresh_all_name_ids()
+{
+	// one pass per owner: count each name, then show the ids of those used more than once
+	for(  int i=0;  i<MAX_PLAYER_COUNT;  i++  ) {
+		const player_t *const player = welt->get_player(i);
+		if(  !player  ) {
+			continue;
+		}
+		stringhashtable_tpl<uint32> count;
+		FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
+			if(  cnv->get_owner()==player  ) {
+				uint32 *const n = count.access( cnv->get_internal_name() );
+				if(  n  ) {
+					(*n)++;
+				}
+				else {
+					count.put( cnv->get_internal_name(), 1 );
+				}
+			}
+		}
+		// the keys point into the names, so decide for all before changing any
+		vector_tpl<convoi_t *> show, hide;
+		FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
+			if(  cnv->get_owner()==player  ) {
+				( *count.access( cnv->get_internal_name() ) > 1 ? show : hide ).append( cnv.get_rep() );
+			}
+		}
+		FOR( vector_tpl<convoi_t *>, const cnv, show ) {
+			cnv->show_name_id( true );
+		}
+		FOR( vector_tpl<convoi_t *>, const cnv, hide ) {
+			cnv->show_name_id( false );
+		}
+	}
+}
+
+
+void convoi_t::notify_name_changed()
+{
+	if(  !self.is_bound()  ) {
+		return;
 	}
 	// now tell the windows that we were renamed
 	convoi_info_t *info = dynamic_cast<convoi_info_t*>(win_get_magic( magic_convoi_info+self.get_id()));
@@ -2880,9 +2992,13 @@ void convoi_t::rdwr(loadsave_t *file)
 		}
 	}
 
-	file->rdwr_str(name_and_id + name_offset, lengthof(name_and_id) - name_offset);
+	file->rdwr_str(name_and_id + name_offset, 128);
 	if(file->is_loading()) {
-		set_name(name_and_id+name_offset); // will add id automatically
+		// fork: translated as before; karte_t::load shows the ids of names used more than once
+		char buf[128];
+		tstrncpy( buf, name_and_id, lengthof(buf) );
+		tstrncpy( name_and_id, skip_shown_ids( translator::translate(buf, welt->get_settings().get_name_language_id()) ), 128 );
+		name_offset = 0;
 	}
 
 	koord3d dummy_pos;

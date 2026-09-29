@@ -425,9 +425,15 @@ private:
 	/**
 	 * Name of the convoi.
 	 * @see set_name
+	 * Fork: name_and_id is the internal name with "(id) " in front only while another convoi of
+	 * the same owner has the same internal name (refresh_name_ids).
 	 */
 	uint8 name_offset;
-	char name_and_id[128];
+	char name_and_id[128+16];
+
+	/// fork: shows or hides the "(id) " in front of the name and tells the windows
+	void show_name_id( bool show );
+	void notify_name_changed();
 
 	/**
 	* Initialize all variables with default values.
@@ -780,8 +786,16 @@ public:
 
 	/**
 	* Sets the name. Copies name into this->name and translates it.
+	* Fork: translate=false (renaming) takes the name as it is, without an "(id) " of this convoi in
+	* front. The id is shown only while the name is not unique among the owner's convois.
 	*/
-	void set_name(const char *name, bool with_new_id = true);
+	void set_name(const char *name, bool translate = true);
+
+	/// fork: shows the id in front of the names of the owner's convois named internal_name if more than one has it
+	static void refresh_name_ids( const player_t *owner, const char *internal_name );
+
+	/// fork: the same for all convois after loading
+	static void refresh_all_name_ids();
 
 	/**
 	 * Return the position of the convois.

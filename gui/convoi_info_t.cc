@@ -738,13 +738,14 @@ void convoi_info_t::rename_cnv()
 			// text changed => call tool
 			cbuffer_t buf;
 			buf.printf( "c%u,%s", cnv.get_id(), t );
+			// do not trigger this command again (fork: before the tool, since the name it sets may
+			// get the id in front, and update_data then puts that here)
+			tstrncpy(old_cnv_name, t, sizeof(old_cnv_name));
 			tool_t *tool = create_tool( TOOL_RENAME | SIMPLE_TOOL );
 			tool->set_default_param(buf);
 			welt->set_tool(tool, cnv->get_owner());
 			// since init always returns false, it is safe to delete immediately
 			delete tool;
-			// do not trigger this command again
-			tstrncpy(old_cnv_name, t, sizeof(old_cnv_name));
 		}
 	}
 }

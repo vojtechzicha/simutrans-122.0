@@ -662,6 +662,15 @@ keeps those for its own stops and those riding through; express leaving 1 min af
 them, 15 min after loses them; capacity limit; save/load while waiting; coupled pair filling its
 joined part; the 34 rail regression scenarios unchanged.
 
+## Convoy names (fork feature, no save change)
+
+A convoy's name gets its id in front ("(4486) R12") only while another convoy of the same owner has
+the same name (`convoi_t::refresh_name_ids`, called by `set_name` for the old and the new name and by
+the destructor; `refresh_all_name_ids` once in `karte_t::load`). `name_and_id` holds the shown name,
+`get_internal_name()` the name without the id, which is what is saved, as in stock. A leading
+"(number) " is never part of a name (`skip_shown_ids` on rename and on load), which also cleans
+names that kept another convoy's id from pasting a shown name. Stock exes show the id always.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds
