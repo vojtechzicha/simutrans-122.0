@@ -505,10 +505,15 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   depot) before any switch or station boundary (`is_bay_tile`) is used only by trains that turn back
   there (`reverses_at_stop`: the way on to the next stop starts back the way the train came, judged
   from the last switch before the stop when the stop itself is a bay, and only if the way on from there
-  runs over another platform of the stop: a train out of a depot on a spur at that switch turns back).
+  runs over another platform of the stop: a train out of a depot on a spur at that switch turns back;
+  the platform the way on ends on does not count, so a next stop in the same station, e.g. metro C at
+  Háje: arrival, bay, departure platform, is turning back).
   `is_platform_suitable` refuses bays to trains that run through (`bay_search` 1, also a clicked bay; a
   station with only bays is not restricted, and tram or road stops of the halt are no through
-  platforms). A train turning back keeps its planned platform when free, else searches bays first
+  platforms). A train planned into a bay is refused it only while some other platform of the halt can
+  be reached from where it chooses, taken or not and however short (`can_enter_without_turning` with
+  `stop_any_length` in `setup_bay_search`); if none can, it takes a bay rather than wait at red for
+  good. A train turning back keeps its planned platform when free, else searches bays first
   (`bay_search` 2), then any track; stock choose search and `find_station_track` alike. In the last
   free track rule a free bay counts only at a station of bays only, or in `station_can_release` for a
   train that comes back from that station. Directed bays: no platform choice takes a way in that runs

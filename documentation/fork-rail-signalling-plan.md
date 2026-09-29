@@ -240,8 +240,17 @@ no save change). Only a train that turns back at the stop may use one.
   entry starts back the way the train came. From a planned stop in a bay it always does, so there
   the way on is judged from the last switch before it: a train that could go on from there without
   turning back over another platform of the station runs through (one that leaves the station from
-  there, e.g. a train out of a depot on a spur at that switch, turns back). Without a next stop any
-  platform will do.
+  there, e.g. a train out of a depot on a spur at that switch, turns back). The platform the way on
+  ends on does not count as another one: a next stop in the same station (a terminus scheduled as
+  arrival platform, bay to turn round, departure platform, like metro C at Háje, where the last
+  switch before the bay leads straight onto the departure platform) is turning back. Without a next
+  stop any platform will do.
+- A train that runs through and is planned into a bay gets no bay only while some other platform
+  of the station can be reached from where it chooses, taken or not and however short
+  (`can_enter_without_turning` in `setup_bay_search`, `stop_any_length`); if none can, the bays are
+  all it can use, so it takes one rather than wait at red for good. A train planned onto a through
+  platform can reach one, so nothing changes for it (a long train still stops sticking out of a
+  short through platform rather than take a long bay).
 - Every platform choice (stock choose search, `find_station_track` at `P` and `LT`,
   `is_planned_platform_suitable`) goes through `is_platform_suitable`, which with `bay_search` 1
   refuses bays for a train that runs through, even a planned (clicked) bay that is free. A station

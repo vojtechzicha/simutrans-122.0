@@ -628,9 +628,11 @@ private:
 	uint8 bay_search;
 
 	// fork: before a stop search at halt, for a stop at the end of route (searched from index start):
-	// a train that does not turn back there gets no bay (bay_search 1, unless halt has only bays);
-	// true when it turns back and halt has a bay, then bays go first after the planned platform
-	bool setup_bay_search(const route_t *route, uint32 start, halthandle_t halt, koord3d next_stop);
+	// a train that does not turn back there gets no bay (bay_search 1, unless halt has only bays, or
+	// the planned stop is a bay and no other platform of halt, taken or not and however short, can be
+	// reached from start; station_search as in can_enter_without_turning); true when it turns back
+	// and halt has a bay, then bays go first after the planned platform
+	bool setup_bay_search(const route_t *route, uint32 start, halthandle_t halt, koord3d next_stop, bool station_search);
 
 	// fork: the train turns back at the stop at the end of route to go on to next_stop; judged from the
 	// last switch before it when the stop itself only leads back (a bay would always)
@@ -638,6 +640,9 @@ private:
 
 	// fork: while set, the stop searches (stock choose and find_station_track) take reserved track too
 	bool turn_probe;
+
+	// fork: while set, a stop position need not be as long as the train (the probe in setup_bay_search)
+	bool stop_any_length;
 
 	// fork: some stop position of halt can be reached from start (heading dir) without running through
 	// the station the other way first, taken or not; station_search: find_station_track's search rules

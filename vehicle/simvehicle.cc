@@ -2704,10 +2704,19 @@ static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &
 	}
 }
 
-// fork: the path (after its first tile) runs over a platform of halt for waytype wt
+// fork: the path (after its first tile) runs over a platform of halt for waytype wt, not counting the
+// platform it ends on (a next stop in the same station, e.g. the departure platform of a terminus)
 static bool passes_platform_of(const route_t &path, halthandle_t halt, waytype_t wt)
 {
-	for(  uint32 i=1;  i<path.get_count();  i++  ) {
+	uint32 end = path.get_count();
+	while(  end>1  ) {
+		grund_t const* const gr = world()->lookup( path.at(end-1) );
+		if(  gr==NULL  ||  gr->get_halt()!=halt  ) {
+			break;
+		}
+		end--;
+	}
+	for(  uint32 i=1;  i<end;  i++  ) {
 		grund_t const* const gr = world()->lookup( path.at(i) );
 		if(  gr  &&  gr->get_halt()==halt  ) {
 			gebaeude_t const* const gb = gr->find<gebaeude_t>();
@@ -2746,6 +2755,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	platform_needs = 0;
 	bay_search = 0;
 	turn_probe = false;
+	stop_any_length = false;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
@@ -2808,6 +2818,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	platform_needs = 0;
 	bay_search = 0;
 	turn_probe = false;
+	stop_any_length = false;
 	hold_search = 0;
 	hold_avoid_from = hold_avoid_to = 0;
 	detour_any_track = false;
@@ -3165,8 +3176,8 @@ bool rail_vehicle_t::is_stop_position(const grund_t *gr, const grund_t *prev_gr,
 			grund_t *to;
 			if(  !gr->get_neighbour(to,get_waytype(),ribi)  ||  !(to->get_halt()==halt)  ||  (to->get_weg(get_waytype())->get_ribi_maske() & ribi_type(dir))!=0  ) {
 				// end of stop: Is it long enough?
-				// end of stop could be also signal!
-				uint16 tiles = cnv->get_tile_length();
+				// end of stop could be also signal! (fork: any length while probing, see setup_bay_search)
+				uint16 tiles = stop_any_length ? 1 : cnv->get_tile_length();
 				while(  tiles>1  ) {
 					if(  gr->get_weg(get_waytype())->get_ribi_maske() & ribi  ||  !gr->get_neighbour(to,get_waytype(),ribi_t::backward(ribi))  ||  !(to->get_halt()==halt)  ||  !is_platform_suitable(to)  ) {
 						return false;
@@ -3424,7 +3435,7 @@ skip_choose:
 	// fork: bay platforms only for a train that turns back here
 	bool prefer_bays = false;
 	if(  cnv->is_waiting()  ) {
-		prefer_bays = setup_bay_search( cnv->get_route(), start_block, target_halt, next_stop );
+		prefer_bays = setup_bay_search( cnv->get_route(), start_block, target_halt, next_stop, false );
 	}
 	else if(  is_bay_tile( target, get_waytype() )  ) {
 		// planned into a bay: whether we turn back here needs a route search, that needs a step
@@ -3909,7 +3920,7 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	}
 	platform_needs = halt.is_bound() ? needs : 0;
 	// fork: bay platforms only for a train that turns back there, then first
-	const bool prefer_bays = setup_bay_search( route, start, halt, next_stop );
+	const bool prefer_bays = setup_bay_search( route, start, halt, next_stop, true );
 	if(  planned_ok  &&  halt.is_bound()  ) {
 		// every tile the train stands on must suit (platform types)
 		uint16 tiles = cnv->get_tile_length();
@@ -5280,7 +5291,7 @@ bool rail_vehicle_t::is_platform_suitable(const grund_t *gr) const
 }
 
 
-bool rail_vehicle_t::setup_bay_search(const route_t *route, uint32 start, halthandle_t halt, koord3d next_stop)
+bool rail_vehicle_t::setup_bay_search(const route_t *route, uint32 start, halthandle_t halt, koord3d next_stop, bool station_search)
 {
 	bay_search = 0;
 	bool has_through;
@@ -5294,6 +5305,15 @@ bool rail_vehicle_t::setup_bay_search(const route_t *route, uint32 start, haltha
 	}
 	// no bay, unless there is nothing else (a terminus)
 	bay_search = has_through ? 1 : 0;
+	if(  bay_search==1  &&  start+1<route->get_count()  &&  bay_search_tiles.is_contained( route->back() )  ) {
+		// planned into a bay: nor when no other platform can be reached from here at all, taken or not
+		// and however short: the bays are all we can use, rather than wait for good
+		stop_any_length = true;
+		if(  !can_enter_without_turning( route->at(start), ribi_type( route->at(start), route->at(start+1) ), halt, station_search )  ) {
+			bay_search = 0;
+		}
+		stop_any_length = false;
+	}
 	return false;
 }
 
