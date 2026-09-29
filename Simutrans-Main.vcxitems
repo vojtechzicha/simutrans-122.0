@@ -82,6 +82,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\ribi.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\route.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_export.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_rename.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\scenario.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\schedule.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\settings.cc" />
@@ -408,6 +409,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\ribi.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\route.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_export.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_rename.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\scenario.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule_entry.h" />

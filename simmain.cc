@@ -66,6 +66,7 @@
 #include "dataobj/loadsave.h"
 #include "dataobj/environment.h"
 #include "dataobj/savegame_export.h"
+#include "dataobj/savegame_rename.h"
 #include "dataobj/tabfile.h"
 #include "dataobj/settings.h"
 #include "dataobj/translator.h"
@@ -462,6 +463,8 @@ int simu_main(int argc, char** argv)
 			" -export FILE        dumps the loaded game as JSON to FILE and quits (needs -load)\n"
 			" -saveas FILE        writes the loaded game to FILE and quits (needs -load)\n"
 			" -saveversion VER    save version for -saveas, e.g. 0.122.0 for the stock game\n"
+			" -rename FILE        renames the objects listed in FILE before -export/-saveas and\n"
+			"                     quits, report in FILE.result.tsv (see dataobj/savegame_rename.h)\n"
 			" -freeplay           play with endless money\n"
 			" -fullscreen         starts simutrans in fullscreen mode\n"
 			" -fps COUNT          framerate (from 5 to 100)\n"
@@ -514,7 +517,8 @@ int simu_main(int argc, char** argv)
 	// no user is there to answer dialogues
 	const char *export_filename = gimme_arg(argc, argv, "-export", 1);
 	const char *saveas_filename = gimme_arg(argc, argv, "-saveas", 1);
-	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL;
+	const char *rename_filename = gimme_arg(argc, argv, "-rename", 1);
+	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL;
 
 #ifdef __BEOS__
 	if (1) // since BeOS only supports relative paths ...
@@ -1404,6 +1408,12 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 			dbg->error( "simmain()", "-export and -saveas need a loadable game, use -load NAME" );
 		}
 		else {
+			if(  rename_filename  ) {
+				// without -saveas this is a dry run: the report tells what would be renamed
+				std::string report( rename_filename );
+				report += ".result.tsv";
+				savegame_rename_t::apply( welt, rename_filename, report.c_str() );
+			}
 			if(  export_filename  ) {
 				const char *save_name = gimme_arg(argc, argv, "-load", 1);
 				savegame_export_t::write_json( welt, save_name ? save_name : loadgame.c_str(), export_filename );

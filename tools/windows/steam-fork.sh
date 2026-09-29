@@ -18,6 +18,13 @@
 #                                                  the stock game; default OUT is NAME-122.0.sve
 #   tools/windows/steam-fork.sh export NAME OUT.json
 #                                                  JSON dump of a save (tools/saveviewer)
+#   tools/windows/steam-fork.sh rename NAME|latest LIST.tsv [OUT.sve]
+#                                                  copy the save to save/backup/, rename the objects
+#                                                  in LIST.tsv (dataobj/savegame_rename.h) and write
+#                                                  the result as a new save, default
+#                                                  NAME-renamed-DATE.sve; report in LIST.tsv.result.tsv
+#   tools/windows/steam-fork.sh rename-dry NAME|latest LIST.tsv
+#                                                  the same without writing anything but the report
 #   tools/windows/steam-fork.sh signals FILE.dat [SIZE]
 #                                                  build the fork's makeobj and compile FILE.dat (the
 #                                                  platform signal and station boundary, see
@@ -187,7 +194,10 @@ run_batch() {
 	local exe="$BUILT"
 	[ -f "$exe" ] || exe="$STEAM_EXE"
 	[ -f "$exe" ] || die "no fork exe to run"
-	(cd "$STEAM_DIR" && PATH="/c/msys64/mingw64/bin:$PATH" "$exe" -use_workdir -objects "$PAKSET" -nosound -nomidi "$@")
+	# SIM_SINGLEUSER=1 (tests): the user dir is STEAM_DIR itself, set SIM_USER_DIR to the same
+	local single=()
+	[ "${SIM_SINGLEUSER:-0}" = 1 ] && single=(-singleuser)
+	(cd "$STEAM_DIR" && PATH="/c/msys64/mingw64/bin:$PATH" "$exe" -use_workdir "${single[@]}" -objects "$PAKSET" -nosound -nomidi "$@")
 }
 
 do_downgrade() {
@@ -206,6 +216,58 @@ do_export() {
 	[ -n "$name" ] && [ -n "$out" ] || die "usage: $0 export NAME OUT.json"
 	run_batch -load "${name%.sve}" -export "$out" | grep -i 'error\|WRONGSAVE' || true
 	[ -f "$out" ] || die "no output file written"
+	echo "done: $out ($(du -h "$out" | cut -f1))"
+}
+
+# the save NAME, or the newest save of the user save dir for "latest"
+save_name() {
+	local name="$1"
+	if [ "$name" = latest ]; then
+		name="$(ls -t "$SIM_USER_DIR/save/"*.sve 2>/dev/null | head -1)"
+		[ -n "$name" ] || die "no saves in $SIM_USER_DIR/save"
+		name="$(basename "$name")"
+	fi
+	name="${name%.sve}"
+	[ -f "$SIM_USER_DIR/save/$name.sve" ] || die "no save $SIM_USER_DIR/save/$name.sve"
+	echo "$name"
+}
+
+rename_summary() {
+	local report="$1"
+	[ -f "$report" ] || die "no report $report written"
+	echo "report: $report"
+	tail -n +2 "$report" | cut -f1 | sort | uniq -c
+	grep -v '^ok' "$report" | tail -n +2 | head -20 || true
+}
+
+do_rename() {
+	local dry="$1"; shift
+	local name="${1:-}" list="${2:-}"
+	[ -n "$name" ] && [ -f "$list" ] || die "usage: $0 rename NAME|latest LIST.tsv [OUT.sve]"
+	name="$(save_name "$name")"
+	local src="$SIM_USER_DIR/save/$name.sve"
+	if tasklist 2>/dev/null | grep -qi '^simutrans'; then
+		echo "warning: Simutrans is running; the copy has the state of $src as saved at $(date -r "$src" '+%Y-%m-%d %H:%M')"
+	fi
+	echo "save: $src ($(date -r "$src" '+%Y-%m-%d %H:%M:%S'))"
+	rm -f "$list.result.tsv"
+	if [ "$dry" = 1 ]; then
+		run_batch -load "$name" -rename "$list" | grep -i 'error\|WRONGSAVE' || true
+		rename_summary "$list.result.tsv"
+		return
+	fi
+	local out="${3:-$SIM_USER_DIR/save/$name-renamed-$(date '+%Y%m%d-%H%M%S').sve}"
+	[ ! -e "$out" ] || die "$out exists, not overwriting it"
+	# the backup keeps the file time of the save, so one save is backed up once
+	mkdir -p "$SIM_USER_DIR/save/backup"
+	local bak; bak="$SIM_USER_DIR/save/backup/$name-$(date -r "$src" '+%Y%m%d-%H%M%S').sve"
+	[ -f "$bak" ] || cp -p "$src" "$bak"
+	cmp -s "$src" "$bak" || die "backup $bak differs from $src"
+	echo "backup: $bak"
+	run_batch -load "$name" -rename "$list" -saveas "$out" | grep -i 'saving game\|error\|WRONGSAVE' || true
+	[ -f "$out" ] || die "no output file written"
+	cmp -s "$src" "$bak" || die "the save changed while renaming, backup kept at $bak"
+	rename_summary "$list.result.tsv"
 	echo "done: $out ($(du -h "$out" | cut -f1))"
 }
 
@@ -232,6 +294,8 @@ case "${1:-}" in
 	status)    do_status ;;
 	downgrade) shift; do_downgrade "$@" ;;
 	export)    shift; do_export "$@" ;;
+	rename)    shift; do_rename 0 "$@" ;;
+	rename-dry) shift; do_rename 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
-	*)         sed -n '2,25p' "$0"; exit 1 ;;
+	*)         sed -n '2,32p' "$0"; exit 1 ;;
 esac

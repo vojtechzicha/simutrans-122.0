@@ -68,6 +68,15 @@ cd simutrans && ./simutrans -use_workdir -objects pak
 is a standalone page that opens such a file (lines, stops, convoys, map, settings). Keep the JSON
 keys stable: the exporter and the viewer are the two halves of one format.
 
+Renaming in a save: `simutrans -load NAME -rename LIST.tsv -saveas OUT.sve` renames stops, lines,
+convoys, players, cities, factories and markers through the rename tool (`dataobj/savegame_rename.*`,
+format in its header: `KIND<TAB>ID<TAB>OLD NAME or *<TAB>NEW NAME`, ids and positions as in the JSON
+export) and writes `LIST.tsv.result.tsv` with a status per row; without `-saveas` it is a dry run.
+A row whose old name does not match, or that would give a stop the name of another stop (loading
+renames duplicates), is skipped. On Windows `steam-fork.sh rename NAME|latest LIST.tsv [OUT.sve]`
+copies the save to `save/backup/NAME-<file time>.sve` first and writes a new
+`NAME-renamed-<date>.sve`, never over an existing file; `rename-dry` only reports.
+
 ## Windows is the real target
 
 - The owner plays on Windows, through Steam, and Steam runs this fork (see the Windows section
