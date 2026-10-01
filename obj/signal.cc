@@ -91,7 +91,8 @@ void signal_t::calc_image()
 			uint16 offset=0;
 			ribi_t::ribi dir = sch->get_ribi_unmasked() & (~calc_mask());
 			if(sch->is_electrified()  &&  (desc->get_count()/8)>1) {
-				offset = (desc->is_pre_signal()  ||  desc->is_priority_signal()) ? 12 : 8;
+				// fork: an autoblock with yellow images has sets of twelve like a pre-signal
+				offset = (desc->is_pre_signal()  ||  desc->is_priority_signal()  ||  (desc->is_autoblock()  &&  desc->has_yellow_aspect())) ? 12 : 8;
 			}
 
 			// vertical offset of the signal positions
@@ -206,13 +207,15 @@ void signal_t::calc_image()
 /* fork: automatic block signals (autoblok). Display only: nothing reads a signal's state for driving,
  * trains stop because their reservation fails. A block runs from the signal to the next signal or
  * station boundary that applies to a train going on; at a switch every branch counts (red if any is
- * taken). Updated on events only: a train's last vehicle leaving a block end or an autoblock
+ * taken). A free block shows green when it ends at another autoblock, yellow when it has a switch or
+ * ends at any other signal, a station boundary or the end of the track (those are red most of the
+ * time). Updated on events only: a train's last vehicle leaving a block end or an autoblock
  * (rail_vehicle_t::leave_tile), a reservation freed (block_reserver) or taken over a switch that
  * joins a block from the side, placing, and loading.
  */
 
-// the signal or station boundary on gr ends the block for a train leaving gr by one of exits
-static bool ends_block(grund_t *gr, const weg_t *way, ribi_t::ribi exits)
+// the signal or station boundary on gr that ends the block for a train leaving gr by one of exits
+static const roadsign_t *get_block_end(grund_t *gr, const weg_t *way, ribi_t::ribi exits)
 {
 	const roadsign_t *rs = NULL;
 	if(  way->has_signal()  ) {
@@ -224,27 +227,30 @@ static bool ends_block(grund_t *gr, const weg_t *way, ribi_t::ribi exits)
 	if(  rs  ) {
 		for(  uint8 i=0;  i<4;  i++  ) {
 			if(  (exits & ribi_t::nsew[i])  &&  rs->applies_to( ribi_t::nsew[i] )  ) {
-				return true;
+				return rs;
 			}
 		}
 	}
-	return false;
+	return NULL;
 }
 
 
-// false if a tile of the block entered from start in direction dir is reserved by another train than owner
-static bool is_block_free(grund_t *start, ribi_t::ribi dir, convoihandle_t owner, waytype_t wt)
+// the aspect for the block entered from start in direction dir: red if a tile is reserved by another
+// train than owner (unless owner holds its way through it), else yellow or green by the block's layout
+static roadsign_t::signalstate get_block_aspect(grund_t *start, ribi_t::ribi dir, convoihandle_t owner, waytype_t wt)
 {
+	bool ignore_others = false;
 	if(  owner.is_bound()  ) {
 		grund_t *to;
 		if(  start->get_neighbour( to, wt, dir )  ) {
 			schiene_t const* const sch = (schiene_t const*)to->get_weg( wt );
 			if(  sch  &&  sch->get_reserved_convoi()==owner  ) {
-				// the train at the signal holds its way through the block (green, as stock sets it)
-				return true;
+				// the train at the signal holds its way through the block (never red, as stock sets it)
+				ignore_others = true;
 			}
 		}
 	}
+	bool caution = false;
 	grund_t *from[AUTOBLOCK_MAX_BRANCHES];
 	ribi_t::ribi dirs[AUTOBLOCK_MAX_BRANCHES];
 	int n = 0;
@@ -256,25 +262,38 @@ static bool is_block_free(grund_t *start, ribi_t::ribi dir, convoihandle_t owner
 		const ribi_t::ribi d = dirs[n];
 		grund_t *to;
 		if(  !from[n]->get_neighbour( to, wt, d )  ) {
+			caution = true;
 			continue;
 		}
 		schiene_t const* const sch = (schiene_t const*)to->get_weg( wt );
 		if(  sch==NULL  ) {
+			caution = true;
 			continue;
 		}
 		if(  sch->get_ribi_maske() & d  ) {
 			// a one-way signal we would pass against its direction: no train of this block goes that way
 			continue;
 		}
-		if(  sch->is_reserved()  &&  sch->get_reserved_convoi()!=owner  ) {
-			return false;
+		if(  !ignore_others  &&  sch->is_reserved()  &&  sch->get_reserved_convoi()!=owner  ) {
+			return roadsign_t::rot;
 		}
 		if(  ++tiles > AUTOBLOCK_MAX_TILES  ) {
 			break;
 		}
 		const ribi_t::ribi exits = sch->get_ribi() & ~ribi_t::backward( d );
-		if(  ends_block( to, sch, exits )  ) {
+		if(  const roadsign_t *end = get_block_end( to, sch, exits )  ) {
+			if(  !end->get_desc()->is_autoblock()  ) {
+				caution = true;
+			}
 			continue;
+		}
+		if(  exits==ribi_t::none  ) {
+			// buffer stop
+			caution = true;
+		}
+		else if(  !ribi_t::is_single( exits )  ) {
+			// a switch
+			caution = true;
 		}
 		for(  uint8 i=0;  i<4  &&  n<AUTOBLOCK_MAX_BRANCHES;  i++  ) {
 			if(  exits & ribi_t::nsew[i]  ) {
@@ -283,7 +302,7 @@ static bool is_block_free(grund_t *start, ribi_t::ribi dir, convoihandle_t owner
 			}
 		}
 	}
-	return true;
+	return caution ? roadsign_t::naechste_rot : roadsign_t::gruen;
 }
 
 
@@ -298,13 +317,19 @@ void signal_t::refresh_autoblock()
 	// the train that reserved up to or through this signal: its own reservation does not count
 	const convoihandle_t owner = sch->get_reserved_convoi();
 	const ribi_t::ribi ribi = sch->get_ribi_unmasked();
-	bool free = true;
-	for(  uint8 i=0;  i<4  &&  free;  i++  ) {
+	signalstate aspect = gruen;
+	for(  uint8 i=0;  i<4  &&  aspect!=rot;  i++  ) {
 		if(  (ribi & ribi_t::nsew[i])  &&  applies_to( ribi_t::nsew[i] )  ) {
-			free = is_block_free( gr, ribi_t::nsew[i], owner, wt );
+			const signalstate block = get_block_aspect( gr, ribi_t::nsew[i], owner, wt );
+			if(  block==rot  ||  block==naechste_rot  ) {
+				aspect = block;
+			}
 		}
 	}
-	const signalstate aspect = free ? gruen : rot;
+	if(  aspect==naechste_rot  &&  !desc->has_yellow_aspect()  ) {
+		// no yellow images: green as before
+		aspect = gruen;
+	}
 	if(  state!=aspect  ) {
 		set_state( aspect );
 	}
@@ -323,20 +348,24 @@ void signal_t::refresh_autoblocks_behind(koord3d pos, ribi_t::ribi exit_dir, way
 	}
 	grund_t *from[AUTOBLOCK_MAX_BRANCHES];
 	ribi_t::ribi dirs[AUTOBLOCK_MAX_BRANCHES];
+	int lengths[AUTOBLOCK_MAX_BRANCHES];
 	int n = 0;
 	const ribi_t::ribi back = way->get_ribi_unmasked() & ~exit_dir;
 	for(  uint8 i=0;  i<4;  i++  ) {
 		if(  back & ribi_t::nsew[i]  ) {
 			from[n] = start;
+			lengths[n] = 0;
 			dirs[n++] = ribi_t::nsew[i];
 		}
 	}
+	// each branch up to the longest block, and all of them together a few times that
 	int tiles = 0;
-	while(  n>0  &&  tiles<AUTOBLOCK_MAX_TILES  ) {
+	while(  n>0  &&  tiles<4*AUTOBLOCK_MAX_TILES  ) {
 		n--;
 		const ribi_t::ribi d = dirs[n];
+		const int length = lengths[n]+1;
 		grund_t *to;
-		if(  !from[n]->get_neighbour( to, wt, d )  ) {
+		if(  length>AUTOBLOCK_MAX_TILES  ||  !from[n]->get_neighbour( to, wt, d )  ) {
 			continue;
 		}
 		weg_t const* const w = to->get_weg( wt );
@@ -346,6 +375,10 @@ void signal_t::refresh_autoblocks_behind(koord3d pos, ribi_t::ribi exit_dir, way
 		tiles++;
 		// a train here going towards pos leaves this tile in direction back
 		const ribi_t::ribi towards = ribi_t::backward( d );
+		if(  w->get_ribi_maske() & towards  ) {
+			// a one-way signal no train passes towards pos
+			continue;
+		}
 		if(  w->has_signal()  ) {
 			signal_t *sig = to->find<signal_t>();
 			if(  sig  &&  sig->applies_to( towards )  ) {
@@ -365,6 +398,7 @@ void signal_t::refresh_autoblocks_behind(koord3d pos, ribi_t::ribi exit_dir, way
 		for(  uint8 i=0;  i<4  &&  n<AUTOBLOCK_MAX_BRANCHES;  i++  ) {
 			if(  next & ribi_t::nsew[i]  ) {
 				from[n] = to;
+				lengths[n] = length;
 				dirs[n++] = ribi_t::nsew[i];
 			}
 		}

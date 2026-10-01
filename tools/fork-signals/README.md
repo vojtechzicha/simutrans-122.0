@@ -37,7 +37,8 @@ Name=Autoblock
 waytype=track
 is_signal=1
 is_autoblock=1
-Image[0..7]=...     like a plain signal: red N,S,W,E then green N,S,W,E (16 with a catenary set)
+Image[0..7]=...     like a plain signal: red N,S,W,E then green N,S,W,E (16 with a catenary set),
+                    or 0..11 with yellow N,S,W,E after them (24 with a catenary set)
 ```
 
 - **Block post** (hradlo): a block signal on the open single-track line between two stations, placed
@@ -45,9 +46,11 @@ Image[0..7]=...     like a plain signal: red N,S,W,E then green N,S,W,E (16 with
   one-way, like the platform signal. It lets a second train follow the first one in the same
   direction (see the signalling plan).
 - **Autoblock** (automaticky blok): a plain signal in every respect (one-way like a stock signal,
-  same running and reservations) that shows green while its block ahead, up to the next signal or
-  station boundary, is free, and red while another train holds it. A plain signal shows red unless
-  a train has reserved past it. No yellow. Autoblocks belong on double track or long plain lines, not
+  same running and reservations) that shows red while another train holds its block ahead, up to
+  the next signal or station boundary. A free block shows green when it ends at another autoblock,
+  yellow when it has a switch or ends at any other signal, a station boundary or a buffer stop
+  (those are red most of the time); without yellow images it shows green. A plain signal shows red
+  unless a train has reserved past it. Autoblocks belong on double track or long plain lines, not
   between a platform signal and the next station boundary (any signal there ends section mode).
 
 The station boundary's images are laid out like a signal's: `Image[E]` shows the board as the

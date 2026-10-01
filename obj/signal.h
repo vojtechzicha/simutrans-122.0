@@ -38,9 +38,11 @@ public:
 	void calc_image() OVERRIDE;
 
 	/**
-	 * fork: aspect of an automatic block signal (autoblok), display only: green unless the block ahead,
+	 * fork: aspect of an automatic block signal (autoblok), display only: red while the block ahead,
 	 * up to the next signal or station boundary, is reserved by a train other than the one that
-	 * reserved this signal's tile. Trains still stop only when their reservation fails.
+	 * reserved this signal's tile; else green if the block ends at another autoblock, yellow if it has
+	 * a switch or ends at any other signal (green without yellow images). Trains still stop only when
+	 * their reservation fails.
 	 */
 	void refresh_autoblock();
 

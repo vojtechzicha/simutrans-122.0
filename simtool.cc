@@ -428,6 +428,23 @@ const char *tool_query_t::work( player_t *, koord3d pos )
 }
 
 
+// fork: a signal or station boundary built, turned or removed at pos: the autoblocks whose block ends
+// there show green or yellow by what stands there now, and an autoblock at pos looks at its block again
+static void refresh_autoblocks_ending_at(koord3d pos, waytype_t wt)
+{
+	if(  !signal_t::any_autoblock  ||  (wt!=track_wt  &&  wt!=monorail_wt  &&  wt!=maglev_wt  &&  wt!=narrowgauge_wt)  ) {
+		return;
+	}
+	signal_t::refresh_autoblocks_behind( pos, ribi_t::none, wt );
+	if(  grund_t *gr = world()->lookup( pos )  ) {
+		signal_t *sig = gr->find<signal_t>();
+		if(  sig  &&  sig->get_desc()->is_autoblock()  ) {
+			sig->refresh_autoblock();
+		}
+	}
+}
+
+
 /* delete things from a tile
  * citycars and pedestrian first and then go up to queue to more important objects
  */
@@ -527,6 +544,7 @@ DBG_MESSAGE("tool_remover_intern()","at (%s)", pos.get_str());
 	roadsign_t* rs = gr->find<signal_t>();
 	if (rs == NULL) rs = gr->find<roadsign_t>();
 	if ( (type == obj_t::signal  ||  type == obj_t::roadsign  ||  type == obj_t::undefined)  &&  rs!=NULL) {
+		const waytype_t rs_wt = rs->get_desc()->get_wtyp()!=tram_wt ? rs->get_desc()->get_wtyp() : track_wt;
 		msg = rs->is_deletable(player);
 		if(msg) {
 			return false;
@@ -540,6 +558,7 @@ DBG_MESSAGE("tool_remover()",  "removing roadsign at (%s)", pos.get_str());
 		delete rs;
 		assert( weg );
 		weg->count_sign();
+		refresh_autoblocks_ending_at( pos, rs_wt );
 		return true;
 	}
 
@@ -4995,7 +5014,11 @@ const char *tool_build_roadsign_t::do_work( player_t *player, const koord3d &sta
 	// single click ->place signal
 	if( end == koord3d::invalid  ||  start == end ) {
 		grund_t *gr = welt->lookup(start);
-		return place_sign_intern( player, gr );
+		const char *error = place_sign_intern( player, gr );
+		if(  error==NULL  &&  gr  ) {
+			refresh_autoblocks_ending_at( start, desc->get_wtyp()!=tram_wt ? desc->get_wtyp() : track_wt );
+		}
+		return error;
 	}
 	// mark tiles to calculate positions of signals
 	mark_tiles(player, start, end);
@@ -5037,6 +5060,7 @@ const char *tool_build_roadsign_t::do_work( player_t *player, const koord3d &sta
 			};
 		}
 		weg->count_sign();
+		refresh_autoblocks_ending_at( gr->get_pos(), weg->get_waytype() );
 		gr->calc_image();
 	}
 	cleanup();

@@ -48,7 +48,7 @@ public:
 		PLATFORM_SIGNAL       = 1U << 9,  // fork: exit signal of a station track (with SIGN_SIGNAL)
 		STATION_BOUNDARY      = 1U << 10, // fork: sign where a single-track line enters a station
 		BLOCK_POST            = 1U << 11, // fork: block signal on a single-track line (with SIGN_SIGNAL)
-		AUTOBLOCK             = 1U << 12  // fork: automatic block signal, green unless its block is taken (with SIGN_SIGNAL)
+		AUTOBLOCK             = 1U << 12  // fork: automatic block signal, red, yellow or green by its block (with SIGN_SIGNAL)
 	};
 
 	image_id get_image_id(ribi_t::dir dir) const
@@ -104,7 +104,7 @@ public:
 	// fork: one-way block signal (hradlo) on a single-track line; it never makes the track one-way
 	bool is_block_post() const { return (flags & BLOCK_POST) != 0; }
 
-	// fork: automatic block signal (autoblok): a plain signal that shows green while its block is free
+	// fork: automatic block signal (autoblok): a plain signal that shows its block's aspect, see signal_t::refresh_autoblock
 	bool is_autoblock() const { return (flags & AUTOBLOCK) != 0; }
 
 	// fork: one-way signal that leaves the track two-way (platform signal or block post)

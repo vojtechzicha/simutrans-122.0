@@ -6183,7 +6183,13 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 
 		uint16 next_signal, next_crossing;
 		if(  block_reserver( cnv->get_route(), next_block+1, next_signal, next_crossing, 0, true, false )  ) {
-			sig->set_state(  roadsign_t::gruen );
+			if(  sig_desc->is_autoblock()  ) {
+				// fork: green or yellow by the block ahead
+				sig->refresh_autoblock();
+			}
+			else {
+				sig->set_state(  roadsign_t::gruen );
+			}
 			cnv->set_next_stop_index( min( next_crossing, next_signal ) );
 			return true;
 		}
@@ -6504,7 +6510,12 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 	// ok, switch everything green ...
 	FOR(slist_tpl<grund_t*>, const g, signs) {
 		if (signal_t* const signal = g->find<signal_t>()) {
-			signal->set_state(roadsign_t::gruen);
+			if(  signal->get_desc()->is_autoblock()  ) {
+				signal->refresh_autoblock();
+			}
+			else {
+				signal->set_state(roadsign_t::gruen);
+			}
 		}
 	}
 	// fork: a train joining over a switch takes the block of the autoblocks on the other branches

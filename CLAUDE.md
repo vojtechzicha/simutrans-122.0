@@ -604,24 +604,31 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
 ## Autoblock signals (fork feature, no save change)
 
 Signal flag `AUTOBLOCK` (makeobj `is_autoblock=1` with `is_signal=1`, 8 or 16 images like a plain
-signal); the owner's `VZ-Signals-D1-{New,Old,Dwarf}-Block` become autoblocks (new plain
+signal, or 12/24 with yellow: red, green, yellow N,S,W,E, then the same for catenary); the owner's `VZ-Signals-D1-{New,Old,Dwarf}-Block` become autoblocks (new plain
 `-Main` objects take their old art). Display only: it drives, reserves and makes the track one-way
 exactly like a stock signal (`is_simple_signal` stays true), since trains stop when `block_reserver`
 fails, never on a signal's state; the tool places it one-way only (like `P`). Aspect
-(`signal_t::refresh_autoblock`, obj/signal.cc): green when the train holding the signal's own tile
-has reserved on into the block (as stock sets it), else green unless a tile of its block, from the
-signal in the direction it applies to up to and including the next signal or station boundary that
-applies (every switch branch except legs against a one-way signal, at most 256 tiles), is reserved
-by another train (so a train standing in a siding of the block keeps it red until one passes). Event-driven, nothing per step: the last vehicle leaving an autoblock refreshes it
+(`signal_t::refresh_autoblock`, obj/signal.cc): red while a tile of its block, from the signal in
+the direction it applies to up to and including the next signal or station boundary that applies
+(every switch branch except legs against a one-way signal, at most 256 tiles), is reserved by
+another train than the one holding the signal's own tile (so a train standing in a siding of the
+block keeps it red until one passes); never red once that train has reserved on into the block.
+Otherwise (`get_block_aspect`) green when the block ends at another autoblock, yellow when it has a
+switch (a tile with two ways on, a depot spur too) or ends at any other signal, an `LT` or a buffer
+stop; an object without yellow images shows green instead. The train passing it sees the same
+(`is_signal_clear` and the `signs` loop of `block_reserver` call `refresh_autoblock` instead of
+setting green). Event-driven, nothing per step: the last vehicle leaving an autoblock refreshes it
 and leaving any signal or `LT` walks back to the autoblocks whose block ends there
 (`refresh_autoblocks_behind`, `rail_vehicle_t::leave_tile`); `block_reserver` refreshes the autoblocks
 whose reservation it frees (instead of setting them red) and, after reserving over a switch, the
 autoblocks on its other branches; a train entering a depot or deleted (`refresh_autoblocks_around`
-from its front and rear tiles); placing or turning one; after loading, `refresh_loaded_autoblocks`
+from its front and rear tiles); placing, turning or removing any signal or sign (the autoblocks
+behind it, `refresh_autoblocks_ending_at` in simtool.cc; the walk back never passes a one-way signal
+against its direction and follows each branch up to 256 tiles); after loading, `refresh_loaded_autoblocks`
 once the convoys reserved their routes again (`finish_rd` lists them). `signal_t::any_autoblock` keeps
 all of it off until one exists. Stale until the next train: coupling, a train leaving a depot inside
-a block, reservations made by `reserve_route`. No yellow (the next plain signal is red most of the
-time). A stock exe reads them as plain signals. Tested headless (harness with an `abcheck` that
+a block, reservations made by `reserve_route`, building or removing a switch. Yellow is by layout
+only (the next plain signal is red most of the time), not by the next signal's state. A stock exe reads them as plain signals. Tested headless (harness with an `abcheck` that
 recomputes every aspect each step): chains, following trains, a branch joining, sidings, depot,
 deletion, save/load, the real pak; driving identical to plain signals, about 2% slower with 110
 autoblocks on a line, the rail regression set byte-identical.
