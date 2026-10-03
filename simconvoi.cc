@@ -79,6 +79,16 @@ static inline uint32 nonzero_ticks(uint32 ticks)
 }
 
 // fork, timetable: calendar minutes from the given slot until now, 0 if early (no max(): it takes ints)
+// fork, timetable: ticks to whole calendar minutes
+static sint32 standing_minutes(uint32 ticks)
+{
+	karte_t *const welt = world();
+	if(  !welt->has_calendar()  ||  welt->ticks_per_world_month == 0  ) {
+		return 0;
+	}
+	return (sint32)( (sint64)ticks * welt->get_settings().get_minutes_per_month() / (sint64)welt->ticks_per_world_month );
+}
+
 static sint32 minutes_after_slot(sint64 slot)
 {
 	const sint64 late = world()->get_calendar_minutes() - slot;
@@ -188,6 +198,8 @@ void convoi_t::init(player_t *player)
 	running_late = false;
 	late_slot = -1;
 	departure_delay = NO_DEPARTURE_DELAY;
+	departure_pending = false;
+	departure_standing = 0;
 	uncouple_since = 0;
 	uncouple_warned = false;
 	wait_lock = 0;
@@ -1448,6 +1460,18 @@ int convoi_t::get_vehicle_at_length(uint16 length)
 // moves all vehicles of a convoi
 sync_result convoi_t::sync_step(uint32 delta_t)
 {
+	// fork, timetable: standing after it got ready to leave adds to the delay
+	if(  departure_pending  ) {
+		if(  akt_speed == 0  ) {
+			departure_standing += delta_t;
+		}
+		else if(  anz_vehikel > 0  &&  fahr[0]->get_waytype() != track_wt  &&  fahr[0]->get_waytype() != tram_wt
+			&&  fahr[0]->get_waytype() != monorail_wt  &&  fahr[0]->get_waytype() != maglev_wt  &&  fahr[0]->get_waytype() != narrowgauge_wt  ) {
+			// no signals to pass: it left once it moves
+			finish_departure_delay();
+		}
+	}
+
 	// still have to wait before next action?
 	wait_lock -= delta_t;
 	if(wait_lock > 0) {
@@ -2130,6 +2154,7 @@ void convoi_t::new_month()
 
 void convoi_t::betrete_depot(depot_t *dep)
 {
+	finish_departure_delay();
 	// first remove reservation, if train is still on track
 	unreserve_route();
 	release_claim( true );
@@ -2265,6 +2290,8 @@ void convoi_t::ziel_erreicht()
 {
 	const vehicle_t* v = fahr[0];
 	alte_richtung = v->get_direction();
+	// fork, timetable: no exit signal on the way, it is here now
+	finish_departure_delay();
 
 	// check, what is at destination!
 	const grund_t *gr = welt->lookup(v->get_pos());
@@ -2275,6 +2302,8 @@ void convoi_t::ziel_erreicht()
 		// rail_vehicle_t::is_held_for_passing_train), then go on to the next stop of the schedule
 		hold_divert = false;
 		clear_passing_hold();
+		// fork, timetable: waiting here for a passing train makes us later
+		start_departure_delay_count();
 		akt_speed = 0;
 		state = ROUTING_1;
 		wait_lock = 0;
@@ -2524,6 +2553,7 @@ bool convoi_t::set_schedule(schedule_t * f)
 		// fork: the delay of the last timetabled departure belongs to the old schedule
 		if(  !same_schedule_entries( schedule, f )  ) {
 			departure_delay = NO_DEPARTURE_DELAY;
+			departure_pending = false;
 		}
 		// now check, we we have been bond to a line we are about to lose:
 		bool changed = false;
@@ -3407,8 +3437,15 @@ void convoi_t::rdwr(loadsave_t *file)
 	}
 
 	if(  file->is_version_atleast(122, 11)  ) {
-		// fork: how late it left the last stop with a timetable
-		file->rdwr_long( departure_delay );
+		// fork: how late it left the last stop with a timetable (with the time it stood since)
+		if(  file->is_saving()  ) {
+			sint32 d = get_departure_delay();
+			file->rdwr_long( d );
+		}
+		else {
+			file->rdwr_long( departure_delay );
+			departure_pending = false;
+		}
 	}
 	else if(  file->is_loading()  ) {
 		departure_delay = NO_DEPARTURE_DELAY;
@@ -4091,8 +4128,12 @@ station_tile_search_ready: ;
 					joined->departure_delay = departure_delay;
 				}
 				joined->schedule->advance();
+				// it stands as long as we do
+				joined->start_departure_delay_count();
 			}
 		}
+		// fork, timetable: from now on standing here makes us later
+		start_departure_delay_count();
 
 		// fork: when we really start from here, who boarded a train that leaves later may change to us
 		// (a joined train that stays here takes no part, so after uncouple_here)
@@ -4541,6 +4582,42 @@ bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
 		return true;
 	}
 	return false;
+}
+
+
+sint32 convoi_t::get_departure_delay() const
+{
+	if(  !departure_pending  ||  departure_delay == NO_DEPARTURE_DELAY  ) {
+		return departure_delay;
+	}
+	// a joined train stands as long as the train it rides with
+	const uint32 standing = state == COUPLED  &&  coupled_convoi.is_bound() ? coupled_convoi->departure_standing : departure_standing;
+	const sint64 d = (sint64)departure_delay + standing_minutes( standing );
+	return d > 0x7FFFFFFF ? 0x7FFFFFFF : (sint32)d;
+}
+
+
+void convoi_t::start_departure_delay_count()
+{
+	departure_pending = departure_delay != NO_DEPARTURE_DELAY;
+	departure_standing = 0;
+}
+
+
+void convoi_t::finish_departure_delay()
+{
+	if(  !departure_pending  ) {
+		return;
+	}
+	departure_delay = get_departure_delay();
+	if(  is_coupled_primary()  &&  coupled_convoi->departure_pending  ) {
+		convoi_t *const joined = coupled_convoi.get_rep();
+		joined->departure_delay = joined->get_departure_delay();
+		joined->departure_pending = false;
+		joined->departure_standing = 0;
+	}
+	departure_pending = false;
+	departure_standing = 0;
 }
 
 
@@ -5196,6 +5273,7 @@ void convoi_t::check_pending_updates()
 		if(  line != line_update_pending  ||  !same_schedule_entries( schedule, new_schedule )  ) {
 			// fork: the delay of the last timetabled departure belongs to the old schedule
 			departure_delay = NO_DEPARTURE_DELAY;
+			departure_pending = false;
 		}
 		int current_stop = schedule->get_current_stop(); // save current position of schedule
 		bool is_same = false;

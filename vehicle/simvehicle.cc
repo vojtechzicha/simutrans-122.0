@@ -6974,6 +6974,13 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 /* beware: we must un-reserve rail blocks... */
 void rail_vehicle_t::leave_tile()
 {
+	// fork, timetable: past its exit signal: the time it stood since it was ready is part of the delay
+	if(  leading  &&  cnv  &&  cnv->is_departure_pending()  ) {
+		route_t const* const r = cnv->get_route();
+		if(  route_index > 0  &&  (uint32)(route_index-1) < r->get_count()  &&  r->at(route_index-1)==get_pos()  &&  is_stop_point( r, route_index-1 )  ) {
+			cnv->finish_departure_delay();
+		}
+	}
 	vehicle_t::leave_tile();
 	// fix counters
 	if(last) {

@@ -164,7 +164,14 @@ the convoy window shows "Departure: HH:MM (in N min), K ahead" from `get_planned
 Below it, "Delay: N min" or "On time": how many minutes after its slot the convoy left the last
 stop with a timetable (`convoi_t::departure_delay`, set where `hat_gehalten` books the slot, i.e. at
 the end of loading; a coupled joined train counts from its own line's slot, or takes the primary's
-delay when its entry has a timetable but no free slot). Stops without a timetable keep it; only a
+delay when its entry has a timetable but no free slot). From then until it passes the first signal or
+station boundary after the stop (rail; other convoys until they move, everyone at the latest on
+arrival), the time it stands still is added (`departure_pending`, `departure_standing` counted in
+`sync_step`, `finish_departure_delay` from `rail_vehicle_t::leave_tile`): held at the platform by a
+red exit signal, waiting for a passing train, red at the exit signal. Stops without a timetable keep
+the delay and add their standing time the same way (from the end of loading), so it only goes down
+at a stop with a timetable. The window and export show it growing while the train stands; a save
+writes it with that time (the count itself is not saved). Only a
 new schedule with other entries or a line change clears it (`set_schedule`,
 `check_pending_updates`). Since only an open slot can be booked, it stays within the departure
 window except when running late after a missed coupling. Saved (122.11), export and viewer

@@ -342,6 +342,16 @@ private:
 	 */
 	sint32 departure_delay;
 
+	/**
+	 * Fork, timetable: departure_delay was set when the convoy got ready to leave its stop (a slot
+	 * booked, or loading done at a stop without a timetable); until it passes the first signal or
+	 * station boundary after the stop (rail; other convoys: until they move), the ticks it stands still
+	 * meanwhile (held at the platform, waiting for a passing train, red at the exit signal) are added
+	 * to it. Not saved (a save writes the delay with them).
+	 */
+	bool departure_pending;
+	uint32 departure_standing;
+
 	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
 	uint32 uncouple_since;
 	bool uncouple_warned;
@@ -1119,7 +1129,12 @@ public:
 	bool is_running_late() const { return running_late; }
 	enum { NO_DEPARTURE_DELAY = -1 };
 	/// fork, timetable: minutes late at the last timetabled departure, NO_DEPARTURE_DELAY if none
-	sint32 get_departure_delay() const { return departure_delay; }
+	sint32 get_departure_delay() const;
+	/// fork, timetable: the delay grows with the time it stands from now on (see departure_pending)
+	void start_departure_delay_count();
+	/// fork, timetable: it passed its exit signal (or arrived): the time it stood is part of the delay now
+	void finish_departure_delay();
+	bool is_departure_pending() const { return departure_pending; }
 	/// fork, timetable: waits at a stop with a timetable whose last slot closed unused (see simline_t::is_last_slot_missed)
 	bool has_missed_slot() const;
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }
