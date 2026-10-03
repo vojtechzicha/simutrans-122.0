@@ -4546,9 +4546,10 @@ bool convoi_t::get_planned_departure(sint64 &minutes, bool &latest) const
 
 bool convoi_t::has_missed_slot() const
 {
-	// a train running late or holding a slot for its partner has a slot of its own
+	// a train running late or holding a slot for its partner has a slot of its own; with a train of the
+	// line ahead of it at this stop, the slot was that one's (it goes first)
 	return state == LOADING  &&  line.is_bound()  &&  !no_load  &&  !running_late  &&  couple_hold_slot < 0
-		&&  line->is_last_slot_missed( self );
+		&&  line->is_last_slot_missed( self )  &&  line->count_earlier_waiting( self ) == 0;
 }
 
 

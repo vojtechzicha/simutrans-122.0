@@ -172,7 +172,8 @@ window except when running late after a missed coupling. Saved (122.11), export 
 time" (the value stays exact), and "Missed its slot" instead (on the departure row as ", missed its
 slot" when that one is shown) while the convoy waits at a timetabled stop whose last slot has closed with no train
 of the line leaving in it (`simline_t::is_last_slot_missed`, `convoi_t::has_missed_slot`; not for
-a train running late or holding a slot for its partner, nor before the line's first departure there).
+a train running late or holding a slot for its partner, nor before the line's first departure there,
+nor for a train with an earlier-arrived train of its line waiting at that stop: the slot was that one's).
 A train that came after the window cannot tell late for that slot from early for the next, so with
 more slots than trains every unused slot counts, e.g. one train on a 20 minute timetable shows it
 until the next slot opens. `book_departure_slot` only moves `last_departure_slot` forwards (a train
