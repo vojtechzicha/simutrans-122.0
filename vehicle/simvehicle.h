@@ -733,6 +733,24 @@ private:
 	// Schedule waypoints ahead stay on the way: stopping, the path follows the route up to keep_to (the
 	// last of them, convoi_t::get_last_waypoint_index) and the search starts there; passing, a waypoint
 	// on the planned track allows only that track, the way on from another one goes through the rest
+	/* fork: the tiles of rt from index from on up to the station boundary it leaves the station through
+	 * (included), at most 128
+	 */
+	void collect_way_out(const route_t &rt, uint32 from, vector_tpl<koord3d> &tiles) const;
+
+	// fork: the way out of train c from the station where its route runs over via (its route on from
+	// there, then from its stop on to its next one)
+	void get_way_out(convoihandle_t c, koord3d via, vector_tpl<koord3d> &tiles);
+
+	/* fork: taking the station track at the end of track (its tiles from track_from on) with way_out as
+	 * our way out of the station: a train holding a tile of way_out has its own way out over that track,
+	 * so each would wait for the other for good
+	 */
+	bool locks_with_others(const route_t &track, uint32 track_from, const vector_tpl<koord3d> &way_out);
+
+	// fork: locks_with_others for the track at the end of track and our way on from there to next_stop
+	bool track_locks(const route_t &track, koord3d next_stop);
+
 	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path, uint32 keep_to);
 
 	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none;

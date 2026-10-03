@@ -3860,6 +3860,26 @@ static uint16 get_track_start(const route_t &path, waytype_t wt)
 }
 
 
+// fork: index in path of the first tile claimed at the station at its end: the platform tiles of the
+// track (get_track_start), or for a track without a platform (a passing loop) the track from its last
+// switch on, so two trains coming from both ends never count on the same free track
+static uint16 get_claim_start(const route_t &path, waytype_t wt)
+{
+	const uint16 start = get_track_start( path, wt );
+	if(  start>0  ||  path.get_count()<2  ) {
+		return start;
+	}
+	for(  uint32 i=path.get_count()-1;  i>0;  i--  ) {
+		grund_t const* const gr = world()->lookup( path.at(i-1) );
+		weg_t const* const way = gr ? gr->get_weg( wt ) : NULL;
+		if(  way  &&  ribi_t::is_threeway( way->get_ribi_unmasked() )  ) {
+			return i;
+		}
+	}
+	return 1;
+}
+
+
 // some platform of this halt holds a train of length tiles (halt tiles in a row along the track);
 // fork: not counting the tiles in skip (bays for a train that does not turn back)
 static bool has_platform_for(halthandle_t halt, uint16 length, waytype_t wt, const vector_tpl<koord3d> *skip)
@@ -3886,6 +3906,130 @@ static bool has_platform_for(halthandle_t halt, uint16 length, waytype_t wt, con
 		}
 	}
 	return false;
+}
+
+
+void rail_vehicle_t::collect_way_out(const route_t &rt, const uint32 from, vector_tpl<koord3d> &tiles) const
+{
+	for(  uint32 i=from;  i<rt.get_count()  &&  tiles.get_count()<128;  i++  ) {
+		tiles.append( rt.at(i) );
+		grund_t const* const gr = welt->lookup( rt.at(i) );
+		roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+		if(  lt  &&  i+1<rt.get_count()  &&  !lt->applies_to( ribi_type( rt.at(i), rt.at(i+1) ) )  ) {
+			break;
+		}
+	}
+}
+
+
+void rail_vehicle_t::get_way_out(convoihandle_t c, const koord3d via, vector_tpl<koord3d> &tiles)
+{
+	route_t const* const r = c->get_route();
+	if(  r->empty()  ) {
+		return;
+	}
+	uint32 from = min( max( c->front()->get_route_index(), 1u ) - 1, r->get_count()-1 );
+	bool on_route = false;
+	for(  uint32 i=from;  i<r->get_count();  i++  ) {
+		if(  r->at(i)==via  ) {
+			from = i;
+			on_route = true;
+			break;
+		}
+	}
+	schedule_t const* const sch = c->get_schedule();
+	if(  !on_route  &&  c->has_claim()  &&  c->get_claim_path().is_contained( via )  &&  sch  &&  !sch->empty()  ) {
+		// a track claimed at a station further on (its route ends before): from there over its claim,
+		// then on to the stop after the one it claimed it for (or to that stop, when it runs through)
+		const vector_tpl<koord3d> &claim = c->get_claim_path();
+		uint32 k = 0;
+		while(  claim[k]!=via  ) {
+			k++;
+		}
+		for(  ;  k<claim.get_count()  &&  tiles.get_count()<128;  k++  ) {
+			tiles.append( claim[k] );
+		}
+		uint8 idx = 0;
+		for(  uint8 e=0;  e<sch->get_count();  e++  ) {
+			if(  sch->entries[e].pos==c->get_claim_stop()  ) {
+				idx = c->get_claim_stops() ? (e+1) % sch->get_count() : e;
+				break;
+			}
+		}
+		route_t on;
+		const uint8 old_search = track_search;
+		track_search = 3;
+		const bool ok = on.calc_route( welt, claim.back(), sch->entries[idx].pos, this, speed_to_kmh( c->get_min_top_speed() ), 8888 )!=route_t::no_route;
+		track_search = old_search;
+		if(  ok  &&  on.get_count()>=2  ) {
+			collect_way_out( on, 1, tiles );
+		}
+		return;
+	}
+	collect_way_out( *r, from, tiles );
+	grund_t const* const last_gr = welt->lookup( tiles.back() );
+	roadsign_t const* const lt = last_gr ? get_station_boundary( last_gr ) : NULL;
+	if(  (lt  &&  tiles.back()!=r->back())  ||  sch==NULL  ||  sch->empty()  ||  tiles.get_count()>=128  ) {
+		// leaves the station along its route
+		return;
+	}
+	// its route ends in the station: on from its stop to the next one
+	uint8 idx = sch->get_current_stop();
+	const halthandle_t end_halt = haltestelle_t::get_halt( r->back(), c->get_owner() );
+	if(  r->back()==sch->entries[idx].pos  ||  (end_halt.is_bound()  &&  end_halt==haltestelle_t::get_halt( sch->entries[idx].pos, c->get_owner() ))  ) {
+		// still on the way to that stop (it stands at the far end of the platform)
+		idx = (idx+1) % sch->get_count();
+	}
+	route_t on;
+	const uint8 old_search = track_search;
+	track_search = 3;
+	const bool ok = on.calc_route( welt, r->back(), sch->entries[idx].pos, this, speed_to_kmh( c->get_min_top_speed() ), 8888 )!=route_t::no_route;
+	track_search = old_search;
+	if(  ok  &&  on.get_count()>=2  ) {
+		collect_way_out( on, 1, tiles );
+	}
+}
+
+
+bool rail_vehicle_t::locks_with_others(const route_t &track, const uint32 track_from, const vector_tpl<koord3d> &way_out)
+{
+	vector_tpl<convoihandle_t> seen;
+	FOR( vector_tpl<koord3d>, const &pos, way_out ) {
+		grund_t const* const gr = welt->lookup( pos );
+		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+		const convoihandle_t c = sch ? sch->get_reserved_convoi() : convoihandle_t();
+		if(  !c.is_bound()  ||  c==cnv->self  ||  c->get_vehicle_count()==0  ||  seen.is_contained( c )  ) {
+			continue;
+		}
+		seen.append( c );
+		vector_tpl<koord3d> theirs;
+		get_way_out( c, pos, theirs );
+		for(  uint32 k=track_from;  k<track.get_count();  k++  ) {
+			if(  theirs.is_contained( track.at(k) )  ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+bool rail_vehicle_t::track_locks(const route_t &track, const koord3d next_stop)
+{
+	if(  next_stop==koord3d::invalid  ||  track.get_count()<2  ) {
+		return false;
+	}
+	route_t on;
+	const uint8 old_search = track_search;
+	track_search = 3;
+	const bool ok = on.calc_route( welt, track.back(), next_stop, this, speed_to_kmh( cnv->get_min_top_speed() ), 8888 )!=route_t::no_route;
+	track_search = old_search;
+	if(  !ok  ||  on.get_count()<2  ) {
+		return false;
+	}
+	vector_tpl<koord3d> way_out;
+	collect_way_out( on, 1, way_out );
+	return locks_with_others( track, get_claim_start( track, get_waytype() ), way_out );
 }
 
 
@@ -3947,6 +4091,21 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 		// it must lead on to the next stop, like any other track
 		planned_onward = get_onward_length( route->back(), next_stop );
 		planned_ok = planned_onward>0;
+	}
+	// fork: not a track whose way out runs over a train whose way out runs over that track
+	if(  planned_ok  ) {
+		route_t planned;
+		for(  uint32 i=start;  i<=planned_end;  i++  ) {
+			planned.append( route->at(i) );
+		}
+		if(  halt.is_bound()  ) {
+			planned_ok = !track_locks( planned, next_stop );
+		}
+		else {
+			vector_tpl<koord3d> way_out;
+			collect_way_out( *route, planned_end, way_out );
+			planned_ok = !locks_with_others( planned, get_claim_start( planned, get_waytype() ), way_out );
+		}
 	}
 	// fork: a train that will overtake us there wants its way through (overtaker_ways): first only
 	// platforms off it; none free: as before (the planned platform, then any)
@@ -4055,6 +4214,11 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 								const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
 								crosses = onward==ONWARD_CROSSING;
 								leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
+								if(  leads_on  &&  track_locks( candidate, next_stop )  ) {
+									// fork: a train in its way out has its way out over it
+									leads_on = false;
+									crosses = false;
+								}
 							}
 						}
 						else {
@@ -4066,6 +4230,12 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 								const uint32 planned_len = count-1-start;
 								const uint32 new_len = candidate.get_count()-1 + on.get_count()-1;
 								leads_on = new_len <= planned_len + (planned_end-start)/2 + 4;
+							}
+							if(  leads_on  ) {
+								// fork: and no train in the way out whose way out runs over this track
+								vector_tpl<koord3d> way_out;
+								collect_way_out( on, 1, way_out );
+								leads_on = !locks_with_others( candidate, get_claim_start( candidate, get_waytype() ), way_out );
 							}
 						}
 					}
@@ -4533,7 +4703,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 				restart_speed = 0;
 				return false;
 			}
-			const uint16 track_start = get_track_start( path, get_waytype() );
+			const uint16 track_start = get_claim_start( path, get_waytype() );
 			if(  track_start>0  ) {
 				// the last free track there only if the trains there can still get away (3.8);
 				// behind our partner we take no track of its own

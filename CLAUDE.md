@@ -465,6 +465,15 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   those tiles free (no end within a schedule cycle: stays red), picks a track there with `find_station_track` (stopping: a stop position of the
   right platform type that leads on to the next stop; passing: a free track up to a `P` from which
   the route goes on; planned track first; searches never pass a signal that applies) and claims it.
+  A track without a platform (a passing loop, a through track) is claimed from its last switch on
+  (`get_claim_start`); before, nothing was claimed there, so trains from both ends could head for the
+  same last free loop track and one stood at the `LT` for good ("No free track at ?", e.g. the
+  Nepřevázka loop with 7 trains). Every track choice (planned first, stopping and passing, at the
+  `P` and at the `LT`) also refuses a track whose way out of the station runs over a tile held by a
+  train whose own way out runs over that track (`locks_with_others`, `track_locks`, `get_way_out`:
+  that train's route on from the tile, or from its claim when it claimed the station a leg ahead,
+  then on from its stop to the next one). Čachovice: two northbound trains on the tracks whose exits
+  run over the southbound platform, with a southbound train standing on it, no longer happens.
 - Station boundary `LT`: sign outside the outermost switch where a single-track line enters a
   station, facing entering trains. A train reserves only up to it; at the `LT`
   (`is_station_boundary_clear`) it reserves the throat into its claimed track, or waits there
