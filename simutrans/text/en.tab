@@ -1713,3 +1713,9 @@ Missed its slot
 Missed its slot
 , missed its slot
 , missed its slot
+Deadlock in %s: %i trams wait for each other in a circle and cannot move.
+Deadlock in %s: %i trams wait for each other in a circle and cannot move.
+Deadlock in %s: %i trains wait for each other in a circle and cannot move.
+Deadlock in %s: %i trains wait for each other in a circle and cannot move.
+%i more are stuck behind them.
+%i more are stuck behind them.

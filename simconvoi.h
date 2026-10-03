@@ -818,6 +818,15 @@ public:
 	static void refresh_all_name_ids();
 
 	/**
+	 * Fork, rail and tram: deadlock warning. Every few minutes, each convoy waiting at a signal or
+	 * stop for a reservation points at the convoy holding the first tile ahead it has not reserved;
+	 * a circle of them in which nobody moved for half an hour (1/16 month without the calendar)
+	 * posts one warning. Called from karte_t::step; reset_deadlock_check after loading.
+	 */
+	static void check_deadlocks();
+	static void reset_deadlock_check();
+
+	/**
 	 * Return the position of the convois.
 	 * @return Position of the convois
 	 */

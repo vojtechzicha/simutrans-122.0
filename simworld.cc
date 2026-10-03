@@ -4310,6 +4310,8 @@ void karte_t::step()
 			INT_CHECK("simworld 1947");
 		}
 	}
+	// fork: warn about trains and trams waiting for each other in a circle
+	convoi_t::check_deadlocks();
 
 	// now step all towns (to generate passengers)
 	DBG_DEBUG4("karte_t::step", "step cities");
@@ -5783,6 +5785,7 @@ DBG_MESSAGE("karte_t::load()", "init player");
 DBG_MESSAGE("karte_t::load()", "%d convois/trains loaded", convoi_array.get_count());
 	// fork: the id goes in front of a convoi name only when the owner has several with that name
 	convoi_t::refresh_all_name_ids();
+	convoi_t::reset_deadlock_check();
 
 	// now the player can be loaded
 	for(int i=0; i<MAX_PLAYER_COUNT; i++) {

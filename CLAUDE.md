@@ -726,6 +726,21 @@ keeps those for its own stops and those riding through; express leaving 1 min af
 them, 15 min after loses them; capacity limit; save/load while waiting; coupled pair filling its
 joined part; the 34 rail regression scenarios unchanged.
 
+## Deadlock warning (fork feature, no save change)
+
+`convoi_t::check_deadlocks()` (simconvoi.cc, called after the convoy loop of `karte_t::step`) runs
+every 5 calendar minutes (1/64 month without the calendar). Each rail or tram convoy waiting at a
+signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*, not in a section wait or passing hold, which
+time out or have `check_section_lock`) points at the convoy holding the first tile on its route
+ahead that it has not reserved (up to the second signal); a circle of such convoys whose members
+and front tiles stay the same for 30 calendar minutes (1/16 month) posts one `warnings` message
+("Deadlock in Brno: 4 trams wait for each other in a circle ... 162 more are stuck behind them.",
+click jumps to the first of them) and lists the circle in the log. The record lives in memory only
+(`reset_deadlock_check` on load), so a loaded save warns again after 30 minutes. Stock warns only per
+convoy after two months ("is stucked"). Found on 2026-10-03: Brno trams at Hlavni nadrazi locked by
+plain signals (line 7 standing on the westbound track at the two-way signal 4561,3354 before its
+crossover, line 9 turning over the westbound track at 4566), a layout lock the stock game has too.
+
 ## Convoy names (fork feature, no save change)
 
 A convoy's name gets its id in front ("(4486) R12") only while another convoy of the same owner has

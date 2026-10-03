@@ -18,6 +18,7 @@
 #include "simmenu.h"
 #include "simcolor.h"
 #include "simmesg.h"
+#include "simcity.h"
 #include "simintr.h"
 #include "simlinemgmt.h"
 #include "simline.h"
@@ -1134,6 +1135,209 @@ void convoi_t::refresh_all_name_ids()
 		}
 		FOR( vector_tpl<convoi_t *>, const cnv, hide ) {
 			cnv->show_name_id( false );
+		}
+	}
+}
+
+
+// fork: a circle of convoys waiting for each other, and since when it stands like this
+struct deadlock_record_t {
+	uint64 key;  // hash of the convoy ids and their front tiles
+	uint32 since;
+	bool warned;
+	bool seen;
+};
+static vector_tpl<deadlock_record_t> deadlock_records;
+static uint32 deadlock_last_check = 0;
+static bool deadlock_checked = false;
+
+
+void convoi_t::reset_deadlock_check()
+{
+	deadlock_records.clear();
+	deadlock_checked = false;
+}
+
+
+void convoi_t::check_deadlocks()
+{
+	const uint32 now = welt->get_ticks();
+	uint32 interval = (uint32)welt->calendar_minutes_to_ticks( 5 );
+	uint32 limit = (uint32)welt->calendar_minutes_to_ticks( 30 );
+	if(  interval==0  ) {
+		// no calendar
+		interval = welt->ticks_per_world_month >> 6;
+		limit = welt->ticks_per_world_month >> 4;
+	}
+	if(  deadlock_checked  &&  (uint32)(now - deadlock_last_check) < interval  ) {
+		return;
+	}
+	deadlock_checked = true;
+	deadlock_last_check = now;
+
+	// rail convoys waiting for a reservation: not for the single-track rules or a passing train,
+	// which time out or have their own warning (rail_vehicle_t::check_section_lock)
+	vector_tpl<convoihandle_t> nodes;
+	inthashtable_tpl<uint16, uint32> node_of;
+	FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
+		const convoi_t *c = cnv.get_rep();
+		const bool waiting = c->state==WAITING_FOR_CLEARANCE  ||  c->state==WAITING_FOR_CLEARANCE_ONE_MONTH  ||  c->state==WAITING_FOR_CLEARANCE_TWO_MONTHS
+			||  c->state==CAN_START  ||  c->state==CAN_START_ONE_MONTH  ||  c->state==CAN_START_TWO_MONTHS;
+		if(  !waiting  ||  c->get_vehicle_count()==0  ) {
+			continue;
+		}
+		const waytype_t wt = c->front()->get_waytype();
+		if(  wt!=track_wt  &&  wt!=monorail_wt  &&  wt!=maglev_wt  &&  wt!=narrowgauge_wt  ) {
+			continue;
+		}
+		if(  c->section_wait!=SECTION_WAIT_NONE  ||  c->passing_hold_for.is_bound()  ||  c->section_hold_for.is_bound()  ) {
+			continue;
+		}
+		node_of.put( cnv.get_id(), nodes.get_count() );
+		nodes.append( cnv );
+	}
+	if(  nodes.empty()  &&  deadlock_records.empty()  ) {
+		return;
+	}
+
+	// each points at the convoy holding the first tile ahead it has not reserved, if that one waits too
+	vector_tpl<sint32> next( nodes.get_count() );
+	FOR( vector_tpl<convoihandle_t>, const cnv, nodes ) {
+		sint32 blocker = -1;
+		const vehicle_t *front = cnv->front();
+		const route_t *route = cnv->get_route();
+		uint32 signals = 0;
+		for(  uint32 i = front->get_route_index();  i < route->get_count()  &&  i < (uint32)front->get_route_index() + 256;  i++  ) {
+			const grund_t *gr = welt->lookup( route->at(i) );
+			const schiene_t *sch = gr ? (const schiene_t *)gr->get_weg( front->get_waytype() ) : NULL;
+			if(  !sch  ) {
+				break;
+			}
+			const convoihandle_t res = sch->get_reserved_convoi();
+			if(  res.is_bound()  &&  res!=cnv  ) {
+				const uint32 *idx = node_of.access( res.get_id() );
+				blocker = idx ? (sint32)*idx : -1;
+				break;
+			}
+			// the reservation that failed ends at the next signal
+			if(  res!=cnv  &&  sch->has_signal()  &&  ++signals >= 2  ) {
+				break;
+			}
+		}
+		next.append( blocker );
+	}
+
+	// one blocker each: follow the chains, a chain running into itself is a circle
+	vector_tpl<uint8> visit( nodes.get_count() );   // 0 new, 1 on the current chain, 2 done
+	vector_tpl<sint32> circle_of( nodes.get_count() );  // circle a convoy waits on, or -1
+	for(  uint32 i=0;  i<nodes.get_count();  i++  ) {
+		visit.append( 0 );
+		circle_of.append( -1 );
+	}
+	vector_tpl<uint32> circle_members;  // all circles one after the other
+	vector_tpl<uint32> circle_begin;    // where each starts in circle_members
+	vector_tpl<uint32> chain;
+	for(  uint32 start=0;  start<nodes.get_count();  start++  ) {
+		chain.clear();
+		sint32 n = start;
+		while(  n>=0  &&  visit[n]==0  ) {
+			visit[n] = 1;
+			chain.append( n );
+			n = next[n];
+		}
+		sint32 circle = -1;
+		if(  n>=0  &&  visit[n]==1  ) {
+			// a new circle from n on
+			circle = circle_begin.get_count();
+			circle_begin.append( circle_members.get_count() );
+			for(  uint32 k = chain.index_of( (uint32)n );  k<chain.get_count();  k++  ) {
+				circle_members.append( chain[k] );
+			}
+		}
+		else if(  n>=0  ) {
+			circle = circle_of[n];
+		}
+		FOR( vector_tpl<uint32>, const k, chain ) {
+			visit[k] = 2;
+			circle_of[k] = circle;
+		}
+	}
+
+	FOR( vector_tpl<deadlock_record_t>, &rec, deadlock_records ) {
+		rec.seen = false;
+	}
+	for(  uint32 c=0;  c<circle_begin.get_count();  c++  ) {
+		const uint32 begin = circle_begin[c];
+		const uint32 end = c+1<circle_begin.get_count() ? circle_begin[c+1] : circle_members.get_count();
+		// the same convoys, none of them moved: the same circle as at the last check
+		uint64 key = 14695981039346656037ull;
+		for(  uint32 a=begin;  a<end;  a++  ) {
+			for(  uint32 b=a+1;  b<end;  b++  ) {
+				if(  nodes[circle_members[b]].get_id() < nodes[circle_members[a]].get_id()  ) {
+					const uint32 t = circle_members[a];
+					circle_members[a] = circle_members[b];
+					circle_members[b] = t;
+				}
+			}
+			const convoihandle_t m = nodes[circle_members[a]];
+			const koord3d p = m->front()->get_pos();
+			const uint64 values[4] = { m.get_id(), (uint64)(sint64)p.x, (uint64)(sint64)p.y, (uint64)(sint64)p.z };
+			for(  int v=0;  v<4;  v++  ) {
+				key = (key ^ values[v]) * 1099511628211ull;
+			}
+		}
+		deadlock_record_t *rec = NULL;
+		FOR( vector_tpl<deadlock_record_t>, &r, deadlock_records ) {
+			if(  !r.seen  &&  r.key==key  ) {
+				rec = &r;
+				break;
+			}
+		}
+		if(  !rec  ) {
+			deadlock_record_t fresh;
+			fresh.key = key;
+			fresh.since = now;
+			fresh.warned = false;
+			deadlock_records.append( fresh );
+			rec = &deadlock_records.back();
+		}
+		rec->seen = true;
+		if(  rec->warned  ||  (uint32)(now - rec->since) < limit  ) {
+			continue;
+		}
+		rec->warned = true;
+
+		uint32 behind = 0;
+		for(  uint32 i=0;  i<nodes.get_count();  i++  ) {
+			if(  circle_of[i]==(sint32)c  ) {
+				behind++;
+			}
+		}
+		behind -= end - begin;
+		const convoihandle_t first = nodes[circle_members[begin]];
+		bool trams = true;
+		cbuffer_t list;
+		for(  uint32 a=begin;  a<end;  a++  ) {
+			const convoihandle_t m = nodes[circle_members[a]];
+			trams &= m->front()->get_desc()->get_waytype()==tram_wt;
+			list.printf( " [%u %s at %s]", m.get_id(), m->get_name(), m->front()->get_pos().get_str() );
+		}
+		const koord pos = first->front()->get_pos().get_2d();
+		const stadt_t *city = welt->find_nearest_city( pos );
+		cbuffer_t buf;
+		buf.printf( translator::translate( trams ? "Deadlock in %s: %i trams wait for each other in a circle and cannot move." : "Deadlock in %s: %i trains wait for each other in a circle and cannot move." ),
+			city ? city->get_name() : "?", (int)(end - begin) );
+		if(  behind>0  ) {
+			buf.append( " " );
+			buf.printf( translator::translate( "%i more are stuck behind them." ), (int)behind );
+		}
+		dbg->warning( "convoi_t::check_deadlocks()", "%s circle:%s", (const char *)buf, (const char *)list );
+		welt->get_message()->add_message( buf, pos, message_t::warnings, PLAYER_FLAG|first->get_owner()->get_player_nr(), first->front()->get_base_image() );
+	}
+	// a circle that broke up may form again and is warned about again
+	for(  uint32 i=deadlock_records.get_count();  i-- > 0;  ) {
+		if(  !deadlock_records[i].seen  ) {
+			deadlock_records.remove_at( i );
 		}
 	}
 }
