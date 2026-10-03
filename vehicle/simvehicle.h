@@ -661,6 +661,25 @@ private:
 	// at a stop: wait for a passing train to go by first; keeps the convoi's hold state
 	bool is_held_for_passing_train();
 
+	/* fork: at the platform signal of a single-track station, a train that runs through this station
+	 * behind us and leaves it through our exit (leave_boundary) without stopping, and is faster or
+	 * runs through our next stop: it already holds or reserves a track here, is in the station, or
+	 * waits at the platform signal of the station before for the line we just left. Its way out must
+	 * not need a tile we hold. stuck: such a train finds no track here, nobody should wait for it.
+	 */
+	convoihandle_t get_section_overtaker(koord3d leave_boundary, bool &stuck, bool any_way=false) const;
+
+	/* fork: claiming a platform at the next station (we stop there, its boundary enter_boundary) at the
+	 * platform signal we leave through leave_boundary: the way through that station of a train that
+	 * would overtake us there (see get_section_overtaker, any_way), from its station boundary to the one
+	 * it leaves through, goes to overtaker_ways, its next tiles to overtaker_routes. False: none.
+	 */
+	bool get_station_overtaker_ways(koord3d leave_boundary, koord3d enter_boundary);
+
+	// fork: wait at this platform signal for such a train (we stopped in this station, or are marked
+	// Hold); keeps the convoi's section hold state
+	bool holds_for_overtaker(koord3d leave_boundary, uint16 next_block);
+
 	/* fork: before choosing a platform at the choose signal at start_block: the ways of the trains that
 	 * will come by while we stand at our stop. Such a train passes that signal after us without stopping
 	 * in the area and reaches the end of its way through it (an end of choose, or the next signal that

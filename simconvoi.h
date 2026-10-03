@@ -243,6 +243,16 @@ private:
 	bool passing_hold_released;
 
 	/**
+	 * Fork, rail: at the platform signal of a single-track station, waiting for this faster train that
+	 * runs through the station to go first, since section_hold_since (ticks; kept while it waits at
+	 * this signal); section_hold_released: done waiting here (time limit, or that train is stuck).
+	 * See rail_vehicle_t::holds_for_overtaker(). Not saved.
+	 */
+	convoihandle_t section_hold_for;
+	uint32 section_hold_since;
+	bool section_hold_released;
+
+	/**
 	 * Fork, rail: the track claimed at the next station of a single-track section, see
 	 * rail_vehicle_t::is_platform_signal_clear(). claim_path runs from the station boundary through
 	 * the claimed track, to the stop (claim_stops) or to the platform signal at its far end; its tiles
@@ -1159,6 +1169,14 @@ public:
 	void release_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = true; }
 	void clear_passing_hold() { passing_hold_for = convoihandle_t(); passing_hold_released = false; }
 
+	// fork, rail: waiting at a platform signal for a faster train to go first (see section_hold_for)
+	convoihandle_t get_section_hold_for() const { return section_hold_for; }
+	uint32 get_section_hold_since() const { return section_hold_since; }
+	bool is_section_hold_released() const { return section_hold_released; }
+	void set_section_hold(convoihandle_t for_cnv, uint32 since) { section_hold_for = for_cnv; section_hold_since = since; }
+	void release_section_hold() { section_hold_for = convoihandle_t(); section_hold_released = true; }
+	void clear_section_hold() { section_hold_for = convoihandle_t(); section_hold_since = 0; section_hold_released = false; }
+
 	// fork, rail: track claimed at the next station of a single-track section (see claim_path)
 	bool has_claim() const { return !claim_path.empty(); }
 	koord3d get_claim_boundary() const { return claim_path.empty() ? koord3d::invalid : claim_path[0]; }
@@ -1194,7 +1212,8 @@ public:
 	// SECTION_WAIT_LAST_TRACK: the last free track there is kept, taking it could lock the stations up
 	// SECTION_WAIT_BLOCK: at a block post, the next block is taken
 	// SECTION_WAIT_YIELD: could follow a train onto the line, but one waits at the other end
-	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK, SECTION_WAIT_BLOCK, SECTION_WAIT_YIELD };
+	// SECTION_WAIT_HOLD: the line is free, but a faster train coming through the station goes first
+	enum { SECTION_WAIT_NONE = 0, SECTION_WAIT_LINE, SECTION_WAIT_TRACK, SECTION_WAIT_ENTRY, SECTION_WAIT_LAST_TRACK, SECTION_WAIT_BLOCK, SECTION_WAIT_YIELD, SECTION_WAIT_HOLD };
 	void set_section_wait(uint8 why, halthandle_t halt, koord3d boundary = koord3d::invalid, koord3d from = koord3d::invalid, koord3d tile = koord3d::invalid);
 	uint8 get_section_wait() const { return section_wait; }
 	halthandle_t get_section_wait_halt() const { return section_wait_halt; }

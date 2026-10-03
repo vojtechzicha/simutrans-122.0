@@ -3948,7 +3948,11 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 		planned_onward = get_onward_length( route->back(), next_stop );
 		planned_ok = planned_onward>0;
 	}
-	if(  planned_ok  ) {
+	// fork: a train that will overtake us there wants its way through (overtaker_ways): first only
+	// platforms off it; none free: as before (the planned platform, then any)
+	const bool aside = halt.is_bound()  &&  !overtaker_ways.empty();
+	const bool planned_on_way = planned_ok  &&  aside  &&  stands_on_any( *route, cnv->get_tile_length(), overtaker_ways );
+	if(  planned_ok  &&  !planned_on_way  ) {
 		for(  uint32 i=start;  i<=planned_end;  i++  ) {
 			path.append( route->at(i) );
 		}
@@ -3992,109 +3996,126 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	const uint8 bay_mode = bay_search;
 	// stopping: of the platforms that do, the shortest that fits (the first found of those as long)
 	const uint16 fit = halt.is_bound() ? cnv->get_platform_length_needed( halt ) : 0;
-	route_t best;
-	uint16 best_rank = 0xFFFF;
-	for(  uint8 pass=halt.is_bound() ? 0 : 1;  !found  &&  pass<2;  pass++  ) {
-		const halthandle_t no_through = pass==0 ? halt : halthandle_t();
-		stop_search_start = route->at(from);
-		track_search_excluded.clear();
-		track_search_taken.clear();
-		// a train turning back there tries the bays first, then any track
-		bay_search = prefer_bays ? 2 : bay_mode;
-		// a platform whose way on runs over another platform only when no other is free
-		vector_tpl<koord3d> crossing;
-		bool avoid_crossing = true;
-		for(  ;;  ) {
-			// every rejected or taken track is excluded, so this ends after at most as many tries as tracks
-			for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
-				route_t candidate;
-				track_search = halt.is_bound() ? 1 : 2;
-				track_search_block = false;
-				stop_search_halt = no_through;
-				const bool ok = candidate.find_route( welt, route->at(from), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
-				stop_search_halt = halthandle_t();
-				// the way on from there may use any track
-				track_search = 3;
-				bool leads_on = false;
-				bool crosses = false;
-				uint16 rank = 0xFFFF;
-				if(  ok  &&  candidate.get_count()>=2  ) {
-					if(  halt.is_bound()  ) {
-						rank = get_platform_rank( get_found_platform_length( candidate ), fit );
-						if(  rank>=best_rank  ) {
-							// no better than the one we have: not worth the way on
+	for(  uint8 round=aside ? 0 : 1;  !found  &&  round<2;  round++  ) {
+		if(  round==1  &&  planned_on_way  ) {
+			// nothing off the overtaker's way: the planned platform after all
+			path.clear();
+			for(  uint32 i=start;  i<=planned_end;  i++  ) {
+				path.append( route->at(i) );
+			}
+			found = true;
+			break;
+		}
+		route_t best;
+		uint16 best_rank = 0xFFFF;
+		for(  uint8 pass=halt.is_bound() ? 0 : 1;  !found  &&  pass<2;  pass++  ) {
+			const halthandle_t no_through = pass==0 ? halt : halthandle_t();
+			stop_search_start = route->at(from);
+			track_search_excluded.clear();
+			track_search_taken.clear();
+			// a train turning back there tries the bays first, then any track
+			bay_search = prefer_bays ? 2 : bay_mode;
+			// a platform whose way on runs over another platform only when no other is free
+			vector_tpl<koord3d> crossing;
+			bool avoid_crossing = true;
+			for(  ;;  ) {
+				// every rejected or taken track is excluded, so this ends after at most as many tries as tracks
+				for(  uint16 attempt=0;  !found  &&  attempt<256;  attempt++  ) {
+					route_t candidate;
+					track_search = halt.is_bound() ? 1 : 2;
+					track_search_block = false;
+					stop_search_halt = no_through;
+					const bool ok = candidate.find_route( welt, route->at(from), this, speed, start_dir, welt->get_settings().get_max_choose_route_steps() );
+					stop_search_halt = halthandle_t();
+					// the way on from there may use any track
+					track_search = 3;
+					bool leads_on = false;
+					bool crosses = false;
+					uint16 rank = 0xFFFF;
+					if(  ok  &&  candidate.get_count()>=2  ) {
+						if(  halt.is_bound()  &&  round==0  &&  ( stands_on_any( candidate, cnv->get_tile_length(), overtaker_ways )  ||  !leads_back_to_overtaker( candidate ) )  ) {
+							// stepping aside: not on its way, and not the other direction's track
 							track_search = 0;
 							track_search_taken.append( candidate.back() );
 							continue;
 						}
-						// never through the station and back in (a bay facing the other way)
-						if(  !turns_round_through( candidate, 0, halt )  ) {
-							if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
-								planned_onward = get_onward_length( route->back(), next_stop );
+						if(  halt.is_bound()  ) {
+							rank = get_platform_rank( get_found_platform_length( candidate ), fit );
+							if(  rank>=best_rank  ) {
+								// no better than the one we have: not worth the way on
+								track_search = 0;
+								track_search_taken.append( candidate.back() );
+								continue;
 							}
-							const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
-							crosses = onward==ONWARD_CROSSING;
-							leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
+							// never through the station and back in (a bay facing the other way)
+							if(  !turns_round_through( candidate, 0, halt )  ) {
+								if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
+									planned_onward = get_onward_length( route->back(), next_stop );
+								}
+								const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
+								crosses = onward==ONWARD_CROSSING;
+								leads_on = onward==ONWARD_OK  ||  (crosses  &&  !avoid_crossing);
+							}
 						}
+						else {
+							route_t on;
+							leads_on = cnv->calc_route_on( candidate.back(), *route, start, candidate.get_route(), on )
+								&&  on.at(1)!=candidate.at( candidate.get_count()-2 );
+							if(  leads_on  ) {
+								// not much longer than the planned way
+								const uint32 planned_len = count-1-start;
+								const uint32 new_len = candidate.get_count()-1 + on.get_count()-1;
+								leads_on = new_len <= planned_len + (planned_end-start)/2 + 4;
+							}
+						}
+					}
+					track_search = 0;
+					if(  !ok  ||  candidate.get_count()<2  ) {
+						break;
+					}
+					if(  leads_on  &&  halt.is_bound()  ) {
+						best.clear();
+						best.append( &candidate );
+						best_rank = rank;
+						// none can fit better: take it, else look for a shorter one
+						found = rank<=fit;
+						track_search_taken.append( candidate.back() );
+					}
+					else if(  leads_on  ) {
+						best.clear();
+						best.append( &candidate );
+						found = true;
 					}
 					else {
-						route_t on;
-						leads_on = cnv->calc_route_on( candidate.back(), *route, start, candidate.get_route(), on )
-							&&  on.at(1)!=candidate.at( candidate.get_count()-2 );
-						if(  leads_on  ) {
-							// not much longer than the planned way
-							const uint32 planned_len = count-1-start;
-							const uint32 new_len = candidate.get_count()-1 + on.get_count()-1;
-							leads_on = new_len <= planned_len + (planned_end-start)/2 + 4;
+						track_search_excluded.append( candidate.back() );
+						if(  crosses  ) {
+							crossing.append( candidate.back() );
 						}
 					}
 				}
-				track_search = 0;
-				if(  !ok  ||  candidate.get_count()<2  ) {
+				found |= best.get_count()>=2;
+				if(  found  ) {
+					for(  uint32 i=start;  i<from;  i++  ) {
+						path.append( route->at(i) );
+					}
+					path.append( &best );
 					break;
 				}
-				if(  leads_on  &&  halt.is_bound()  ) {
-					best.clear();
-					best.append( &candidate );
-					best_rank = rank;
-					// none can fit better: take it, else look for a shorter one
-					found = rank<=fit;
-					track_search_taken.append( candidate.back() );
-				}
-				else if(  leads_on  ) {
-					best.clear();
-					best.append( &candidate );
-					found = true;
-				}
-				else {
-					track_search_excluded.append( candidate.back() );
-					if(  crosses  ) {
-						crossing.append( candidate.back() );
+				if(  avoid_crossing  &&  !crossing.empty()  ) {
+					// nothing better: again with those
+					avoid_crossing = false;
+					FOR( vector_tpl<koord3d>, const &k, crossing ) {
+						track_search_excluded.remove( k );
 					}
+					crossing.clear();
+					continue;
 				}
-			}
-			found |= best.get_count()>=2;
-			if(  found  ) {
-				for(  uint32 i=start;  i<from;  i++  ) {
-					path.append( route->at(i) );
+				if(  bay_search!=2  ) {
+					break;
 				}
-				path.append( &best );
-				break;
+				bay_search = 0;
+				avoid_crossing = true;
 			}
-			if(  avoid_crossing  &&  !crossing.empty()  ) {
-				// nothing better: again with those
-				avoid_crossing = false;
-				FOR( vector_tpl<koord3d>, const &k, crossing ) {
-					track_search_excluded.remove( k );
-				}
-				crossing.clear();
-				continue;
-			}
-			if(  bay_search!=2  ) {
-				break;
-			}
-			bay_search = 0;
-			avoid_crossing = true;
 		}
 	}
 	stop_search_start = koord3d::invalid;
@@ -4452,6 +4473,13 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		}
 	}
 
+	// fork: a faster train coming through this station behind us goes first
+	if(  holds_for_overtaker( leave_boundary, next_block )  ) {
+		sig->set_state( roadsign_t::rot );
+		restart_speed = 0;
+		return false;
+	}
+
 	// the line is ours, unless another train has waited long for it (see yields_to_waiting)
 	halthandle_t waiting_halt;
 	if(  yields_to_waiting( leave_boundary, follows, ahead, last, waiting_halt )  ) {
@@ -4489,7 +4517,14 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			bool standing = false;
 			const convoihandle_t partner = stops  &&  leg==0  &&  keep_to==INVALID_INDEX ? cnv->find_partner_at( halt, standing ) : convoihandle_t();
 			const bool to_partner = partner.is_bound()  &&  standing  &&  find_partner_track( &leg_route, at, partner, path );
-			if(  !to_partner  &&  !find_station_track( &leg_route, at, halt, needs, next_stop, path, keep_to )  ) {
+			// fork: a faster train right behind us runs through there: stand off its way if we can
+			if(  !to_partner  &&  stops  ) {
+				get_station_overtaker_ways( leave_boundary, enter_boundary );
+			}
+			const bool track_found = to_partner  ||  find_station_track( &leg_route, at, halt, needs, next_stop, path, keep_to );
+			overtaker_ways.clear();
+			overtaker_routes.clear();
+			if(  !track_found  ) {
 				grund_t const* const end_gr = welt->lookup( leg_route.back() );
 				const halthandle_t full_halt = halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t());
 				sig->set_state( roadsign_t::rot );
@@ -4555,6 +4590,7 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 		return false;
 	}
 	cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+	cnv->clear_section_hold();
 	sig->set_state( roadsign_t::gruen );
 	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
 	return true;
@@ -5662,6 +5698,242 @@ bool rail_vehicle_t::is_held_for_passing_train()
 	}
 	// fork: not waiting for the line while held (else a train at the signal ahead would let us go first)
 	cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+	return true;
+}
+
+
+convoihandle_t rail_vehicle_t::get_section_overtaker(const koord3d leave_boundary, bool &stuck, const bool any_way) const
+{
+	stuck = false;
+	route_t const* const route = cnv->get_route();
+	if(  route->empty()  ) {
+		return convoihandle_t();
+	}
+	const halthandle_t our_next = haltestelle_t::get_halt( route->back(), get_owner() );
+	const sint32 our_speed = speed_to_kmh( cnv->get_min_top_speed() );
+	const bool we_carry_passengers = carries_passengers( cnv );
+	const koord3d our_pos = get_pos();
+
+	convoihandle_t best;
+	uint32 best_dist = 0xFFFFFFFFul;
+	FOR( vector_tpl<convoihandle_t>, const other, welt->convoys() ) {
+		if(  other == cnv->self  ||  other->get_vehicle_count()==0  ||  other->in_depot()  ) {
+			continue;
+		}
+		const int st = other->get_state();
+		if(  st!=convoi_t::DRIVING  &&  st!=convoi_t::WAITING_FOR_CLEARANCE  &&  st!=convoi_t::WAITING_FOR_CLEARANCE_ONE_MONTH  &&  st!=convoi_t::WAITING_FOR_CLEARANCE_TWO_MONTHS  ) {
+			// standing at a stop, coupled, in or out of a depot: no train running through
+			continue;
+		}
+		vehicle_t const* const front = other->front();
+		route_t const* const r = other->get_route();
+		if(  front->get_waytype() != get_waytype()  ||  r->get_count() < 2  ||  koord_distance( front->get_pos(), our_pos ) > 256  ) {
+			continue;
+		}
+		if(  we_carry_passengers  &&  !carries_passengers( other.get_rep() )  ) {
+			continue;
+		}
+		const sint32 other_speed = speed_to_kmh( other->get_min_top_speed() );
+		if(  other_speed < our_speed  ) {
+			continue;
+		}
+		const uint32 from = max( front->get_route_index(), 1u ) - 1;
+		// it leaves through our exit
+		uint32 j = INVALID_INDEX;
+		for(  uint32 i=from;  i+1 < r->get_count()  &&  i < from+512;  i++  ) {
+			if(  r->at(i)==leave_boundary  ) {
+				grund_t const* const gr = welt->lookup( r->at(i) );
+				roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+				if(  lt  &&  !lt->applies_to( ribi_type( r->at(i), r->at(i+1) ) )  ) {
+					j = i;
+				}
+				break;
+			}
+		}
+		if(  j==INVALID_INDEX  ) {
+			continue;
+		}
+		// the station boundary it enters our station through (none behind it: it is in the station)
+		uint32 in = INVALID_INDEX;
+		bool other_station = false;
+		for(  uint32 k=j;  k>from;  k--  ) {
+			grund_t const* const gr = welt->lookup( r->at(k-1) );
+			if(  roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL  ) {
+				if(  lt->applies_to( ribi_type( r->at(k-1), r->at(k) ) )  ) {
+					in = k-1;
+				}
+				else {
+					other_station = true;
+				}
+				break;
+			}
+		}
+		if(  other_station  ||  (in==INVALID_INDEX  &&  j-from > 128)  ) {
+			continue;
+		}
+		bool waits_for_line = false;
+		if(  in!=INVALID_INDEX  ) {
+			// at most at the station before ours: no station boundary into another station before
+			bool farther = false;
+			for(  uint32 k=from+1;  k<in  &&  !farther;  k++  ) {
+				grund_t const* const gr = welt->lookup( r->at(k) );
+				roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+				farther = lt  &&  lt->applies_to( ribi_type( r->at(k), r->at(k+1) ) );
+			}
+			if(  farther  ) {
+				continue;
+			}
+			const uint8 sw = other->get_section_wait();
+			if(  other->get_akt_speed()==0  &&  (sw==convoi_t::SECTION_WAIT_TRACK  ||  sw==convoi_t::SECTION_WAIT_LAST_TRACK)  ) {
+				// it finds no track in our station: waiting for it would only block it
+				stuck = true;
+				return convoihandle_t();
+			}
+			bool comes = other->get_claim_boundary()==r->at(in);
+			if(  !comes  ) {
+				grund_t const* const gr = welt->lookup( r->at(in) );
+				schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+				comes = sch  &&  sch->get_reserved_convoi()==other;
+			}
+			if(  !comes  &&  sw==convoi_t::SECTION_WAIT_LINE  &&  other->get_akt_speed()==0  &&  other->get_section_wait_boundary()==r->at(in)  ) {
+				// red at the platform signal before only while the line behind us clears: it claims a
+				// track here at its next step (unless what stops it is another train)
+				grund_t const* const gr = welt->lookup( other->get_section_wait_tile() );
+				schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+				const convoihandle_t holder = sch ? sch->get_reserved_convoi() : convoihandle_t();
+				comes = waits_for_line = !holder.is_bound()  ||  holder==cnv->self;
+			}
+			if(  !comes  ) {
+				continue;
+			}
+		}
+		// worth it: faster, or it runs through our next stop (it does not stop there, we do)
+		bool skips = false;
+		if(  our_next.is_bound()  ) {
+			for(  uint32 k=j;  k<r->get_count();  k++  ) {
+				grund_t const* const gr = welt->lookup( r->at(k) );
+				if(  gr  &&  gr->get_halt()==our_next  ) {
+					for(  uint32 m=k+1;  m<r->get_count()  &&  !skips;  m++  ) {
+						grund_t const* const gr2 = welt->lookup( r->at(m) );
+						skips = gr2  &&  gr2->get_halt()!=our_next;
+					}
+					break;
+				}
+			}
+		}
+		if(  !skips  &&  other_speed*100 < our_speed*115  ) {
+			continue;
+		}
+		// its way out must not need a tile we hold (a train still at the station before chooses a free
+		// track when it claims one)
+		if(  !waits_for_line  &&  !any_way  ) {
+			bool needs_ours = false;
+			for(  uint32 k=(in==INVALID_INDEX ? from : in)+1;  k<=j  &&  !needs_ours;  k++  ) {
+				grund_t const* const gr = welt->lookup( r->at(k) );
+				schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+				needs_ours = sch  &&  sch->get_reserved_convoi()==cnv->self;
+			}
+			if(  needs_ours  ) {
+				continue;
+			}
+		}
+		if(  j-from < best_dist  ) {
+			best = other;
+			best_dist = j-from;
+		}
+	}
+	return best;
+}
+
+
+bool rail_vehicle_t::get_station_overtaker_ways(const koord3d leave_boundary, const koord3d enter_boundary)
+{
+	overtaker_ways.clear();
+	overtaker_routes.clear();
+	if(  !welt->has_calendar()  ||  leave_boundary==koord3d::invalid  ||  enter_boundary==koord3d::invalid  ) {
+		return false;
+	}
+	bool stuck = false;
+	const convoihandle_t overtaker = get_section_overtaker( leave_boundary, stuck, true );
+	if(  stuck  ||  !overtaker.is_bound()  ) {
+		return false;
+	}
+	route_t const* const r = overtaker->get_route();
+	const uint32 from = max( overtaker->front()->get_route_index(), 1u ) - 1;
+	// into that station through its boundary, and out of it through another one, without stopping there
+	uint32 in = INVALID_INDEX, out = INVALID_INDEX;
+	for(  uint32 i=from;  i+1 < r->get_count()  &&  i < from+1024;  i++  ) {
+		grund_t const* const gr = welt->lookup( r->at(i) );
+		roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+		if(  lt==NULL  ) {
+			continue;
+		}
+		const bool applies = lt->applies_to( ribi_type( r->at(i), r->at(i+1) ) );
+		if(  in==INVALID_INDEX  ) {
+			if(  r->at(i)==enter_boundary  &&  applies  ) {
+				in = i;
+			}
+		}
+		else if(  !applies  ) {
+			out = i;
+			break;
+		}
+		else {
+			// into yet another station: no way through ours
+			break;
+		}
+	}
+	if(  in==INVALID_INDEX  ||  out==INVALID_INDEX  ) {
+		return false;
+	}
+	for(  uint32 i=in;  i<=out;  i++  ) {
+		overtaker_ways.append_unique( r->at(i) );
+	}
+	for(  uint32 i=out+1;  i<r->get_count()  &&  i<=out+OVERTAKER_WALK_TILES;  i++  ) {
+		overtaker_routes.append_unique( r->at(i) );
+	}
+	return true;
+}
+
+
+bool rail_vehicle_t::holds_for_overtaker(const koord3d leave_boundary, const uint16 next_block)
+{
+	if(  !welt->has_calendar()  ||  leave_boundary==koord3d::invalid  ||  cnv->is_section_hold_released()  ) {
+		return false;
+	}
+	// only a train that stopped in this station (its route runs from the stop to here without a station
+	// boundary), or one marked Hold
+	route_t const* const route = cnv->get_route();
+	bool may_hold = cnv->is_hold_marked();
+	if(  !may_hold  &&  !route->empty()  ) {
+		may_hold = haltestelle_t::get_halt( route->front(), get_owner() ).is_bound();
+		for(  uint32 i=1;  may_hold  &&  i<=next_block  &&  i<route->get_count();  i++  ) {
+			grund_t const* const gr = welt->lookup( route->at(i) );
+			may_hold = gr==NULL  ||  get_station_boundary( gr )==NULL;
+		}
+	}
+	if(  !may_hold  ) {
+		return false;
+	}
+	bool stuck = false;
+	const convoihandle_t overtaker = get_section_overtaker( leave_boundary, stuck );
+	if(  stuck  ) {
+		cnv->release_section_hold();
+		return false;
+	}
+	if(  !overtaker.is_bound()  ) {
+		// keep the clock: several trains in turn make us wait no longer in all
+		cnv->set_section_hold( convoihandle_t(), cnv->get_section_hold_since() );
+		return false;
+	}
+	const uint32 now = welt->get_ticks();
+	const uint32 since = cnv->get_section_hold_since()!=0 ? cnv->get_section_hold_since() : (now ? now : 1);
+	if(  (sint64)(uint32)(now - since) > welt->calendar_minutes_to_ticks( welt->get_settings().get_passing_hold_max_minutes() )  ) {
+		cnv->release_section_hold();
+		return false;
+	}
+	cnv->set_section_hold( overtaker, since );
+	cnv->set_section_wait( convoi_t::SECTION_WAIT_HOLD, halthandle_t() );
 	return true;
 }
 

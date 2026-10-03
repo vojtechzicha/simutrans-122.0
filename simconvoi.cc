@@ -169,6 +169,8 @@ void convoi_t::init(player_t *player)
 	hold_divert = false;
 	passing_hold_since = 0;
 	passing_hold_released = false;
+	section_hold_since = 0;
+	section_hold_released = false;
 	claim_first = 0;
 	claim_stops = false;
 	claim_stop = koord3d::invalid;
@@ -1588,6 +1590,7 @@ bool convoi_t::drive_to()
 	// fork: nor a wait at a platform signal for the old one (it is checked again there)
 	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
 	platform_hold = false;
+	clear_section_hold();
 
 	if(  anz_vehikel>0  ) {
 
@@ -4582,6 +4585,15 @@ bool convoi_t::append_wait_reason(cbuffer_t &buf) const
 	if(  passing_hold_for.is_bound()  ) {
 		// waiting at the stop for a passing train to go by
 		buf.printf( translator::translate("Waiting for %s to pass"), passing_hold_for->get_name() );
+		return true;
+	}
+	if(  section_hold_for.is_bound()  &&  section_wait == SECTION_WAIT_HOLD  ) {
+		// at the platform signal: a faster train coming through the station goes first
+		if(  is_platform_held()  &&  boards_while_held()  ) {
+			buf.printf( translator::translate("Held at the platform, boarding (%i%%)"), loading_level );
+			buf.append( ": " );
+		}
+		buf.printf( translator::translate("Waiting for %s to pass"), section_hold_for->get_name() );
 		return true;
 	}
 	const bool waiting = state>=WAITING_FOR_CLEARANCE  &&  state<=CAN_START_TWO_MONTHS  &&  state!=SELF_DESTRUCT;

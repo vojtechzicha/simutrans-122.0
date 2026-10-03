@@ -931,6 +931,10 @@ static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t 
 		reason = "passing_train";
 		for_cnv = driver->get_passing_hold_for();
 	}
+	else if(  driver->get_section_hold_for().is_bound()  &&  driver->get_section_wait() == convoi_t::SECTION_WAIT_HOLD  ) {
+		reason = "passing_train";
+		for_cnv = driver->get_section_hold_for();
+	}
 	else if(  driver->get_section_wait() != convoi_t::SECTION_WAIT_NONE  &&  driver->is_waiting()  ) {
 		switch(  driver->get_section_wait()  ) {
 			case convoi_t::SECTION_WAIT_TRACK:      reason = "no_free_track";   break;

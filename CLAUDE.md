@@ -299,6 +299,32 @@ express, local ignores fast freight, freight waits for freight, both tracks held
 at red releases both, marked convoy and marked line divert, save/load mid-diversion, 20 minute limit,
 no hold outside a choose area, plus the earlier overtaking cases).
 
+## Overtaking at single-track LT/P stations (fork feature, no save change)
+
+The choose-signal overtaking above needs an end-of-choose sign; on single-track lines worked with
+`LT`/`P` only, every section is one block, so a fast train used to trail a slower one for good.
+- Hold (`rail_vehicle_t::holds_for_overtaker`, called in `is_platform_signal_clear` in section mode
+  once the line ahead is free, before `yields_to_waiting`): a train that stopped in this station (its
+  route runs from a halt to this `P` without a station boundary) or carries the Hold marker stays red
+  while `get_section_overtaker` finds a train that leaves the station through our exit boundary
+  without stopping and is in the station, holds or reserves a track here (its claim boundary, or our
+  entry `LT` reserved by it), or stands at the `P` of the station before only because the line we
+  left is not clear yet (`SECTION_WAIT_LINE`, the blocking tile ours or free). It must be at least as
+  fast and either 15% faster or run through our next stop, carry passengers if we do, and its way out
+  must not run over a tile we reserved. Capped by `passing_hold_max_minutes` per signal (clock kept
+  while the overtaker changes); a train that finds no track here (`TRACK`/`LAST_TRACK`) releases it.
+  State `convoi_t::section_hold_for/_since/_released` (not saved, cleared at green and in
+  `drive_to`), `SECTION_WAIT_HOLD` keeps the wait seniority; the window and export show the same
+  "Waiting for X to pass" / `passing_train` as the choose-area hold. Needs the calendar.
+- Step aside (`get_station_overtaker_ways`, before `find_station_track` at the `P` for a stopping
+  train): with such a train right behind (the same finder from the station we leave), its way through
+  the next station goes to `overtaker_ways`; `find_station_track` then takes first only platforms off
+  that way that lead back into it (`leads_back_to_overtaker`), else the planned one, else any.
+Tested headless (line 062 rebuilt from the layout dump: Os062 overtaken at Veleliby, Čachovice in
+both directions, Dobrovice and MB hl.n. depending on the gap, express 17-34 min faster; a marked
+freight overtaken at Čachovice; a small loop/station layout where the stopper steps off the main
+platform; save/load mid-hold; the 33 rail regression scenarios byte-identical).
+
 ## Mixed traction (fork feature)
 
 A convoy with electric engines and other engines (diesel, steam, ...) needs no catenary
