@@ -118,6 +118,14 @@ public:
 	void hop(grund_t *gr) OVERRIDE;
 	bool ist_weg_frei(grund_t *gr);
 
+	// fork: remembers v (if any) as the vehicle in our way for the deadlock warning, returns it
+	vehicle_base_t *note_blocker(vehicle_base_t *v) {
+		if(  v  ) {
+			set_blocked_by( v, v->get_pos() );
+		}
+		return v;
+	}
+
 	void enter_tile(grund_t* gr) OVERRIDE;
 
 	void calc_current_speed(grund_t*);

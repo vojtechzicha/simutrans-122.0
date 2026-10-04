@@ -463,6 +463,9 @@ void private_car_t::rdwr(loadsave_t *file)
 
 bool private_car_t::ist_weg_frei(grund_t *gr)
 {
+	// fork: set again below if a vehicle is in our way (deadlock warning)
+	set_blocked_by( NULL, koord3d::invalid );
+
 	if(gr->get_top()>200) {
 		// already too many things here
 		return false;
@@ -482,12 +485,12 @@ bool private_car_t::ist_weg_frei(grund_t *gr)
 	if(  get_pos()==pos_next_next  ) {
 		// turning around => single check
 		const uint8 next_direction = ribi_t::backward(this_direction);
-		frei = (NULL == no_cars_blocking( gr, NULL, next_direction, next_direction, next_direction ));
+		frei = (NULL == note_blocker( no_cars_blocking( gr, NULL, next_direction, next_direction, next_direction ) ));
 
 		// do not block railroad crossing
 		if(frei  &&  str->is_crossing()) {
 			const grund_t *gr = welt->lookup(get_pos());
-			frei = (NULL == no_cars_blocking( gr, NULL, next_direction, next_direction, next_direction ));
+			frei = (NULL == note_blocker( no_cars_blocking( gr, NULL, next_direction, next_direction, next_direction ) ));
 		}
 	}
 	else {
@@ -504,10 +507,10 @@ bool private_car_t::ist_weg_frei(grund_t *gr)
 			grund_t *test = welt->lookup(pos_next_next);
 			if(  test  ) {
 				uint8 next_90direction = this->calc_direction(pos_next, pos_next_next);
-				frei = (NULL == no_cars_blocking( gr, NULL, this_direction, next_direction, next_90direction ));
+				frei = (NULL == note_blocker( no_cars_blocking( gr, NULL, this_direction, next_direction, next_90direction ) ));
 				if(  frei  ) {
 					// check, if it can leave this crossings
-					if(  vehicle_base_t *dt = no_cars_blocking( test, NULL, next_direction, next_90direction, next_90direction )  ) {
+					if(  vehicle_base_t *dt = note_blocker( no_cars_blocking( test, NULL, next_direction, next_90direction, next_90direction ) )  ) {
 						// unless there is a standing convoi that we can pass
 						frei = false;
 						if(  road_vehicle_t const* const car = obj_cast<road_vehicle_t>(dt)  ) {
@@ -526,7 +529,7 @@ bool private_car_t::ist_weg_frei(grund_t *gr)
 			// (except on the tile after a passed standing convoi)
 			if(  !is_overtaking()  ||  is_passing_standing_last_tile()  ) {
 				// not a crossing => skip 90 degrees check!
-				vehicle_base_t *dt = no_cars_blocking( gr, NULL, this_direction, next_direction, next_direction );
+				vehicle_base_t *dt = note_blocker( no_cars_blocking( gr, NULL, this_direction, next_direction, next_direction ) );
 				if(  dt  ) {
 					if(dt->is_stuck()) {
 						// previous vehicle is stuck => end of traffic jam ...
@@ -584,7 +587,7 @@ bool private_car_t::ist_weg_frei(grund_t *gr)
 				const uint8 next_direction = ribi_type(dir);
 				const uint8 nextnext_direction = ribi_type(dir);
 				// test next field after way crossing
-				if(no_cars_blocking( test, NULL, next_direction, nextnext_direction, nextnext_direction )) {
+				if(note_blocker( no_cars_blocking( test, NULL, next_direction, nextnext_direction, nextnext_direction ) )) {
 					return false;
 				}
 				// ok, left the crossing
@@ -611,6 +614,9 @@ bool private_car_t::ist_weg_frei(grund_t *gr)
 	if(frei  &&  current_speed==0) {
 		ms_traffic_jam = 0;
 		current_speed = 48;
+	}
+	if(  frei  ) {
+		set_blocked_by( NULL, koord3d::invalid );
 	}
 
 	if(!frei) {

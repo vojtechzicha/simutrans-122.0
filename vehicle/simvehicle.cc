@@ -2300,6 +2300,10 @@ bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 {
 	// check for traffic lights (only relevant for the first car in a convoi)
 	if(  leading  ) {
+		if(  !second_check_count  ) {
+			// fork: set again below if a vehicle is in our way (deadlock warning)
+			cnv->set_blocked_by( NULL, koord3d::invalid );
+		}
 		// no further check, when already entered a crossing (to allow leaving it)
 		if(  !second_check_count  ) {
 			if(  const grund_t *gr_current = welt->lookup(get_pos())  ) {
@@ -2474,6 +2478,7 @@ bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 
 		// stuck message ...
 		if(  obj  &&  !second_check_count  ) {
+			cnv->set_blocked_by( obj, obj->get_pos() );
 			if(  obj->is_stuck()  ) {
 				// end of traffic jam, but no stuck message, because previous vehicle is stuck too
 				restart_speed = 0;

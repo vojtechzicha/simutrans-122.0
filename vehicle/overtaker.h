@@ -8,6 +8,9 @@
 
 
 #include "../simtypes.h"
+#include "../dataobj/koord3d.h"
+
+class obj_t;
 
 /**
  * Class dealing with overtaking
@@ -27,8 +30,13 @@ protected:
 	bool passing_standing;
 
 	sint32 max_power_speed; // max achievable speed at current power/weight
+
+	// fork, deadlock warning: the vehicle that kept us from going on at the last try and its tile
+	// (not saved); only compared with the objects on that tile, since it may be gone by now
+	const obj_t *blocked_by;
+	koord3d blocked_by_pos;
 public:
-	overtaker_t():tiles_overtaking(0), diff(0), passing_standing(false), max_power_speed(SPEED_UNLIMITED) {}
+	overtaker_t():tiles_overtaking(0), diff(0), passing_standing(false), max_power_speed(SPEED_UNLIMITED), blocked_by(NULL), blocked_by_pos(koord3d::invalid) {}
 	virtual ~overtaker_t() {}
 
 	bool is_overtaking() const { return diff < 0; }
@@ -72,6 +80,10 @@ public:
 	virtual bool can_overtake(overtaker_t *other_overtaker, sint32 other_speed, sint16 steps_other) = 0;
 
 	sint32 get_max_power_speed() const { return max_power_speed; }
+
+	void set_blocked_by(const obj_t *v, koord3d pos) { blocked_by = v; blocked_by_pos = pos; }
+	const obj_t *get_blocked_by() const { return blocked_by; }
+	koord3d get_blocked_by_pos() const { return blocked_by_pos; }
 };
 
 #endif

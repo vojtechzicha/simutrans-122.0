@@ -729,17 +729,29 @@ joined part; the 34 rail regression scenarios unchanged.
 ## Deadlock warning (fork feature, no save change)
 
 `convoi_t::check_deadlocks()` (simconvoi.cc, called after the convoy loop of `karte_t::step`) runs
-every 5 calendar minutes (1/64 month without the calendar). Each rail or tram convoy waiting at a
-signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*, not in a section wait or passing hold, which
-time out or have `check_section_lock`) points at the convoy holding the first tile on its route
-ahead that it has not reserved (up to the second signal); a circle of such convoys whose members
-and front tiles stay the same for 30 calendar minutes (1/16 month) posts one `warnings` message
-("Deadlock in Brno: 4 trams wait for each other in a circle ... 162 more are stuck behind them.",
-click jumps to the first of them) and lists the circle in the log. The record lives in memory only
-(`reset_deadlock_check` on load), so a loaded save warns again after 30 minutes. Stock warns only per
-convoy after two months ("is stucked"). Found on 2026-10-03: Brno trams at Hlavni nadrazi locked by
-plain signals (line 7 standing on the westbound track at the two-way signal 4561,3354 before its
-crossover, line 9 turning over the westbound track at 4566), a layout lock the stock game has too.
+every 5 calendar minutes (1/64 month without the calendar) and builds a wait-for graph, one edge per
+vehicle:
+- Rail and tram convoys waiting at a signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*, not in a
+  section wait or passing hold, which time out or have `check_section_lock`) point at the convoy
+  holding the first tile on their route ahead that they have not reserved (up to the second signal).
+- Road convoys in those states point at the vehicle that stopped them at their last try:
+  `overtaker_t::set_blocked_by` (not saved) is set in `road_vehicle_t::can_enter_tile` and, for city
+  cars, in `private_car_t::ist_weg_frei` (`note_blocker`), and cleared when the way is free. The
+  stored pointer is only compared with the objects on the stored tile, so a vehicle that left or was
+  deleted gives no edge. Standing city cars (speed 0) and waiting convoys found that way become nodes
+  too, so a circle of buses and city cars counts; city cars alone are never looked at.
+A circle that stays on the same tiles for 30 calendar minutes (1/16 month) posts one `warnings`
+message ("Deadlock in Brno: 4 trams wait for each other in a circle and cannot move. 162 more are
+stuck behind them.", or "... road vehicles ..."; click jumps there) and lists the circle in the log.
+Circles are keyed by their tiles, not vehicles, and a circle touching a tile of one already warned
+about is the same jam (buses reaching a stop tile of a jammed ring against the flow replaced the stuck
+one there each hour and re-warned). The record lives in memory only (`reset_deadlock_check` on
+load), so a loaded save warns again after 30 minutes. Stock warns only per convoy after two months
+("is stucked"). Found on 2026-10-03: Brno trams at Hlavni nadrazi locked by plain signals (line 7
+standing on the westbound track at the two-way signal 4561,3354 before its crossover, line 9 turning
+over the westbound track at 4566), a layout lock the stock game has too. Tested headless: that save
+(one warning), a full bus ring with a dwelling stop just before the depot junction (one warning, 16
+buses), and a month of the owner's game without a jam (none).
 
 ## Convoy names (fork feature, no save change)
 
