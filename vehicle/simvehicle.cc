@@ -2259,23 +2259,29 @@ bool road_vehicle_t::choose_route(sint32 &restart_speed, ribi_t::ribi start_dire
 				return false;
 			}
 
-			// check if there is a free position
-			// this is much faster than waysearch
-			if(  !target_halt->find_free_position(road_wt,cnv->self,obj_t::road_vehicle  )) {
-				restart_speed = 0;
-				target_halt = halthandle_t();
-				return false;
-			}
-
-			// now it make sense to search a route
 			route_t target_rt;
 			koord3d next3d = rt->at(index);
-			// first look for a position beyond standing convois (we pass them), then take the first free one
-			choose_pass_standing = true;
-			bool found = target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() );
-			choose_pass_standing = false;
-			if(  !found  ) {
+			bool found = false;
+			// fork: second pass after taking a position reserved by a convoi queuing behind us,
+			// which could never use it before we left
+			for(  int pass=0;  pass<2  &&  !found;  pass++  ) {
+				if(  pass==1  &&  !take_reservation_from_behind()  ) {
+					break;
+				}
+				// check if there is a free position
+				// this is much faster than waysearch
+				if(  !target_halt->find_free_position(road_wt,cnv->self,obj_t::road_vehicle  )) {
+					continue;
+				}
+
+				// now it make sense to search a route
+				// first look for a position beyond standing convois (we pass them), then take the first free one
+				choose_pass_standing = true;
 				found = target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() );
+				choose_pass_standing = false;
+				if(  !found  ) {
+					found = target_rt.find_route( welt, next3d, this, speed_to_kmh(cnv->get_min_top_speed()), start_direction, welt->get_settings().get_max_choose_route_steps() );
+				}
 			}
 			if(  !found  ) {
 				// nothing empty or not route with less than 33 tiles
@@ -2293,6 +2299,42 @@ bool road_vehicle_t::choose_route(sint32 &restart_speed, ribi_t::ribi start_dire
 		}
 	}
 	return true;
+}
+
+
+// fork: every free position of target_halt is reserved. A convoi whose way to its reserved position
+// runs over our tile is queuing behind us and cannot get there before we have left, so waiting for
+// it would never end (Ostrava-Svinov: buses that found the far side's positions from the choose sign
+// on the near side drove round the block into the queue behind the first bus at the far side's
+// choose sign). Take its reservation; it chooses again at the next choose sign.
+// Returns true if a position was freed.
+bool road_vehicle_t::take_reservation_from_behind()
+{
+	const koord3d here = get_pos();
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &t, target_halt->get_tiles() ) {
+		const convoihandle_t holder = t.reservation;
+		if(  !holder.is_bound()  ||  holder==cnv->self  ||  holder->get_vehicle_count()==0  ||  !t.grund->hat_weg(road_wt)  ||  t.grund->suche_obj(obj_t::road_vehicle)  ) {
+			continue;
+		}
+		road_vehicle_t *front = obj_cast<road_vehicle_t>( holder->front() );
+		if(  !front  ||  front->target_halt!=target_halt  ) {
+			continue;
+		}
+		const route_t *r = holder->get_route();
+		bool behind = false;
+		for(  uint32 i=front->get_route_index();  i+1<r->get_count()  &&  !behind;  i++  ) {
+			behind = r->at(i)==here;
+		}
+		if(  !behind  ) {
+			continue;
+		}
+		for(  uint32 length=0;  length<holder->get_tile_length()  &&  length+1<r->get_count();  length++  ) {
+			target_halt->unreserve_position( welt->lookup( r->at( r->get_count()-length-1 ) ), holder );
+		}
+		front->target_halt = halthandle_t();
+		return true;
+	}
+	return false;
 }
 
 

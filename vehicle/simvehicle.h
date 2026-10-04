@@ -510,6 +510,9 @@ private:
 	// true during a choose sign search that may pick a stop position beyond a standing convoi
 	bool choose_pass_standing;
 
+	// fork: frees a position of target_halt reserved by a convoi that must pass our tile to get there
+	bool take_reservation_from_behind();
+
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;
 

@@ -219,6 +219,19 @@ search for a free stop tile beyond standing convoys (`road_vehicle_t::choose_pas
 `is_target`), then fall back to the stock nearest free tile. Moving overtaking is unchanged. Not saved:
 a game loaded mid-pass finishes it like a stock overtake.
 
+Reservations from behind (no save change): a road vehicle at a choose sign that finds no free stop
+position (`choose_route`) takes the reservation of a convoy whose way to its reserved position runs
+over the tile it stands on (`take_reservation_from_behind`: that convoy queues behind it and could
+never get there first), unreserves it, clears that convoy's `target_halt` so it chooses again at the
+next choose sign, and searches once more. Found in Ostrava-Svinov (2026-10-04): a stop with places on
+both sides of the road and a choose sign on each; buses for the westbound side found the eastbound
+places from the westbound sign, reserved them, drove round the block into the queue behind the first
+bus at the eastbound sign, which waited for a free place for good (95 buses). The deadlock warning did
+not see it (a wait at a choose sign has no vehicle in the way). Stock drops stop reservations on load
+(`road_vehicle_t::set_convoi` restores them only for an empty route), so saving and loading also
+cleared it. Tested headless on that save with reservations restored on load: stuck without the fix,
+moving within 10 minutes with it.
+
 ## Overtaking at choose signals (fork feature)
 
 Stock rail choose signal: a train whose next stop lies in the choose area picks a free platform; a train
