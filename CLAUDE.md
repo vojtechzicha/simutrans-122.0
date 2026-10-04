@@ -655,26 +655,39 @@ fails, never on a signal's state; the tool places it one-way only (like `P`). As
 the direction it applies to up to and including the next signal or station boundary that applies
 (every switch branch except legs against a one-way signal, at most 256 tiles), is reserved by
 another train than the one holding the signal's own tile (so a train standing in a siding of the
-block keeps it red until one passes); never red once that train has reserved on into the block.
-Otherwise (`get_block_aspect`) green when the block ends at another autoblock, yellow when it has a
-switch (a tile with two ways on, a depot spur too) or ends at any other signal, an `LT` or a buffer
-stop; an object without yellow images shows green instead. The train passing it sees the same
-(`is_signal_clear` and the `signs` loop of `block_reserver` call `refresh_autoblock` instead of
-setting green). Event-driven, nothing per step: the last vehicle leaving an autoblock refreshes it
-and leaving any signal or `LT` walks back to the autoblocks whose block ends there
-(`refresh_autoblocks_behind`, `rail_vehicle_t::leave_tile`); `block_reserver` refreshes the autoblocks
-whose reservation it frees (instead of setting them red) and, after reserving over a switch, the
-autoblocks on its other branches; a train entering a depot or deleted (`refresh_autoblocks_around`
-from its front and rear tiles); placing, turning or removing any signal or sign (the autoblocks
-behind it, `refresh_autoblocks_ending_at` in simtool.cc; the walk back never passes a one-way signal
-against its direction and follows each branch up to 256 tiles); after loading, `refresh_loaded_autoblocks`
-once the convoys reserved their routes again (`finish_rd` lists them). `signal_t::any_autoblock` keeps
-all of it off until one exists. Stale until the next train: coupling, a train leaving a depot inside
-a block, reservations made by `reserve_route`, building or removing a switch. Yellow is by layout
-only (the next plain signal is red most of the time), not by the next signal's state. A stock exe reads them as plain signals. Tested headless (harness with an `abcheck` that
-recomputes every aspect each step): chains, following trains, a branch joining, sidings, depot,
-deletion, save/load, the real pak; driving identical to plain signals, about 2% slower with 110
-autoblocks on a line, the rail regression set byte-identical.
+block keeps it red until one passes), and red once the head of that train is past it
+(`head_is_past`: it holds the tile, which is not on its route from the head to its reservation end);
+before that it is never red for others once that train has reserved on into the block. Otherwise
+(`get_block_aspect`) yellow when the signal or `LT` at the end of the block is red (its state, any
+kind of signal; a plain signal is red until a train reserves past it, an `LT` without aspect images
+always) or the block ends at a buffer stop, green when it is not red (green or yellow); at a switch
+every branch counts, except that the way the train holding the signal reserved is followed alone
+(tiles reserved by it), so it sees its own next signal. An object without yellow images shows green
+instead. `get_autoblock_aspect` computes it, `refresh_autoblock` sets it. The train passing it sees
+the same (`is_signal_clear` and the `signs` loop of `block_reserver` call `refresh_autoblock` instead
+of setting green). Event-driven, nothing per step: any rail signal or `LT` turning red or no longer
+red walks back to the autoblocks whose block ends there (`roadsign_t::set_state` calls
+`refresh_autoblocks_ending_here`; green to yellow is not passed on, and an autoblock is red only by
+its own block, so it goes back one signal); the head of a train entering the tile after an
+autoblock refreshes it (`rail_vehicle_t::enter_tile`, `refresh_autoblock( false )`: the ones behind
+are red anyway, the train still holds that tile); the last vehicle leaving an autoblock refreshes it
+and leaving any signal or `LT` walks back to the autoblocks whose block ends there unless its aspect
+change just did (`refresh_autoblocks_behind`, `rail_vehicle_t::leave_tile`); `block_reserver` sets
+the signals and `LT`s whose reservation it frees once the whole way is freed
+(`refresh_freed_signals`: autoblocks refreshed, others red) and, after reserving over a switch,
+refreshes the autoblocks on its other branches; a train entering a depot or deleted
+(`refresh_autoblocks_around` from its front and rear tiles); placing, turning or removing any signal
+or sign (the autoblocks behind it, `refresh_autoblocks_ending_at` in simtool.cc; the walk back never
+passes a one-way signal against its direction and follows each branch up to 256 tiles); after
+loading, `refresh_loaded_autoblocks` once the convoys reserved their routes again (`finish_rd` lists
+them). `roadsign_t::any_autoblock` (also as `signal_t::any_autoblock`) keeps all of it off until one
+exists. Stale until the next train: coupling, a train leaving a depot inside a block, reservations
+made by `reserve_route`, building or removing a switch. A stock exe reads them as plain signals.
+Tested headless (harness `abstale on` compares every autoblock with `get_autoblock_aspect` each
+step): chains, following trains, a branch joining, sidings, depot, deletion, save/load; driving
+identical to plain signals, 0 stale aspects in 187000 changes; with 112 autoblocks and 15 trains on
+one line about 1% slower than the layout-only rule, plain signals with autoblocks on the map within
+noise.
 
 ## Standing and overcrowded passengers (fork feature, savegame 122.8)
 

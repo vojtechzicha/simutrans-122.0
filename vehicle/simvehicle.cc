@@ -6824,6 +6824,24 @@ bool rail_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, ui
 }
 
 
+// fork: the signals and entry signals a train no longer goes past, set once its reservation is freed
+// (a signal turning red refreshes the autoblocks behind it, which look at the reservations)
+void rail_vehicle_t::refresh_freed_signals(const vector_tpl<signal_t *> &signals, const vector_tpl<koord3d> &boundaries)
+{
+	FOR( vector_tpl<signal_t *>, const sig, signals ) {
+		if(  sig->get_desc()->is_autoblock()  ) {
+			sig->refresh_autoblock();
+		}
+		else {
+			sig->set_state( roadsign_t::rot );
+		}
+	}
+	FOR( vector_tpl<koord3d>, const pos, boundaries ) {
+		update_boundary_aspect( pos );
+	}
+}
+
+
 /**
  * reserves or un-reserves all blocks and returns the handle to the next block (if there)
  * if count is larger than 1, (and defined) maximum MAX_CHOOSE_BLOCK_TILES tiles will be checked
@@ -6862,7 +6880,8 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 	next_signal_index=INVALID_INDEX;
 	next_crossing_index=INVALID_INDEX;
 	bool unreserve_now = false;
-	vector_tpl<signal_t *> autoblocks; // fork: freed ones get their aspect once the loop is done
+	vector_tpl<signal_t *> autoblocks; // fork: freed signals get their aspect once the loop is done
+	vector_tpl<koord3d> boundaries;    // fork: and freed entry signals (an aspect change looks at the blocks behind)
 	vector_tpl<uint16> junctions;      // fork: switches reserved, may join autoblock sections from the side
 	for ( ; success  &&  count>=0  &&  i<route->get_count(); i++) {
 
@@ -6903,9 +6922,7 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 			if(!sch1->unreserve(cnv->self)) {
 				if(unreserve_now) {
 					// reached an reserved or free track => finished
-					FOR( vector_tpl<signal_t *>, const sig, autoblocks ) {
-						sig->refresh_autoblock();
-					}
+					refresh_freed_signals( autoblocks, boundaries );
 					return false;
 				}
 			}
@@ -6914,18 +6931,14 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 				unreserve_now = !force_unreserve;
 			}
 			if(sch1->has_signal()) {
-				signal_t* signal = gr->find<signal_t>();
-				if(  signal  &&  signal->get_desc()->is_autoblock()  ) {
-					// fork: green again if nobody else holds its block
+				// fork: red, or an autoblock green again if nobody else holds its block, once all is freed
+				if(  signal_t* signal = gr->find<signal_t>()  ) {
 					autoblocks.append( signal );
-				}
-				else if(signal) {
-					signal->set_state(roadsign_t::rot);
 				}
 			}
 			else if(  sch1->has_sign()  ) {
 				// fork: an entry signal we no longer go past
-				update_boundary_aspect( pos );
+				boundaries.append( pos );
 			}
 			if(sch1->is_crossing()) {
 				gr->find<crossing_t>()->release_crossing(this);
@@ -6934,9 +6947,7 @@ bool rail_vehicle_t::block_reserver(const route_t *route, uint16 start_index, ui
 	}
 
 	if(!reserve) {
-		FOR( vector_tpl<signal_t *>, const sig, autoblocks ) {
-			sig->refresh_autoblock();
-		}
+		refresh_freed_signals( autoblocks, boundaries );
 		return false;
 	}
 	// here we go only with reserve
@@ -7004,8 +7015,12 @@ void rail_vehicle_t::leave_tile()
 				}
 				// tell next signal?
 				// and switch to red
+				const roadsign_t *end = NULL; // fork: the signal or entry signal we left
+				bool was_red = false;
 				if(sch0->has_signal()) {
 					signal_t* sig = gr->find<signal_t>();
+					end = sig;
+					was_red = sig  &&  sig->get_state()==roadsign_t::rot;
 					if(  sig  &&  sig->get_desc()->is_autoblock()  ) {
 						// fork: red while we are still in its block (green if we turned back out of it)
 						sig->refresh_autoblock();
@@ -7016,12 +7031,20 @@ void rail_vehicle_t::leave_tile()
 				}
 				else if(  sch0->has_sign()  ) {
 					// fork: an entry signal turns red behind the train, or shows the next train's aspect
+					end = get_station_boundary( gr );
+					was_red = end  &&  end->get_state()==roadsign_t::rot;
 					update_boundary_aspect( get_pos() );
 				}
-				// fork: we left the block of the autoblocks behind us, which ends here
-				if(  signal_t::any_autoblock  &&  (sch0->has_signal()  ||  get_station_boundary( gr ))  ) {
+				// fork: we left the block of the autoblocks behind us, which ends here (unless turning
+				// red just refreshed them)
+				if(  signal_t::any_autoblock  &&  end  ) {
 					const ribi_t::ribi exit_dir = pos_next!=get_pos() ? ribi_type( get_pos(), pos_next ) : (ribi_t::ribi)ribi_t::none;
-					signal_t::refresh_autoblocks_behind( get_pos(), exit_dir, get_waytype() );
+					if(  was_red!=(end->get_state()==roadsign_t::rot)  &&  exit_dir!=ribi_t::none  &&  end->applies_to( exit_dir )  ) {
+						// done by the aspect change
+					}
+					else {
+						signal_t::refresh_autoblocks_behind( get_pos(), exit_dir, get_waytype() );
+					}
 				}
 			}
 		}
@@ -7040,6 +7063,19 @@ void rail_vehicle_t::enter_tile(grund_t* gr)
 		if(leading) {
 			sch0->book(1, WAY_STAT_CONVOIS);
 			sch0->reserve( cnv->self, get_direction() );
+		}
+	}
+	// fork: an autoblock turns red as soon as our head is past it (the autoblocks behind it are red
+	// anyway: we still hold its tile, which is part of their blocks)
+	if(  leading  &&  !last  &&  signal_t::any_autoblock  &&  cnv  &&  route_index>=2  &&  route_index-2u<cnv->get_route()->get_count()  ) {
+		const koord3d prev = cnv->get_route()->at( route_index-2u );
+		grund_t *gr_prev = prev!=get_pos() ? welt->lookup( prev ) : NULL;
+		weg_t const* const way_prev = gr_prev ? gr_prev->get_weg( get_waytype() ) : NULL;
+		if(  way_prev  &&  way_prev->has_signal()  ) {
+			signal_t *sig = gr_prev->find<signal_t>();
+			if(  sig  &&  sig->get_desc()->is_autoblock()  ) {
+				sig->refresh_autoblock( false );
+			}
 		}
 	}
 }

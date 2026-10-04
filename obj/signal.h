@@ -40,11 +40,15 @@ public:
 	/**
 	 * fork: aspect of an automatic block signal (autoblok), display only: red while the block ahead,
 	 * up to the next signal or station boundary, is reserved by a train other than the one that
-	 * reserved this signal's tile; else green if the block ends at another autoblock, yellow if it has
-	 * a switch or ends at any other signal (green without yellow images). Trains still stop only when
-	 * their reservation fails.
+	 * reserved this signal's tile, or once the head of that train is past it; else yellow if the
+	 * signal at the end of the block is red (or the block ends at a buffer stop), green if it is not
+	 * (green without yellow images). Trains still stop only when their reservation fails.
+	 * tell_behind false: the autoblocks behind need no refresh (red anyway, as when a head passes)
 	 */
-	void refresh_autoblock();
+	void refresh_autoblock(bool tell_behind = true);
+
+	/// fork: the aspect refresh_autoblock sets
+	signalstate get_autoblock_aspect() const;
 
 	/// fork: refreshes the autoblocks whose block ends at pos, a signal or station boundary a train
 	/// just left in direction exit_dir, walking back over the track to the previous signals
@@ -53,9 +57,6 @@ public:
 	/// fork: a train left the map from tiles front to rear (depot, deletion): the autoblocks of the
 	/// blocks it held, both ways (there may be no signal behind it to do this)
 	static void refresh_autoblocks_around(koord3d front, koord3d rear, waytype_t wt);
-
-	/// fork: true once an autoblock was built or loaded; the walks above run only then
-	static bool any_autoblock;
 
 	/// fork: aspects of the autoblocks loaded or built since the last call (after loading: once the
 	/// convoys have reserved their routes again)

@@ -69,14 +69,28 @@ public:
 	*/
 	void set_dir(ribi_t::ribi dir);
 
-	void set_state(signalstate z) {state = z; calc_image();}
+	void set_state(signalstate z) {
+		const bool red_changed = (state==rot) != (z==rot);
+		state = z;
+		calc_image();
+		if(  red_changed  &&  any_autoblock  ) {
+			refresh_autoblocks_ending_here();
+		}
+	}
+
+	/// fork: true once an autoblock was built or loaded; the autoblock walks run only then
+	static bool any_autoblock;
+
+	/// fork: a rail signal or station boundary turned red or stopped being red: the autoblocks whose
+	/// block ends here show yellow or green by it
+	void refresh_autoblocks_ending_here();
 
 	/**
 	 * fork: a station boundary drawn as an entry signal (8 or 12 images: red, green, yellow) shows
 	 * aspects; display only, set by rail_vehicle_t::update_boundary_aspect
 	 */
 	bool shows_aspects() const { return desc  &&  desc->is_station_boundary()  &&  desc->get_count()>=8; }
-	signalstate get_state() { return (signalstate)state; }
+	signalstate get_state() const { return (signalstate)state; }
 
 	typ get_typ() const OVERRIDE { return roadsign; }
 	const char* get_name() const OVERRIDE { return "Roadsign"; }

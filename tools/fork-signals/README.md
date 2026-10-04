@@ -47,10 +47,11 @@ Image[0..7]=...     like a plain signal: red N,S,W,E then green N,S,W,E (16 with
   direction (see the signalling plan).
 - **Autoblock** (automaticky blok): a plain signal in every respect (one-way like a stock signal,
   same running and reservations) that shows red while another train holds its block ahead, up to
-  the next signal or station boundary. A free block shows green when it ends at another autoblock,
-  yellow when it has a switch or ends at any other signal, a station boundary or a buffer stop
-  (those are red most of the time); without yellow images it shows green. A plain signal shows red
-  unless a train has reserved past it. Autoblocks belong on double track or long plain lines, not
+  the next signal or station boundary, and as soon as the head of a passing train is past it. A
+  free block shows yellow when the signal or station boundary at its end is red (or the block ends
+  at a buffer stop) and green when it is not; without yellow images it shows green. A plain signal
+  shows red unless a train has reserved past it, so the autoblock before it shows yellow until the
+  train reserves through it. Autoblocks belong on double track or long plain lines, not
   between a platform signal and the next station boundary (any signal there ends section mode).
 
 The station boundary's images are laid out like a signal's: `Image[E]` shows the board as the

@@ -861,6 +861,9 @@ public:
 	// returns true on successful reservation
 	bool block_reserver(const route_t *route, uint16 start_index, uint16 &next_signal, uint16 &next_crossing, int signal_count, bool reserve, bool force_unreserve ) const;
 
+	// fork: sets the signals and entry signals freed by block_reserver once the whole way is freed
+	static void refresh_freed_signals(const vector_tpl<signal_t *> &signals, const vector_tpl<koord3d> &boundaries);
+
 	void leave_tile() OVERRIDE;
 
 	typ get_typ() const OVERRIDE { return rail_vehicle; }
