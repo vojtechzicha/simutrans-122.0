@@ -552,7 +552,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	update_crowding_buttons();
 	tabs.add_tab( &cont_loading, translator::translate("Loading") );
 
-	if(  schedule->allows_hold()  ) {
+	if(  schedule->allows_coupling()  ) {
 		// coupling: a train of this line joins a train of that line here
 		cont_coupling.set_table_layout(3,2);
 		cont_coupling.set_margin( page_margin_tl, page_margin_br );
@@ -1182,7 +1182,7 @@ void schedule_gui_t::draw(scr_coord pos, scr_size size)
 		init_line_selector();
 		last_schedule_count = schedule->get_count();
 	}
-	if(  schedule->allows_hold()  &&  player->simlinemgmt.get_line_count()!=couple_line_count  ) {
+	if(  schedule->allows_coupling()  &&  player->simlinemgmt.get_line_count()!=couple_line_count  ) {
 		init_couple_selector();
 		update_selection();
 	}

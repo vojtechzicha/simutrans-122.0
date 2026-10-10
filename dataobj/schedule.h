@@ -77,8 +77,11 @@ public:
 
 	virtual waytype_t get_waytype() const = 0;
 
-	/// fork: the Hold stop type needs rail vehicles (they wait there for passing trains)
+	/// fork: the Hold stop type: rail vehicles (they wait there for passing trains) and road vehicles (layover)
 	bool allows_hold() const;
+
+	/// fork: coupling of trains needs rail vehicles
+	bool allows_coupling() const;
 
 	/// fork: stop types (and coupling) this schedule's vehicles cannot use become regular stops
 	void sanitize_stop_types();

@@ -285,7 +285,7 @@ void schedule_t::rdwr(loadsave_t *file)
 				// fork: coupling with a train of another line
 				file->rdwr_short(entries[i].couple_line_id);
 				file->rdwr_short(entries[i].couple_max_wait);
-				if(  file->is_loading()  &&  !allows_hold()  ) {
+				if(  file->is_loading()  &&  !allows_coupling()  ) {
 					entries[i].couple_line_id = 0;
 					entries[i].couple_max_wait = 0;
 				}
@@ -565,21 +565,26 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 }
 
 
-bool schedule_t::allows_hold() const
+bool schedule_t::allows_coupling() const
 {
 	const waytype_t wt = get_waytype();
 	return wt == track_wt  ||  wt == tram_wt  ||  wt == monorail_wt  ||  wt == maglev_wt  ||  wt == narrowgauge_wt;
 }
 
 
+bool schedule_t::allows_hold() const
+{
+	return allows_coupling()  ||  get_waytype() == road_wt;
+}
+
+
 void schedule_t::sanitize_stop_types()
 {
-	if(  !allows_hold()  ) {
-		FOR( minivec_tpl<schedule_entry_t>, &entry, entries ) {
-			if(  entry.stop_type == schedule_entry_t::hold  ) {
-				entry.stop_type = schedule_entry_t::regular;
-			}
-			// coupling needs rail vehicles as well
+	FOR( minivec_tpl<schedule_entry_t>, &entry, entries ) {
+		if(  entry.stop_type == schedule_entry_t::hold  &&  !allows_hold()  ) {
+			entry.stop_type = schedule_entry_t::regular;
+		}
+		if(  !allows_coupling()  ) {
 			entry.couple_line_id = 0;
 			entry.couple_max_wait = 0;
 		}
