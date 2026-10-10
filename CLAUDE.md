@@ -155,7 +155,12 @@ old and new entries as the longest run of the same stops in order, and resets an
 interval or offsets changed); among ready convoys the earliest arrival goes first
 (`convoi_t::arrived_before`, the same tick goes by convoy number). Fork saves keep `arrived_time`
 also at stops without a waiting time (stock wrote a dummy there, so every train waiting at such a
-stop came back with one tick); a slot already in `last_departure_slot` is never booked twice. Convoys without a line and
+stop came back with one tick); a slot already in `last_departure_slot` is never booked twice. Until a train left at an
+entry since its timetable came into force (a new line, or an edit of that stop or of the way to it: the entries from the
+stop with a timetable before it up to it, all of them if it is the only one, `same_way_to`), the first train never leaves
+late: it takes only a slot it already stood there for and that came after the edit, else it waits for the next whole slot
+(`is_full_slot`; the entry's `last_departure_slot` is then -2 - the minute of the edit, `fresh_slot_mark`, saved as
+before; -1 = unknown, arrival only; tool `c` and the depot's new line call `fresh_slots`). Convoys without a line and
 convoys with `no_load` ignore the timetable. The schedule dialog shows the two inputs only with the
 calendar on and greys them out for line-less convoys; the entry list appends "(every N min, +M)".
 A convoy that arrived after another convoy of its line at the same entry only unloads until

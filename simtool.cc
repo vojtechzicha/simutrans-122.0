@@ -7048,6 +7048,8 @@ bool tool_change_line_t::init( player_t *player )
 				}
 
 				line->get_schedule()->finish_editing(); // just in case ...
+				// fork, timetable: no slot that opened before the line existed counts
+				line->fresh_slots();
 				if(  can_use_gui()  ) {
 					schedule_gui_t *fg = dynamic_cast<schedule_gui_t *>(win_get_magic((ptrdiff_t)t));
 					if(  fg  ) {
@@ -7313,6 +7315,7 @@ bool tool_change_depot_t::init( player_t *player )
 			linehandle_t selected_line = depot->get_owner()->simlinemgmt.create_line(depot->get_line_type(),depot->get_owner());
 			// no need to check schedule for scenario conditions, as schedule is only copied
 			selected_line->get_schedule()->sscanf_schedule( p );
+			selected_line->fresh_slots();
 
 			depot_frame_t *depot_frame = dynamic_cast<depot_frame_t *>(win_get_magic( (ptrdiff_t)depot ));
 			if(  can_use_gui()  ) {

@@ -75,6 +75,8 @@ private:
 	 * Timetable (fork): per schedule entry the calendar minute of the slot a convoy last
 	 * left in, so every slot is used by one convoy only. A schedule edit keeps it for the entries
 	 * that stayed with the same timetable (keep_slots_across_edit).
+	 * Below 0 nobody left there yet: -1 since when is unknown, else (fresh_slots) -2 - the minute
+	 * the timetable came into force there (new line, or that stop or the way to it edited).
 	 */
 	vector_tpl<sint64> last_departure_slot;
 
@@ -165,6 +167,9 @@ public:
 
 	/// Timetable (fork): marks the slot as used at this schedule entry
 	void book_departure_slot(uint8 entry, sint64 slot);
+
+	/// Timetable (fork): a new line's schedule, filled in place: no slot that opened before now counts
+	void fresh_slots();
 
 	/**
 	 * Timetable (fork): the last slot of the convoy's current entry has closed and no train of

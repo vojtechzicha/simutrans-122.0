@@ -158,6 +158,44 @@ static bool same_stop(koord3d a, koord3d b, const player_t *owner)
 }
 
 
+// fork: last_departure_slot of an entry whose timetable comes into force now (see simline.h)
+static sint64 fresh_slot_mark()
+{
+	const sint64 now = world()->get_calendar_minutes();
+	return -2 - (now > 0 ? now : 0);
+}
+
+
+// fork: is the way to new entry j the old one: the entries from the stop with a timetable before it
+// (all of them, if it is the only one) up to j itself unchanged and in a row in the old schedule?
+static bool same_way_to(const schedule_t *old_schedule, const schedule_t *new_schedule, const vector_tpl<sint16> &from, uint32 j)
+{
+	const uint32 n = old_schedule->get_count();
+	const uint32 m = new_schedule->get_count();
+	uint32 k = j;
+	for(  uint32 steps = 0;  steps < m;  steps++  ) {
+		if(  from[k] < 0  ||  !(old_schedule->entries[from[k]] == new_schedule->entries[k])  ) {
+			return false;
+		}
+		if(  k != j  &&  new_schedule->entries[k].has_timetable()  ) {
+			// trains come from there on time
+			return true;
+		}
+		const uint32 prev = k > 0 ? k-1 : m-1;
+		if(  prev == j  ) {
+			break;
+		}
+		if(  from[prev] != (from[k] > 0 ? from[k]-1 : (sint16)n-1)  ) {
+			// a stop added or removed in between
+			return false;
+		}
+		k = prev;
+	}
+	// round the whole schedule: the same stops all the way, and no more of them
+	return m == n;
+}
+
+
 void simline_t::keep_slots_across_edit(const schedule_t *old_schedule, const schedule_t *new_schedule)
 {
 	// which old entry each new entry continues: the longest run of the same stops in the same order
@@ -199,12 +237,14 @@ void simline_t::keep_slots_across_edit(const schedule_t *old_schedule, const sch
 	#undef LEN
 	delete [] len;
 
-	// used slots: kept where the entry stayed and its timetable did not change
+	// used slots: kept where the entry stayed, its timetable did not change and neither did the way
+	// to it; elsewhere the first train may not leave late in a slot that opened before it came
 	vector_tpl<sint64> slots( m );
 	for(  uint32 j=0;  j<m;  j++  ) {
 		const sint16 i = from[j];
-		const bool keep = i >= 0  &&  (uint32)i < last_departure_slot.get_count()  &&  same_timetable( old_schedule->entries[i], new_schedule->entries[j] );
-		slots.append( keep ? last_departure_slot[i] : -1 );
+		const bool keep = i >= 0  &&  (uint32)i < last_departure_slot.get_count()  &&  same_timetable( old_schedule->entries[i], new_schedule->entries[j] )
+			&&  same_way_to( old_schedule, new_schedule, from, j );
+		slots.append( keep ? last_departure_slot[i] : fresh_slot_mark() );
 	}
 	last_departure_slot.clear();
 	FOR( vector_tpl<sint64>, const s, slots ) {
@@ -320,6 +360,32 @@ static sint64 first_departure_slot(const schedule_entry_t &entry, sint64 now)
 }
 
 
+// fork: until a train left at this entry (last below 0), a slot counts only when the timetable was
+// in force then and the convoy already stood there, so the first train never leaves late
+static bool is_full_slot(convoihandle_t cnv, sint64 last, sint64 slot)
+{
+	if(  last >= 0  ) {
+		return true;
+	}
+	if(  last <= -2  &&  slot < -2 - last  ) {
+		return false;
+	}
+	// (never later than now, whatever the tick counter did)
+	const sint64 now = world()->get_calendar_minutes();
+	const sint64 arrived = world()->get_calendar_minutes_at( cnv->get_arrived_time() );
+	return (arrived < now ? arrived : now) <= slot;
+}
+
+
+void simline_t::fresh_slots()
+{
+	last_departure_slot.clear();
+	for(  uint32 i=0;  i<schedule->get_count();  i++  ) {
+		last_departure_slot.append( fresh_slot_mark() );
+	}
+}
+
+
 uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
 {
 	const schedule_t *cnv_schedule = cnv->get_schedule();
@@ -356,8 +422,13 @@ bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint6
 		return false;
 	}
 	sint64 s = first_departure_slot( entry, max( ready_at, welt->get_calendar_minutes() ) );
-	if(  idx < last_departure_slot.get_count()  &&  last_departure_slot[idx] == s  ) {
+	const sint64 last = idx < last_departure_slot.get_count() ? last_departure_slot[idx] : -1;
+	if(  last == s  ) {
 		// this slot is gone already
+		s = next_departure_slot( entry, s );
+	}
+	for(  int n = 0;  n < 64  &&  !is_full_slot( cnv, last, s );  n++  ) {
+		// the first train after the timetable came into force waits for a whole slot
 		s = next_departure_slot( entry, s );
 	}
 	// every convoy that arrived earlier takes one slot before us
@@ -404,8 +475,13 @@ bool simline_t::can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const
 	if(  !get_open_departure_slot( entry, slot )  ) {
 		return false;
 	}
-	if(  idx < last_departure_slot.get_count()  &&  last_departure_slot[idx] == slot  ) {
+	const sint64 last = idx < last_departure_slot.get_count() ? last_departure_slot[idx] : -1;
+	if(  last == slot  ) {
 		// somebody left in this slot already
+		return false;
+	}
+	if(  !is_full_slot( cnv, last, slot )  ) {
+		// the first train after the timetable came into force: not late in a slot that opened before
 		return false;
 	}
 	// first come, first served: a ready convoy that arrived earlier at this stop goes first
