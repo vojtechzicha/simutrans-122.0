@@ -40,6 +40,7 @@ gui_combobox_t::gui_combobox_t(gui_scrolled_list_t::item_compare_func cmp) :
 	first_call = true;
 	finish = false;
 	wrapping = true;
+	stepping = true;
 	droplist.set_visible(false);
 	droplist.add_listener(this);
 	closed_size = get_size();
@@ -59,6 +60,9 @@ bool gui_combobox_t::infowin_event(const event_t *ev)
 DBG_MESSAGE("event","%d,%d",ev->cx, ev->cy);
 		if(  bt_prev.getroffen(ev->cx, ev->cy)  ) {
 DBG_MESSAGE("event","HOWDY!");
+			if(  !stepping  ) {
+				return true;
+			}
 			bt_prev.pressed = IS_LEFT_BUTTON_PRESSED(ev);
 			if(IS_LEFTRELEASE(ev)) {
 				value_t p;
@@ -70,6 +74,9 @@ DBG_MESSAGE("event","HOWDY!");
 			return true;
 		}
 		else if(  bt_next.getroffen(ev->cx, ev->cy)  ) {
+			if(  !stepping  ) {
+				return true;
+			}
 			bt_next.pressed = IS_LEFT_BUTTON_PRESSED(ev);
 			if(IS_LEFTRELEASE(ev)) {
 				bt_next.pressed = false;
@@ -88,7 +95,7 @@ DBG_MESSAGE("event","HOWDY!");
 	}
 
 	// goto next/previous choice
-	if(  ev->ev_class == EVENT_KEYBOARD  &&  (ev->ev_code == SIM_KEY_UP  ||  ev->ev_code == SIM_KEY_DOWN)  ) {
+	if(  stepping  &&  ev->ev_class == EVENT_KEYBOARD  &&  (ev->ev_code == SIM_KEY_UP  ||  ev->ev_code == SIM_KEY_DOWN)  ) {
 		int sel = droplist.get_selection();
 		if(  ev->ev_code == SIM_KEY_UP  ) {
 			set_selection(  sel > 0 ? sel-1 : (wrapping ? droplist.get_count()-1 : 0) );
@@ -245,8 +252,10 @@ void gui_combobox_t::draw(scr_coord offset)
 void gui_combobox_t::enable()
 {
 	set_focusable(true);
-	bt_next.enable();
-	bt_prev.enable();
+	if(  stepping  ) {
+		bt_next.enable();
+		bt_prev.enable();
+	}
 	textinp.set_color(SYSCOL_EDIT_TEXT);
 }
 

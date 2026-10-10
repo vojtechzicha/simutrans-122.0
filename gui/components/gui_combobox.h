@@ -49,6 +49,9 @@ private:
 	// true to allow buttons to wrap around selection
 	bool wrapping:1;
 
+	// fork: false when the arrow buttons and the up/down keys must not change the selection
+	bool stepping:1;
+
 	// offset of last draw call, needed to decide, where to open droplist
 	scr_coord last_draw_offset;
 
@@ -143,6 +146,9 @@ public:
 	void close_box();
 
 	void set_wrapping(const bool wrap) { wrapping = wrap; }
+
+	/// fork: false: only a choice from the opened list changes the selection (no arrow buttons or up/down keys)
+	void set_stepping(const bool step) { stepping = step;  if(  !step  ) { bt_prev.disable();  bt_next.disable(); } }
 
 	bool is_dropped() const { return droplist.is_visible(); }
 

@@ -17,9 +17,10 @@ line_management_gui_t::line_management_gui_t(linehandle_t line, player_t* player
 	schedule_gui_t()
 {
 	if (line.is_bound() ) {
+		// (before init, which leaves this line out of the coupling list)
+		this->line = line;
 		schedule_gui_t::init(line->get_schedule()->copy(), player_, convoihandle_t() );
 
-		this->line = line;
 		// has this line a single running convoi?
 		if(  line->count_convoys() > 0  ) {
 			minimap_t::get_instance()->set_selected_cnv( line->get_convoy(0) );

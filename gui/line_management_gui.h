@@ -29,6 +29,8 @@ public:
 
 private:
 	linehandle_t line;
+
+	linehandle_t get_schedule_line() const OVERRIDE { return line; }
 };
 
 #endif

@@ -559,6 +559,8 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		{
 			cont_coupling.add_component(&lb_couple);
 			init_couple_selector();
+			// a click on an arrow or an up/down key would quietly couple with the line next in the list
+			couple_selector.set_stepping( false );
 			couple_selector.add_listener(this);
 			cont_coupling.add_component(&couple_selector, 2);
 
@@ -707,13 +709,22 @@ void schedule_gui_t::init_couple_selector()
 	couple_selector.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate("<no coupling>"), SYSCOL_TEXT );
 	vector_tpl<linehandle_t> lines;
 	player->simlinemgmt.get_lines( schedule->get_type(), &lines );
+	const linehandle_t own = get_schedule_line();
 	FOR( vector_tpl<linehandle_t>, line, lines ) {
-		couple_selector.new_component<line_scrollitem_t>( line );
+		if(  line!=own  ) {
+			couple_selector.new_component<line_scrollitem_t>( line );
+		}
 	}
 	line_scrollitem_t::sort_mode = line_scrollitem_t::SORT_BY_NAME;
 	couple_selector.sort( 1 );
 	couple_selector.set_selection( 0 );
 	couple_line_count = player->simlinemgmt.get_line_count();
+}
+
+
+linehandle_t schedule_gui_t::get_schedule_line() const
+{
+	return cnv.is_bound() ? cnv->get_line() : linehandle_t();
 }
 
 

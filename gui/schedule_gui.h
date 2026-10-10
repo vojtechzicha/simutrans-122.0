@@ -97,7 +97,7 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_numberinput_t numimp_couple_wait;
 	gui_label_minw_t lb_couple_wait_fmt;
 	uint32 couple_line_count;        // lines in couple_selector, to notice new or deleted lines
-	void init_couple_selector();
+	void init_couple_selector();       // all lines of this type but our own (a line never couples with itself)
 
 	/// the schedule belongs to a line (timetable slots only work with lines)
 	bool has_line() const;
@@ -126,6 +126,9 @@ protected:
 	linehandle_t new_line, old_line;
 
 	void init(schedule_t* schedule, player_t* player, convoihandle_t cnv);
+
+	/// fork: the line this schedule belongs to (unbound for a convoy without a line)
+	virtual linehandle_t get_schedule_line() const;
 
 public:
 	schedule_gui_t(schedule_t* schedule = NULL, player_t* player = NULL, convoihandle_t cnv = convoihandle_t());
