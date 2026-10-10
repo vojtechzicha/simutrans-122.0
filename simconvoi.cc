@@ -2116,6 +2116,8 @@ bool convoi_t::drive_to()
 				release_claim( true );
 			}
 			if(  route_ok  ) {
+				// fork, coupling: the train we parted from may stand in our way out of the platform
+				pass_standing_partner();
 				vorfahren();
 				return true;
 			}
@@ -2674,12 +2676,11 @@ void convoi_t::ziel_erreicht()
 			}
 			leaving_halt = halthandle_t();
 			if(  is_coupled_primary()  ) {
-				// fork, coupling: the joined train stops here as well, or parts here
+				// fork, coupling: the joined train stops here as well, or we part here (in laden(), since
+				// this runs in sync_step, where the joined train cannot join the sync list)
 				convoi_t *c = coupled_convoi.get_rep();
 				c->arrived_time = arrived_time;
-				if(  !c->follow_to_stop( halt )  ) {
-					uncouple_here();
-				}
+				c->follow_to_stop( halt );
 			}
 			else if(  line.is_bound()  ) {
 				// fork, coupling: our primary left without us here, so we run late with its slot
@@ -4008,6 +4009,18 @@ void convoi_t::laden()
 		return;
 	}
 
+	// fork, coupling: where the joined train does not stop or goes on to another stop, we part: each
+	// loads and leaves by its own rules
+	if(  is_coupled_primary()  ) {
+		const convoi_t *c = coupled_convoi.get_rep();
+		const halthandle_t here = haltestelle_t::get_halt( schedule->get_current_entry().pos, owner );
+		const halthandle_t next = next_stop_halt( schedule, schedule->get_current_stop(), owner );
+		if(  here!=haltestelle_t::get_halt( c->schedule->get_current_entry().pos, owner )  ||  !next.is_bound()
+			||  next!=next_stop_halt( c->schedule, c->schedule->get_current_stop(), owner )  ) {
+			part_here( here );
+		}
+	}
+
 	// fork, coupling: join the partner standing next to us
 	if(  !coupled_convoi.is_bound()  &&  !handover_to.is_bound()  ) {
 		bool standing;
@@ -4443,10 +4456,11 @@ station_tile_search_ready: ;
 		late_slot = -1;
 
 		if(  joined  ) {
-			// fork, coupling: together on to the same next stop, or the joined train stays here
+			// fork, coupling: together on to the same next stop, or the joined train stays here (normally they
+			// parted on arrival already; this is for a schedule edited while standing here)
 			const halthandle_t next = next_stop_halt( schedule, schedule->get_current_stop(), owner );
 			if(  !next.is_bound()  ||  next!=next_stop_halt( joined->schedule, joined->schedule->get_current_stop(), owner )  ) {
-				uncouple_here();
+				part_here( halt );
 			}
 			else {
 				// the joined line's timetable does not hold us (ours decides), but its open slot is used
@@ -4470,7 +4484,7 @@ station_tile_search_ready: ;
 		start_departure_delay_count();
 
 		// fork: when we really start from here, who boarded a train that leaves later may change to us
-		// (a joined train that stays here takes no part, so after uncouple_here)
+		// (a joined train that stays here takes no part, so after part_here)
 		leaving_halt = halt;
 		leaving_loadable = min( vehicles_loading, anz_vehikel );
 		platform_boarded = false;
@@ -4484,7 +4498,7 @@ station_tile_search_ready: ;
 		}
 
 		// fork: a full train leaves; whoever still waits for its next stops missed it and may overcrowd the next one
-		for(  int p=0;  p<2;  p++  ) {
+		for(  int p=0;  p<(is_coupled_primary() ? 2 : 1);  p++  ) {
 			if(  has_crowd[p]  &&  !space_left[p][0]  &&  (!portions[p].schedule->allows_standing()  ||  !space_left[p][1])  ) {
 				halt->mark_missed_connection( goods_manager_t::passengers, portions[p].destination_halts );
 			}
@@ -6672,43 +6686,146 @@ void convoi_t::resync_coupled_schedule()
 }
 
 
-void convoi_t::uncouple_here()
+void convoi_t::part_here(halthandle_t halt)
 {
 	convoi_t *c = coupled_convoi.get_rep();
 
-	// the joined train appears on the tiles of the whole train once we have left them
-	get_train_tiles( c->uncouple_span );
-
-	const sint32 own_fixed = sum_fixed_costs;
-	while(  anz_vehikel > coupled_first  ) {
-		vehicle_t *v = fahr[anz_vehikel-1];
-		// off the map; the tile stays reserved for us until we hand it over
-		v->set_last( false );
-		v->set_leading( false );
-		v->mark_image_dirty( v->get_image(), 0 );
-		v->leave_tile();
-		v->set_flag( obj_t::not_on_map );
-		remove_vehikel_bei( anz_vehikel-1 );
-		v->set_convoi( c );
+	// both stay where they stand, each a train of its own
+	release_coupled_in_place();
+	recalc_traction( false );
+	if(  halt.is_bound()  &&  halt==haltestelle_t::get_halt( c->schedule->get_current_entry().pos, owner )  ) {
+		// it stopped here with us: it loads and leaves by its own rules (its arrival time is ours)
+		c->state = LOADING;
 	}
-	sum_fixed_costs = own_fixed;
-	coupled_convoi = convoihandle_t();
-	recalc_catg_index();
-	calc_loading();
-	freight_info_resort = true;
+	c->couple_wait_since = 0;
+	c->couple_hold_slot = -1;
+	c->next_reservation_index = 0;
 
-	handover_to = c->self;
-	c->coupled_convoi = self;
-	c->state = UNCOUPLING;
-	for(  uint8 i=0;  i<c->anz_vehikel;  i++  ) {
-		c->fahr[i]->set_leading( false );
-		c->fahr[i]->set_last( i+1==c->anz_vehikel );
+	DBG_MESSAGE( "convoi_t::part_here()", "%s and %s parted", get_name(), c->get_name() );
+}
+
+
+bool convoi_t::pass_standing_partner()
+{
+	if(  anz_vehikel==0  ||  route.get_count()<2  ||  akt_speed>0  ||  !line.is_bound()  ||  coupled_convoi.is_bound()  ||  handover_to.is_bound()  ||  !dynamic_cast<rail_vehicle_t *>(fahr[0])  ) {
+		return false;
 	}
-	c->calc_loading();
-	c->freight_info_resort = true;
-	c->wait_lock = 0;
+	const waytype_t wt = fahr[0]->get_waytype();
+	const halthandle_t halt = haltestelle_t::get_halt( fahr[0]->get_pos(), owner );
+	if(  !halt.is_bound()  ) {
+		return false;
+	}
+	vector_tpl<koord3d> ours;
+	get_train_tiles( ours );
 
-	DBG_MESSAGE( "convoi_t::uncouple_here()", "%s leaves %s behind", get_name(), c->get_name() );
+	// the first tile of our way out that we do not stand on, right behind our tiles
+	uint32 k = 0;
+	while(  k<route.get_count()  &&  ours.is_contained( route.at(k) )  ) {
+		k++;
+	}
+	if(  k==0  ||  k>=route.get_count()  ) {
+		return false;
+	}
+	const grund_t *gr = welt->lookup( route.at(k) );
+	const schiene_t *sch = gr ? obj_cast<schiene_t>( gr->get_weg( wt ) ) : NULL;
+	const convoihandle_t other = sch ? sch->get_reserved_convoi() : convoihandle_t();
+	if(  !other.is_bound()  ||  other==self  ) {
+		return false;
+	}
+
+	// a train standing at this stop that we just parted from or couple with
+	convoi_t *B = other.get_rep();
+	if(  B->owner!=owner  ||  B->state!=LOADING  ||  B->anz_vehikel==0  ||  B->coupled_convoi.is_bound()  ||  B->handover_to.is_bound()  ||  !B->line.is_bound()
+		||  (!line_couples_with( B->line, line.get_id() )  &&  !line_couples_with( line, B->line.get_id() ))
+		||  haltestelle_t::get_halt( B->fahr[0]->get_pos(), owner )!=halt  ||  B->fahr[0]->get_waytype()!=wt  ) {
+		return false;
+	}
+
+	// all its tiles (but one we share) come next on our way, and our way goes on beyond them
+	vector_tpl<koord3d> theirs;
+	B->get_train_tiles( theirs );
+	uint32 n = 0;
+	FOR( vector_tpl<koord3d>, const t, theirs ) {
+		if(  !ours.is_contained( t )  ) {
+			n++;
+		}
+	}
+	const uint32 last = k + n - 1;
+	if(  n==0  ||  last+1 >= route.get_count()  ) {
+		return false;
+	}
+	for(  uint32 i=k;  i<=last;  i++  ) {
+		if(  !theirs.is_contained( route.at(i) )  ) {
+			return false;
+		}
+	}
+
+	// the row of both trains, in the direction we leave
+	vector_tpl<koord3d> chain;
+	if(  ours.back()==route.at(k-1)  ) {
+		// we stand behind it, facing that way
+		FOR( vector_tpl<koord3d>, const t, ours ) { chain.append( t ); }
+	}
+	else if(  ours.front()==route.at(k-1)  ) {
+		// we turn back through it
+		for(  uint32 i=ours.get_count();  i-- > 0;  ) { chain.append( ours[i] ); }
+	}
+	else {
+		return false;
+	}
+	for(  uint32 i=k;  i<=last;  i++  ) {
+		chain.append( route.at(i) );
+	}
+	for(  uint32 i=1;  i<chain.get_count();  i++  ) {
+		if(  !tiles_connected( chain[i-1], chain[i], wt )  ) {
+			return false;
+		}
+	}
+
+	// change places: we go to the end we leave from, the other train behind us (facing the same way)
+	vector_tpl<koord3d> way_on;
+	for(  uint32 i=last;  i<route.get_count();  i++  ) {
+		way_on.append( route.at(i) );
+	}
+	FOR( vector_tpl<koord3d>, const t, chain ) {
+		if(  grund_t *g = welt->lookup( t )  ) {
+			if(  schiene_t *s = obj_cast<schiene_t>( g->get_weg( wt ) )  ) {
+				s->unreserve( self );
+				s->unreserve( other );
+			}
+		}
+	}
+	route.clear();
+	FOR( vector_tpl<koord3d>, const t, chain ) { route.append( t ); }
+	lay_out_on_route( true );
+	B->route.clear();
+	FOR( vector_tpl<koord3d>, const t, chain ) { B->route.append( t ); }
+	B->lay_out_on_route();
+	const uint32 b_next = B->fahr[0]->get_route_index();
+	B->route.remove_koord_from( b_next>0 ? b_next-1 : 0 );
+	// the other train keeps the tiles it stands on (a shared one too), we hold the rest of ours
+	for(  int pass=0;  pass<2;  pass++  ) {
+		convoi_t *c = pass==0 ? B : this;
+		for(  uint8 i=0;  i<c->anz_vehikel;  i++  ) {
+			c->fahr[i]->last_stop_pos = c->fahr[i]->get_pos();
+			if(  grund_t *g = welt->lookup( c->fahr[i]->get_pos() )  ) {
+				if(  schiene_t *s = obj_cast<schiene_t>( g->get_weg( wt ) )  ) {
+					if(  !s->is_reserved()  ) {
+						s->reserve( c->self, ribi_t::none );
+					}
+				}
+			}
+		}
+		c->alte_richtung = c->fahr[0]->get_direction();
+		c->recalc_traction( false );
+		c->next_reservation_index = 0;
+	}
+	// our way on from the end of the row (vorfahren() puts our vehicles on it again)
+	route.clear();
+	FOR( vector_tpl<koord3d>, const t, way_on ) { route.append( t ); }
+
+	DBG_MESSAGE( "convoi_t::pass_standing_partner()", "%s changed places with %s to leave", get_name(), B->get_name() );
+	return true;
 }
 
 

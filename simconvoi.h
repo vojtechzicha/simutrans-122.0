@@ -73,7 +73,7 @@ public:
 		LEAVING_DEPOT,
 		ENTERING_DEPOT,
 		COUPLED,        ///< fork: joined to a primary train, which drives its vehicles (see coupled_convoi)
-		UNCOUPLING,     ///< fork: just uncoupled, off the map until the primary has left the platform
+		UNCOUPLING,     ///< fork: just uncoupled, off the map until the primary has left the platform (older fork saves only)
 		MAX_STATES
 	};
 
@@ -288,9 +288,10 @@ private:
 	 * the end of fahr, from index coupled_first on, and coupled_convoi is that train. The joined
 	 * train is in state COUPLED: its fahr points to the same vehicles (they belong to the primary
 	 * while coupled, see get_vehicle_owner) and its coupled_convoi is the primary.
-	 * A train in state UNCOUPLING has just been uncoupled: its vehicles are off the map until the
-	 * primary (its coupled_convoi) has left uncouple_span (tiles, rear to front), then it appears
-	 * there. The primary hands over the span tiles as its last vehicle leaves them (handover_to).
+	 * Where they part, both become trains of their own standing where they are (part_here).
+	 * Only saves of older fork builds have a train in state UNCOUPLING: its vehicles are off the map
+	 * until the primary (its coupled_convoi) has left uncouple_span (tiles, rear to front), then it
+	 * appears there. The primary hands over the span tiles as its last vehicle leaves them (handover_to).
 	 */
 	convoihandle_t coupled_convoi;
 	uint8 coupled_first;
@@ -551,10 +552,14 @@ private:
 	/// fork, coupling: joins the train C to the primary P standing next to it at a stop
 	static bool couple(convoihandle_t P, convoihandle_t C);
 
-	/// fork, coupling: at a stop where the schedules part, the joined train stays behind
-	void uncouple_here();
+	/// fork, coupling: at a stop where the schedules part, the two trains become two trains standing where they are
+	void part_here(halthandle_t halt);
 
-	/// fork, coupling: while UNCOUPLING, takes the span tiles over and appears when all are ours
+	/// fork, coupling: before leaving, a train whose way out runs through the train it just parted from (or
+	/// one it couples with) standing at the same platform changes places with it; true if it did
+	bool pass_standing_partner();
+
+	/// fork, coupling: while UNCOUPLING (saves of older fork builds), takes the span tiles over and appears when all are ours
 	void step_uncoupling();
 
 	/// fork, coupling: the joined train takes its vehicles back where they stand (primary removed)

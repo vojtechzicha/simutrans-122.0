@@ -398,8 +398,8 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
 - Every wait is bounded (max wait at the stop; red at a choose signal only while the partner's route
   already leads into the stop), so a pair that cannot get together runs separately. Two warnings in
   the message window: both stood at the stop but could not couple (no free track behind the
-  primary), and a train that cannot reappear after uncoupling for 30 calendar minutes (1/8 month
-  without the calendar) because its platform stays occupied (`uncouple_since`, not saved).
+  primary), and a train from an older save that cannot reappear after uncoupling for 30 calendar
+  minutes (1/8 month without the calendar) because its platform stays occupied (`uncouple_since`, not saved).
 - Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
   become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
   primary's direction (`lay_out_on_route( true )`: the front stays where the front train stood, halfway through its tile heading north or west as `hop()` stops it, the rest packed behind; the stock reversal code packs from the rear instead), all tiles reserved for the
@@ -425,14 +425,23 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   else goes to the first following stop still there (`find_matching_entry`). The stock scoring
   compared entries at fixed distances, so e.g. a waypoint inserted at the start while a train went
   to one of the last stops made it skip that stop.
-- Parting (`uncouple_here`): at the first stop where the next stops differ (checked at departure),
-  or on arrival at a stop the joined train's schedule skips. The joined train goes off the map
-  (UNCOUPLING) and remembers the tiles of the whole train (`uncouple_span`); the primary leaves on
-  green, hands each span tile over as its last vehicle leaves it (`handover_tile` from
-  `rail_vehicle_t::leave_tile`, `move_to` keeps span tiles), and tiles it will not drive through are
-  taken in `step_uncoupling`. When all are ours, the train appears at the rear of the span and loads
-  there as a train of its own. Nothing else can take the platform in between, so single track with
-  full stop signals behaves like two stock trains.
+- Parting (`part_here`, from the primary's first `laden()` after arrival, since arrival runs in
+  `sync_step` where nothing may join the sync list): at a stop the joined train's schedule skips, or
+  where the next stops differ (again at departure, for a schedule edited while standing). Both become
+  trains of their own standing where they are (`release_coupled_in_place`: each holds the tiles its
+  vehicles stand on), each loads and leaves by its own timetable, waits and coupling rules. The part
+  that must leave through the other one (the rear going on, or the front turning back) changes places
+  with it when it leaves (`pass_standing_partner`, in `drive_to` before `vorfahren`): when the first
+  tiles of its way out after its own are all the tiles of a LOADING train of the same owner at the
+  same stop whose line couples with ours (either way), the two rows become one, we are laid out at
+  the end we leave from and it behind us facing the same way, and our route is the rest of the way
+  from there. Stateless, so it works after loading a save too. Instant, like the coupling move.
+  Found on R18 at Staré Město (2026-10-10): R18/2 (primary, in front) turns back there after a long
+  wait for the returning R18/1, R18/1 (behind) goes on to Luhačovice. Before, the joined train went
+  off the map until the primary left (`uncouple_here`, UNCOUPLING), so R18/1 waited invisibly for
+  R18/2's departure an hour later, and R18/2 waited for an R18/1 that could not come back.
+  UNCOUPLING remains only for saves of older fork builds: such a train takes over `uncouple_span`
+  as the primary leaves it (`handover_tile`, `step_uncoupling`) and appears at its rear.
 - Missed coupling: a primary that leaves alone after the max wait gives its slot to the joining line
   (`simline_t::add_missed_coupling`); the next train of that line arriving alone at that entry takes
   it (`late_slot`, `running_late`), does not wait for the gone partner, and leaves at once. While
@@ -462,6 +471,10 @@ terminus reversal while coupled, the primary turning back through the span, choo
 partner on the other platform, coupling across platforms without choose signals, missed coupling with timetable and late running, save/load while
 coupled, uncoupling and waiting, downgrade, deleting either train, depot entry. The GUI parts
 (schedule dialog row, convoy window, departure board) are compiled but not seen on screen.
+Parting in place tested headless (pak128.cs) on a small rebuild of the R18 layout: two pairs on a
+60-minute timetable, the primary turning back at the parting stop after waiting for the returning
+branch train, the rear part changing places to leave on time; the reverse order (primary goes on);
+save/load while parted; the 33 rail regression scenarios unchanged except the parting events.
 
 ## Platform signals and station boundaries (fork feature, savegame 122.7)
 
