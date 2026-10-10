@@ -49,6 +49,8 @@
 #include "obj/crossing.h"
 #include "obj/roadsign.h"
 #include "obj/signal.h"
+#include "obj/gebaeude.h"
+#include "descriptor/building_desc.h"
 #include "obj/wayobj.h"
 
 #include "vehicle/simroadtraffic.h"
@@ -205,6 +207,11 @@ void convoi_t::init(player_t *player)
 	departure_standing = 0;
 	uncouple_since = 0;
 	uncouple_warned = false;
+	layover_pos = koord3d::invalid;
+	layover_bay = 0;
+	layover_phase = LAYOVER_NONE;
+	layover_since = 0;
+	layover_warned = false;
 	wait_lock = 0;
 	arrived_time = 0;
 
@@ -971,6 +978,10 @@ void convoi_t::rotate90( const sint16 y_size )
 	}
 	if(schedule) {
 		schedule->rotate90( y_size );
+	}
+	// fork: the bay at a bus layover too (the table of owners is rebuilt in restore_layover_bays)
+	if(  layover_pos!=koord3d::invalid  ) {
+		layover_pos.rotate90( y_size );
 	}
 	// fork: the claimed track turns with the map
 	for(  uint32 i=0;  i<claim_path.get_count();  i++  ) {
@@ -2116,6 +2127,8 @@ bool convoi_t::drive_to()
 				release_claim( true );
 			}
 			if(  route_ok  ) {
+				// fork, bus layover: a bay at the stop the route ends at (may change the route)
+				plan_layover();
 				// fork, coupling: the train we parted from may stand in our way out of the platform
 				pass_standing_partner();
 				vorfahren();
@@ -2491,6 +2504,7 @@ void convoi_t::new_month()
 void convoi_t::betrete_depot(depot_t *dep)
 {
 	finish_departure_delay();
+	release_layover();
 	// first remove reservation, if train is still on track
 	unreserve_route();
 	release_claim( true );
@@ -2668,6 +2682,8 @@ void convoi_t::ziel_erreicht()
 			halt->book(1, HALT_CONVOIS_ARRIVED);
 			state = LOADING;
 			arrived_time = welt->get_ticks();
+			// fork, bus layover: into the bay
+			layover_arrived();
 			couple_wait_since = 0;
 			couple_hold_slot = -1;
 			// fork: who boarded at the last stop rides on as anybody else (joined train included)
@@ -3784,6 +3800,21 @@ void convoi_t::rdwr(loadsave_t *file)
 	}
 	else if(  file->is_loading()  ) {
 		departure_delay = NO_DEPARTURE_DELAY;
+	}
+
+	if(  file->is_version_atleast(122, 12)  ) {
+		// fork: the bay it holds at a bus layover (the owners are rebuilt in restore_layover_bays)
+		layover_pos.rdwr( file );
+		file->rdwr_byte( layover_bay );
+		file->rdwr_byte( layover_phase );
+		file->rdwr_long( layover_since );
+		if(  file->is_loading()  &&  layover_phase>LAYOVER_PARKED  ) {
+			layover_phase = LAYOVER_NONE;
+		}
+	}
+	else if(  file->is_loading()  ) {
+		layover_phase = LAYOVER_NONE;
+		layover_pos = koord3d::invalid;
 	}
 
 	if(  file->is_loading()  ) {
@@ -5023,6 +5054,12 @@ bool convoi_t::append_wait_reason(cbuffer_t &buf) const
 		return true;
 	}
 	const bool waiting = state>=WAITING_FOR_CLEARANCE  &&  state<=CAN_START_TWO_MONTHS  &&  state!=SELF_DESTRUCT;
+	if(  layover_phase==LAYOVER_QUEUED  &&  waiting  ) {
+		// fork: every bay of the layover stop is taken
+		const halthandle_t halt = haltestelle_t::get_halt( layover_pos, owner );
+		buf.printf( translator::translate("Waiting for a free layover bay at %s"), halt.is_bound() ? halt->get_name() : "?" );
+		return true;
+	}
 	if(  is_platform_held()  ) {
 		// still at the stop position until the platform signal ahead clears, boarding meanwhile
 		if(  boards_while_held()  ) {
@@ -5328,6 +5365,7 @@ void convoi_t::self_destruct()
 void convoi_t::destroy()
 {
 	release_claim( true );
+	release_layover();
 	clear_section();
 	set_section_wait( SECTION_WAIT_NONE, halthandle_t() );
 
@@ -5718,6 +5756,11 @@ void convoi_t::check_pending_updates()
 				/* same destination
 				 * We are already there => keep current state
 				 */
+				if(  (layover_phase==LAYOVER_QUEUED  ||  layover_phase==LAYOVER_APPROACHING)  &&  !get_layover_kind( welt->lookup( schedule->get_current_entry().pos ) )  ) {
+					// fork, bus layover: the entry moved off the layover within the same stop: a new way there
+					release_layover();
+					suche_neue_route();
+				}
 			}
 			else {
 				// need re-routing
@@ -5965,6 +6008,10 @@ bool convoi_t::can_overtake(overtaker_t *other_overtaker, sint32 other_speed, si
 		const uint8 top = gr->get_top();
 		for(  uint8 j=1;  j<top;  j++ ) {
 			if (vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(j))) {
+				if(  v->is_off_lane()  ) {
+					// fork: parked in a layover bay
+					continue;
+				}
 				// check for other traffic on the road
 				const overtaker_t *ov = v->get_overtaker();
 				if(ov) {
@@ -6029,7 +6076,7 @@ bool convoi_t::can_overtake(overtaker_t *other_overtaker, sint32 other_speed, si
 		const uint8 top = gr->get_top();
 		for(  uint8 j=1;  j<top;  j++ ) {
 			vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(j));
-			if(  v  &&  v->get_direction() == their_direction  &&  v->get_overtaker()  ) {
+			if(  v  &&  v->get_direction() == their_direction  &&  v->get_overtaker()  &&  !v->is_off_lane()  ) {
 				// tolerated distance us>them: total_distance*akt_speed > current_distance*other_speed
 				if(  road_vehicle_t const* const car = obj_cast<road_vehicle_t>(v)  ) {
 					convoi_t* const ocnv = car->get_convoi();
@@ -7064,4 +7111,550 @@ const char* convoi_t::send_to_depot(bool local)
 	delete shortest_route;
 
 	return txt;
+}
+
+
+/*
+ * Fork: bus layover. A layover tile (a road stop building with building_desc_t::get_layover_kind)
+ * has two bays beside the lanes; a bus parked in one is off the lane (road_vehicle_t::is_off_lane),
+ * so traffic and other buses drive past it. See layover_phase in simconvoi.h.
+ */
+inthashtable_tpl<uint64, convoi_t::layover_bays_t> convoi_t::layover_bays;
+
+// queued convoys of all layover stops, in no particular order (see is_first_in_layover_queue)
+static vector_tpl<convoihandle_t> layover_queue;
+
+
+uint8 convoi_t::get_layover_kind(const grund_t *gr)
+{
+	if(  !gr  ||  !gr->is_halt()  ||  !gr->hat_weg(road_wt)  ) {
+		return 0;
+	}
+	const gebaeude_t *gb = gr->find<gebaeude_t>();
+	return gb ? gb->get_tile()->get_desc()->get_layover_kind() : 0;
+}
+
+
+bool convoi_t::get_bay_offset(const grund_t *gr, uint8 bay, sint16 &dx, sint16 &dy)
+{
+	dx = dy = 0;
+	const uint8 kind = get_layover_kind( gr );
+	if(  kind==0  ||  bay>1  ) {
+		return false;
+	}
+	const uint8 layout = gr->find<gebaeude_t>()->get_tile()->get_layout();
+	switch(  kind  ) {
+		case building_desc_t::LAYOVER_ONE_SIDE: {
+			// both bays on the side of the layout: 0 = east, 1 = north, 2 = west, 3 = south; bay 0 next to the lane
+			const sint16 d = bay==0 ? 275 : 415;
+			switch(  layout & 3  ) {
+				case 0:  dx =  d; break;
+				case 1:  dy = -d; break;
+				case 2:  dx = -d; break;
+				default: dy =  d; break;
+			}
+			break;
+		}
+		case building_desc_t::LAYOVER_BOTH_SIDES: {
+			// bay 0 east or south of the road, bay 1 west or north
+			const sint16 d = bay==0 ? 400 : -400;
+			if(  layout & 1  ) {
+				dy = d;
+			}
+			else {
+				dx = d;
+			}
+			break;
+		}
+		default: {
+			// dead end: the road leaves 0 = south, 1 = east, 2 = north, 3 = west; the bays either side of it
+			const sint16 d = bay==0 ? 250 : -250;
+			if(  layout & 1  ) {
+				dy = d;
+			}
+			else {
+				dx = d;
+			}
+			break;
+		}
+	}
+	return true;
+}
+
+
+convoihandle_t convoi_t::get_bay_owner(koord3d pos, uint8 bay)
+{
+	if(  layover_bays_t *b = layover_bays.access( layover_key(pos) )  ) {
+		const convoihandle_t c = b->owner[bay];
+		if(  c.is_bound()  &&  c->layover_pos==pos  &&  c->layover_bay==bay  &&  (c->layover_phase==LAYOVER_APPROACHING  ||  c->layover_phase==LAYOVER_PARKED)  ) {
+			return c;
+		}
+	}
+	return convoihandle_t();
+}
+
+
+sint8 convoi_t::find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const
+{
+	const uint8 kind = get_layover_kind( gr );
+	if(  kind==0  ) {
+		return -1;
+	}
+	for(  uint8 bay=0;  bay<2;  bay++  ) {
+		if(  kind==building_desc_t::LAYOVER_BOTH_SIDES  ) {
+			// only the bay on our driving side: we never cross the other lane
+			sint16 dx, dy;
+			get_bay_offset( gr, bay, dx, dy );
+			sint16 rx = 0, ry = 0;
+			if(  arrive_dir==ribi_t::north  ) { rx = 1; }
+			else if(  arrive_dir==ribi_t::south  ) { rx = -1; }
+			else if(  arrive_dir==ribi_t::east  ) { ry = 1; }
+			else if(  arrive_dir==ribi_t::west  ) { ry = -1; }
+			if(  welt->get_settings().is_drive_left()  ) {
+				rx = -rx;
+				ry = -ry;
+			}
+			if(  (rx  ||  ry)  &&  dx*rx + dy*ry < 0  ) {
+				continue;
+			}
+		}
+		const convoihandle_t holder = get_bay_owner( gr->get_pos(), bay );
+		if(  !holder.is_bound()  ||  holder==self  ) {
+			return bay;
+		}
+	}
+	return -1;
+}
+
+
+void convoi_t::take_bay(koord3d pos, uint8 bay, uint8 phase)
+{
+	release_layover();
+	layover_pos = pos;
+	layover_bay = bay;
+	layover_phase = phase;
+	const uint64 key = layover_key( pos );
+	layover_bays_t *b = layover_bays.access( key );
+	if(  !b  ) {
+		layover_bays.put( key, layover_bays_t() );
+		b = layover_bays.access( key );
+	}
+	b->owner[bay] = self;
+}
+
+
+void convoi_t::release_layover()
+{
+	if(  layover_phase==LAYOVER_QUEUED  ) {
+		layover_queue.remove( self );
+	}
+	else if(  layover_phase==LAYOVER_APPROACHING  ||  layover_phase==LAYOVER_PARKED  ) {
+		const uint64 key = layover_key( layover_pos );
+		if(  layover_bays_t *b = layover_bays.access( key )  ) {
+			if(  b->owner[layover_bay]==self  ) {
+				b->owner[layover_bay] = convoihandle_t();
+			}
+			if(  !b->owner[0].is_bound()  &&  !b->owner[1].is_bound()  ) {
+				layover_bays.remove( key );
+			}
+		}
+	}
+	if(  layover_phase==LAYOVER_PARKED  ) {
+		// back into the lane on the screen
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			fahr[i]->mark_image_dirty( fahr[i]->get_image(), 0 );
+		}
+		layover_phase = LAYOVER_NONE;
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			fahr[i]->mark_image_dirty( fahr[i]->get_image(), 0 );
+		}
+	}
+	layover_phase = LAYOVER_NONE;
+	layover_pos = koord3d::invalid;
+	layover_bay = 0;
+	layover_since = 0;
+	layover_warned = false;
+}
+
+
+// a road tile of the waiting area: a layover tile of one of our stops, or a road tile next to one
+bool convoi_t::is_in_layover_area(const grund_t *gr, const player_t *owner)
+{
+	if(  !gr  ) {
+		return false;
+	}
+	if(  get_layover_kind( gr )  ) {
+		return haltestelle_t::get_halt( gr->get_pos(), owner ).is_bound();
+	}
+	const weg_t *w = gr->get_weg( road_wt );
+	if(  !w  ) {
+		return false;
+	}
+	for(  uint8 i=0;  i<4;  i++  ) {
+		grund_t *to;
+		if(  (w->get_ribi_unmasked() & ribi_t::nsew[i])  &&  gr->get_neighbour( to, road_wt, ribi_t::nsew[i] )  ) {
+			if(  get_layover_kind( to )  &&  haltestelle_t::get_halt( to->get_pos(), owner ).is_bound()  ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
+void convoi_t::get_layover_group(koord3d start, const player_t *owner, vector_tpl<koord3d> &group)
+{
+	group.clear();
+	vector_tpl<koord3d> open, seen;
+	open.append( start );
+	seen.append( start );
+	while(  !open.empty()  &&  seen.get_count() < 256  ) {
+		const koord3d p = open.pop_back();
+		const grund_t *gr = welt->lookup( p );
+		if(  !gr  ) {
+			continue;
+		}
+		if(  get_layover_kind( gr )  &&  haltestelle_t::get_halt( p, owner ).is_bound()  ) {
+			group.append( p );
+		}
+		const weg_t *w = gr->get_weg( road_wt );
+		if(  !w  ) {
+			continue;
+		}
+		for(  uint8 i=0;  i<4;  i++  ) {
+			grund_t *to;
+			if(  (w->get_ribi_unmasked() & ribi_t::nsew[i])  &&  gr->get_neighbour( to, road_wt, ribi_t::nsew[i] )
+				&&  !seen.is_contained( to->get_pos() )  &&  is_in_layover_area( to, owner )  ) {
+				seen.append( to->get_pos() );
+				open.append( to->get_pos() );
+			}
+		}
+	}
+}
+
+
+bool convoi_t::is_first_in_layover_queue(const vector_tpl<koord3d> &group) const
+{
+	// the order is that of arrival in front of the waiting area (layover_since); a convoy still on its way does not count
+	FOR( vector_tpl<convoihandle_t>, const c, layover_queue ) {
+		if(  !c.is_bound()  ||  c==self  ||  c->layover_phase!=LAYOVER_QUEUED  ||  c->layover_since==0  ||  !group.is_contained( c->layover_pos )  ) {
+			continue;
+		}
+		if(  layover_phase!=LAYOVER_QUEUED  ||  layover_since==0  ) {
+			// somebody waits in front of it already
+			return false;
+		}
+		// (by the time waited: the tick counter may wrap)
+		const uint32 now = welt->get_ticks();
+		const uint32 waited = now - layover_since, c_waited = now - c->layover_since;
+		if(  c_waited > waited  ||  (c_waited==waited  &&  c->self.get_id() < self.get_id())  ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+// direction of the last step of a route (all: it has one tile only)
+static ribi_t::ribi get_arrival_dir(const route_t &r)
+{
+	return r.get_count()>1 ? ribi_type( r.at(r.get_count()-2), r.back() ) : (ribi_t::ribi)ribi_t::all;
+}
+
+
+bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, koord3d &pos, route_t &way)
+{
+	if(  anz_vehikel==0  ) {
+		return false;
+	}
+	// the next stop after the layover, to check that we can go on from there
+	koord3d next = koord3d::invalid;
+	if(  schedule  &&  schedule->get_count()>1  ) {
+		next = schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos;
+	}
+	const koord3d here = fahr[0]->get_pos();
+	const sint32 speed = speed_to_kmh( min_top_speed );
+	uint32 best = 0xFFFFFFFFu;
+	FOR( vector_tpl<koord3d>, const p, group ) {
+		const grund_t *gr = welt->lookup( p );
+		if(  p==not_here  ||  get_layover_kind( gr )==0  ) {
+			continue;
+		}
+		if(  get_bay_owner( p, 0 ).is_bound()  &&  get_bay_owner( p, 1 ).is_bound()  ) {
+			continue;
+		}
+		// (route_t directly: road_vehicle_t::calc_route would drop a choose sign's reservation)
+		route_t r;
+		if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ||  r.get_count() >= best  ) {
+			continue;
+		}
+		if(  start!=here  &&  r.get_count()>1  &&  r.at(1)==here  ) {
+			// would turn round on the road behind us
+			continue;
+		}
+		if(  find_free_bay( gr, get_arrival_dir( r ) ) < 0  ) {
+			continue;
+		}
+		if(  next!=koord3d::invalid  ) {
+			route_t on;
+			if(  on.calc_route( welt, p, next, fahr[0], speed, 1 )==route_t::no_route  ) {
+				continue;
+			}
+		}
+		best = r.get_count();
+		pos = p;
+		way.clear();
+		way.append( &r );
+	}
+	return best != 0xFFFFFFFFu;
+}
+
+
+void convoi_t::plan_layover()
+{
+	if(  anz_vehikel==0  ||  fahr[0]->get_waytype()!=road_wt  ) {
+		release_layover();
+		return;
+	}
+	if(  layover_phase==LAYOVER_PARKED  ) {
+		if(  fahr[0]->get_pos()==layover_pos  &&  get_layover_kind( welt->lookup(layover_pos) )  ) {
+			// still in the bay: it pulls out when it moves (leave_bay)
+			return;
+		}
+		release_layover();
+	}
+	if(  route.empty()  ) {
+		release_layover();
+		return;
+	}
+	const koord3d target = route.back();
+	const grund_t *gr = welt->lookup( target );
+	if(  get_layover_kind( gr )==0  ||  !haltestelle_t::get_halt( target, owner ).is_bound()  ||  get_tile_length()>1  ) {
+		// not a layover, or too long for a bay: stands in the lane as at any stop
+		release_layover();
+		return;
+	}
+	if(  layover_phase==LAYOVER_APPROACHING  &&  layover_pos==target  ) {
+		return;
+	}
+	vector_tpl<koord3d> group;
+	get_layover_group( target, owner, group );
+	const bool queued_here = layover_phase==LAYOVER_QUEUED  &&  group.is_contained( layover_pos );
+	if(  !queued_here  ) {
+		release_layover();
+	}
+	if(  is_first_in_layover_queue( group )  ) {
+		sint8 bay = find_free_bay( gr, get_arrival_dir( route ) );
+		if(  bay>=0  ) {
+			take_bay( target, bay, LAYOVER_APPROACHING );
+			return;
+		}
+		// another layover tile of the area with a free bay (only without waypoints: the new route would skip them)
+		koord3d pos;
+		route_t way;
+		if(  schedule_target==koord3d::invalid  &&  find_other_layover( group, route.front(), target, pos, way )  ) {
+			bay = find_free_bay( welt->lookup( pos ), get_arrival_dir( way ) );
+			if(  bay>=0  ) {
+				route.clear();
+				route.append( &way );
+				take_bay( pos, bay, LAYOVER_APPROACHING );
+				return;
+			}
+		}
+	}
+	// no bay: it will wait in front of the waiting area
+	if(  queued_here  ) {
+		layover_pos = target;
+	}
+	else {
+		// the place in the queue counts from the arrival in front of it (layover_gate)
+		layover_phase = LAYOVER_QUEUED;
+		layover_pos = target;
+		layover_since = 0;
+		layover_queue.append( self );
+	}
+}
+
+
+bool convoi_t::layover_gate(const grund_t *next, uint32 next_index)
+{
+	if(  layover_phase!=LAYOVER_QUEUED  ) {
+		return true;
+	}
+	const grund_t *target = welt->lookup( layover_pos );
+	const halthandle_t halt = haltestelle_t::get_halt( layover_pos, owner );
+	if(  get_layover_kind( target )==0  ||  !halt.is_bound()  ||  route.empty()  ||  route.back()!=layover_pos  ) {
+		// the stop was rebuilt or the route changed
+		release_layover();
+		return true;
+	}
+	// a queued bus waits in front of a layover tile or a junction next to one
+	if(  !next  ||  !is_in_layover_area( next, owner )  ) {
+		return true;
+	}
+	if(  !get_layover_kind( next )  ) {
+		const weg_t *w = next->get_weg( road_wt );
+		if(  !w  ||  !ribi_t::is_threeway( w->get_ribi_unmasked() )  ) {
+			return true;
+		}
+	}
+	vector_tpl<koord3d> group;
+	get_layover_group( layover_pos, owner, group );
+	if(  layover_since==0  ) {
+		// arrived in front of the waiting area: in the queue from now on
+		layover_since = nonzero_ticks( welt->get_ticks() );
+	}
+	if(  is_first_in_layover_queue( group )  ) {
+		sint8 bay = find_free_bay( target, get_arrival_dir( route ) );
+		if(  bay>=0  ) {
+			take_bay( layover_pos, bay, LAYOVER_APPROACHING );
+			return true;
+		}
+		koord3d pos;
+		route_t way;
+		if(  schedule_target==koord3d::invalid  &&  next_index < route.get_count()  &&  route.at(next_index)==next->get_pos()
+			&&  find_other_layover( group, next->get_pos(), layover_pos, pos, way )  ) {
+			bay = find_free_bay( welt->lookup( pos ), get_arrival_dir( way ) );
+			if(  bay>=0  ) {
+				// the next tile stays the same, only the way after it changes
+				route.remove_koord_from( next_index );
+				route.append( &way );
+				take_bay( pos, bay, LAYOVER_APPROACHING );
+				return true;
+			}
+		}
+	}
+	// wait here; warn once after half an hour
+	const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 4);
+	if(  !layover_warned  &&  (sint64)(welt->get_ticks() - layover_since) > limit  ) {
+		layover_warned = true;
+		cbuffer_t buf;
+		buf.printf( translator::translate("%s has been waiting for a free layover bay at %s for half an hour."), get_name(), halt->get_name() );
+		welt->get_message()->add_message( buf, fahr[0]->get_pos().get_2d(), message_t::warnings, PLAYER_FLAG|get_owner()->get_player_nr(), IMG_EMPTY );
+	}
+	return false;
+}
+
+
+void convoi_t::layover_arrived()
+{
+	if(  anz_vehikel==0  ||  fahr[0]->get_waytype()!=road_wt  ) {
+		return;
+	}
+	const koord3d here = fahr[0]->get_pos();
+	if(  layover_phase==LAYOVER_PARKED  &&  here==layover_pos  ) {
+		return;
+	}
+	if(  layover_phase==LAYOVER_APPROACHING  &&  here==layover_pos  ) {
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			fahr[i]->mark_image_dirty( fahr[i]->get_image(), 0 );
+		}
+		layover_phase = LAYOVER_PARKED;
+		for(  uint8 i=0;  i<anz_vehikel;  i++  ) {
+			fahr[i]->mark_image_dirty( fahr[i]->get_image(), 0 );
+		}
+		return;
+	}
+	release_layover();
+	// came here without a bay of this tile: take one if free, else it stands in the lane
+	const grund_t *gr = welt->lookup( here );
+	if(  get_layover_kind( gr )  &&  get_tile_length()==1  ) {
+		const sint8 bay = find_free_bay( gr, fahr[0]->get_direction() );
+		if(  bay>=0  ) {
+			take_bay( here, bay, LAYOVER_APPROACHING );
+			layover_arrived();
+		}
+	}
+}
+
+
+bool convoi_t::may_leave_bay() const
+{
+	const grund_t *gr = welt->lookup( layover_pos );
+	if(  !gr  ) {
+		return true;
+	}
+	// the one-side bays lie beyond one lane: cross only when the tile is clear; else mind our lane only
+	const bool crosses = get_layover_kind( gr )==building_desc_t::LAYOVER_ONE_SIDE;
+	const ribi_t::ribi dir = fahr[0]->get_direction();
+	for(  uint8 i=1;  i<gr->get_top();  i++  ) {
+		const vehicle_base_t *v = obj_cast<vehicle_base_t>( gr->obj_bei(i) );
+		if(  !v  ||  v->get_typ()==obj_t::pedestrian  ||  v->get_waytype()!=road_wt  ||  v->is_off_lane()  ) {
+			continue;
+		}
+		if(  const road_vehicle_t *rv = obj_cast<road_vehicle_t>( v )  ) {
+			if(  rv->get_convoi()==this  ) {
+				continue;
+			}
+		}
+		if(  crosses  ||  v->get_direction()==dir  ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+void convoi_t::leave_bay()
+{
+	if(  layover_phase==LAYOVER_PARKED  ) {
+		release_layover();
+	}
+}
+
+
+void convoi_t::restore_layover_bays()
+{
+	layover_bays.clear();
+	layover_queue.clear();
+	FOR( vector_tpl<convoihandle_t>, const c, welt->convoys() ) {
+		convoi_t *cnv = c.get_rep();
+		if(  cnv->layover_phase==LAYOVER_NONE  ) {
+			continue;
+		}
+		const bool usable = get_layover_kind( welt->lookup( cnv->layover_pos ) )  &&  cnv->get_vehicle_count()>0  &&  cnv->front()->get_waytype()==road_wt;
+		if(  cnv->layover_phase==LAYOVER_QUEUED  ) {
+			if(  usable  ) {
+				layover_queue.append( c );
+			}
+			else {
+				cnv->layover_phase = LAYOVER_NONE;
+				cnv->layover_pos = koord3d::invalid;
+			}
+			continue;
+		}
+		if(  usable  &&  cnv->layover_bay<2  &&  !get_bay_owner( cnv->layover_pos, cnv->layover_bay ).is_bound()  ) {
+			const uint8 phase = cnv->layover_phase;
+			cnv->layover_phase = LAYOVER_NONE;
+			cnv->take_bay( cnv->layover_pos, cnv->layover_bay, phase );
+		}
+		else {
+			// the bay is taken or gone: it stands in the lane
+			cnv->layover_phase = LAYOVER_NONE;
+			cnv->layover_pos = koord3d::invalid;
+		}
+	}
+}
+
+
+bool convoi_t::is_bay_occupied(koord3d pos)
+{
+	for(  uint8 bay=0;  bay<2;  bay++  ) {
+		const convoihandle_t c = get_bay_owner( pos, bay );
+		if(  c.is_bound()  &&  c->is_parked_in_bay()  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+void convoi_t::release_bays_at(koord3d pos)
+{
+	for(  uint8 bay=0;  bay<2;  bay++  ) {
+		const convoihandle_t c = get_bay_owner( pos, bay );
+		if(  c.is_bound()  ) {
+			c->release_layover();
+		}
+	}
 }

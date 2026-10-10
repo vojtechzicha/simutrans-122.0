@@ -1020,6 +1020,10 @@ bool private_car_t::can_overtake( overtaker_t *other_overtaker, sint32 other_spe
 		const uint8 top = gr->get_top();
 		for(  uint8 j=1;  j<top;  j++  ) {
 			if(  vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(j))  ) {
+				if(  v->is_off_lane()  ) {
+					// fork: parked in a layover bay
+					continue;
+				}
 				// check for other traffic on the road
 				const overtaker_t *ov = v->get_overtaker();
 				if(ov) {
@@ -1091,7 +1095,7 @@ bool private_car_t::can_overtake( overtaker_t *other_overtaker, sint32 other_spe
 		const uint8 top = gr->get_top();
 		for(  uint8 j=1;  j<top;  j++ ) {
 			vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(j));
-			if(  v  &&  v->get_direction() == their_direction  ) {
+			if(  v  &&  v->get_direction() == their_direction  &&  !v->is_off_lane()  ) {
 				// check for car
 				if(v->get_overtaker()) {
 					return false;

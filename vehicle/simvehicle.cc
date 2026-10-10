@@ -516,7 +516,7 @@ vehicle_base_t *vehicle_base_t::no_cars_blocking( const grund_t *gr, const convo
 	// Search vehicle
 	for(  uint8 pos=1;  pos<(uint8)gr->get_top();  pos++  ) {
 		if(  vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(pos))  ) {
-			if(  v->get_typ()==obj_t::pedestrian  ) {
+			if(  v->get_typ()==obj_t::pedestrian  ||  v->is_off_lane()  ) {
 				continue;
 			}
 
@@ -596,6 +596,10 @@ bool vehicle_base_t::is_free_for_passing( const grund_t *gr, const overtaker_t *
 	other_here = false;
 	for(  uint8 pos=1;  pos<(uint8)gr->get_top();  pos++  ) {
 		if(  vehicle_base_t* const v = obj_cast<vehicle_base_t>(gr->obj_bei(pos))  ) {
+			if(  v->is_off_lane()  ) {
+				// fork: parked in a layover bay
+				continue;
+			}
 			const overtaker_t *ov = v->get_overtaker();
 			if(  ov  ) {
 				if(  ov==other  ) {
@@ -2202,6 +2206,43 @@ void road_vehicle_t::get_screen_offset( int &xoff, int &yoff, const sint16 raste
 		yoff += tile_raster_scale_y( driveleft_base_offsets[drive_left_dir][1], raster_width );
 	}
 
+	// fork: parked in a layover bay: from the lane drawn in the image to the bay
+	if(  is_off_lane()  ) {
+		sint16 bx, by;
+		if(  convoi_t::get_bay_offset( welt->lookup( get_pos() ), cnv->get_layover_bay(), bx, by )  ) {
+			// where the image draws it: 0.135 tile right of the direction (left when driving on the left),
+			// and the pak128 images sit 0.045 tile further north-west (measured on the native buses)
+			sint16 rx = 0, ry = 0;
+			switch(  get_direction()  ) {
+				case ribi_t::north: rx =  135; break;
+				case ribi_t::south: rx = -135; break;
+				case ribi_t::east:  ry =  135; break;
+				case ribi_t::west:  ry = -135; break;
+				default: break;
+			}
+			if(  welt->get_settings().is_drive_left()  ) {
+				rx = -rx;
+				ry = -ry;
+			}
+			if(  ribi_t::is_straight_ns( get_direction() )  ) {
+				rx -= 45;
+			}
+			else if(  ribi_t::is_straight_ew( get_direction() )  ) {
+				ry -= 45;
+			}
+			const sint32 bdx = bx - rx, bdy = by - ry;
+			// one tile along x is (+w/2, +w/4) on the screen, along y (-w/2, +w/4)
+			xoff += (raster_width * (bdx - bdy)) / 2000;
+			yoff += (raster_width * (bdx + bdy)) / 4000;
+			// it stopped at the end of the tile: draw it in the middle, where the bay is
+			const sint32 drawn = ((sint32)steps * raster_width) & 0xFFFFFC00;
+			const sint32 middle = ((sint32)(VEHICLE_STEPS_PER_TILE/2) * raster_width) & 0xFFFFFC00;
+			xoff += ((middle - drawn) * dx) >> 10;
+			yoff += ((middle - drawn) * dy) >> 10;
+		}
+		return;
+	}
+
 	// eventually shift position to take care of overtaking
 	if(cnv) {
 		if(  cnv->is_overtaking()  ) {
@@ -2226,6 +2267,10 @@ bool road_vehicle_t::choose_route(sint32 &restart_speed, ribi_t::ribi start_dire
 
 	// are we heading to a target?
 	route_t *rt = cnv->access_route();
+	if(  convoi_t::get_layover_kind( welt->lookup( rt->back() ) )  ) {
+		// fork: a bus layover chooses its bays itself (convoi_t::plan_layover)
+		return true;
+	}
 	target_halt = haltestelle_t::get_halt( rt->back(), get_owner() );
 	if(  target_halt.is_bound()  ) {
 
@@ -2338,7 +2383,41 @@ bool road_vehicle_t::take_reservation_from_behind()
 }
 
 
+bool road_vehicle_t::is_off_lane() const
+{
+	return cnv  &&  cnv->is_parked_in_bay()  &&  get_pos()==cnv->get_layover_pos()  &&  convoi_t::get_layover_kind( welt->lookup( get_pos() ) );
+}
+
+
+// fork: the bus layover around the stock checks
 bool road_vehicle_t::can_enter_tile(const grund_t *gr, sint32 &restart_speed, uint8 second_check_count)
+{
+	if(  leading  &&  cnv  ) {
+		if(  cnv->is_parked_in_bay()  &&  get_pos()==cnv->get_layover_pos()  ) {
+			// pulling out of the bay into the lane of our tile
+			if(  second_check_count  ||  !cnv->may_leave_bay()  ) {
+				restart_speed = 0;
+				return false;
+			}
+		}
+		else if(  cnv->is_queued_for_bay()  &&  !second_check_count  ) {
+			// no bay yet: wait in front of the layover stop
+			if(  !cnv->layover_gate( gr, route_index )  ) {
+				cnv->set_blocked_by( NULL, koord3d::invalid );
+				restart_speed = 0;
+				return false;
+			}
+		}
+	}
+	const bool ok = can_enter_tile_lane( gr, restart_speed, second_check_count );
+	if(  ok  &&  leading  &&  cnv  &&  !second_check_count  &&  cnv->is_parked_in_bay()  ) {
+		cnv->leave_bay();
+	}
+	return ok;
+}
+
+
+bool road_vehicle_t::can_enter_tile_lane(const grund_t *gr, sint32 &restart_speed, uint8 second_check_count)
 {
 	// check for traffic lights (only relevant for the first car in a convoi)
 	if(  leading  ) {

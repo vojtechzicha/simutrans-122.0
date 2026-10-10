@@ -19,6 +19,7 @@
 #include "tpl/array_tpl.h"
 #include "tpl/minivec_tpl.h"
 #include "tpl/vector_tpl.h"
+#include "tpl/inthashtable_tpl.h"
 
 #include "convoihandle_t.h"
 #include "halthandle_t.h"
@@ -26,6 +27,7 @@
 #define MAX_MONTHS               12 // Max history
 
 class weg_t;
+class grund_t;
 class depot_t;
 class karte_ptr_t;
 class player_t;
@@ -356,6 +358,45 @@ private:
 	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
 	uint32 uncouple_since;
 	bool uncouple_warned;
+
+	/**
+	 * Fork, bus layover: a road convoy whose stop is a layover tile (building flag, see
+	 * building_desc_t::get_layover_kind) holds one of its two bays there: APPROACHING from the
+	 * departure at the previous stop, PARKED (off the lane, see road_vehicle_t::is_off_lane) from its
+	 * arrival until it pulls out into the lane. QUEUED: no bay free in the whole stop, it waits in front
+	 * of it (road_vehicle_t::can_enter_tile) until it is first in the queue and a bay is free. The
+	 * owners of all bays are in layover_bays. Saved (122.12).
+	 */
+	enum { LAYOVER_NONE=0, LAYOVER_QUEUED, LAYOVER_APPROACHING, LAYOVER_PARKED };
+	koord3d layover_pos;
+	uint8 layover_bay;
+	uint8 layover_phase;
+	/// waits in front of the stop since (ticks, the queue order); 0 while still on its way there
+	uint32 layover_since;
+	/// fork, bus layover: warned once that it waits long for a bay (not saved)
+	bool layover_warned;
+
+	struct layover_bays_t {
+		convoihandle_t owner[2];
+	};
+	/// fork, bus layover: owners of the bays by tile (layover_key); rebuilt after loading
+	static inthashtable_tpl<uint64, layover_bays_t> layover_bays;
+	static uint64 layover_key(koord3d pos) { return ((uint64)(uint16)pos.z<<32) | ((uint32)(uint16)pos.x<<16) | (uint16)pos.y; }
+	/// a bay of that tile this convoy may use (arriving from arrive_dir), or -1
+	sint8 find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const;
+	/// a convoy that holds the bay according to its own record, or unbound
+	static convoihandle_t get_bay_owner(koord3d pos, uint8 bay);
+	void take_bay(koord3d pos, uint8 bay, uint8 phase);
+	/// the waiting area: road tiles that are layover tiles of the owner's stops or next to one
+	static bool is_in_layover_area(const grund_t *gr, const player_t *owner);
+	/// the layover tiles of the waiting area of the one at start (one or several stops: rows of bays
+	/// that do not touch are stops of their own), found over the road through the waiting area
+	static void get_layover_group(koord3d start, const player_t *owner, vector_tpl<koord3d> &group);
+	/// first among the convoys queued in front of that waiting area (by layover_since, then id)
+	bool is_first_in_layover_queue(const vector_tpl<koord3d> &group) const;
+	/// a layover tile of the group other than not_here with a bay for us and the way there from start
+	/// (and on to the next stop of the schedule); false if none
+	bool find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, koord3d &pos, route_t &way);
 
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
@@ -833,6 +874,17 @@ public:
 	static void check_deadlocks();
 	static void reset_deadlock_check();
 
+	/// fork, bus layover: the layover kind of a stop tile (building_desc_t::get_layover_kind), 0 = none
+	static uint8 get_layover_kind(const grund_t *gr);
+	/// fork, bus layover: bay offsets (1/1000 tile, map frame) of a layover tile; false if none
+	static bool get_bay_offset(const grund_t *gr, uint8 bay, sint16 &dx, sint16 &dy);
+	/// fork, bus layover: the bays of all convoys after loading
+	static void restore_layover_bays();
+	/// fork, bus layover: the stop building of that tile is replaced: whoever holds a bay there gives it up
+	static void release_bays_at(koord3d pos);
+	/// fork, bus layover: a bus stands in a bay of that tile (its stop building must not be removed or replaced)
+	static bool is_bay_occupied(koord3d pos);
+
 	/**
 	 * Return the position of the convois.
 	 * @return Position of the convois
@@ -1130,6 +1182,25 @@ public:
 
 	// standing at a stop (loading, or finding its route before leaving): road traffic may pass it
 	bool is_standing() const { return state==LOADING  ||  state==ROUTING_1  ||  state==NO_ROUTE; }
+
+	// fork, bus layover (see layover_phase)
+	bool is_parked_in_bay() const { return layover_phase==LAYOVER_PARKED; }
+	bool is_queued_for_bay() const { return layover_phase==LAYOVER_QUEUED; }
+	koord3d get_layover_pos() const { return layover_pos; }
+	uint8 get_layover_bay() const { return layover_bay; }
+	/// after drive_to: a bay for the stop the route ends at, or the queue (road convoys)
+	void plan_layover();
+	/// gives up the bay or the place in the queue (idempotent)
+	void release_layover();
+	/// arrived at the end of the route (ziel_erreicht): park in the bay
+	void layover_arrived();
+	/// next is the tile after the front vehicle's tile (route index next_index): a queued convoy waits in
+	/// front of the layover stop until it gets a bay; may change the route after next. True: go on.
+	bool layover_gate(const grund_t *next, uint32 next_index);
+	/// the parked bus may pull out of its bay into the lane on its tile (true: go, the bay is freed
+	/// once it moves, see leave_bay)
+	bool may_leave_bay() const;
+	void leave_bay();
 
 	// fork, coupling (see coupled_convoi)
 	bool is_coupled() const { return state==COUPLED; }

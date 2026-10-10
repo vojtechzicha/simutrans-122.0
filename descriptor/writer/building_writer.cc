@@ -120,7 +120,9 @@ void building_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& ob
 	building_desc_t::flag_t const flags =
 		(obj.get_int("noinfo",         0) > 0 ? building_desc_t::FLAG_NO_INFO  : building_desc_t::FLAG_NULL) |
 		(obj.get_int("noconstruction", 0) > 0 ? building_desc_t::FLAG_NO_PIT : building_desc_t::FLAG_NULL) |
-		(obj.get_int("needs_ground",   0) > 0 ? building_desc_t::FLAG_NEED_GROUND : building_desc_t::FLAG_NULL);
+		(obj.get_int("needs_ground",   0) > 0 ? building_desc_t::FLAG_NEED_GROUND : building_desc_t::FLAG_NULL) |
+		// fork: bus layover kind 1..3 (one side, both sides, dead end)
+		(building_desc_t::flag_t)( (obj.get_int("layover", 0) & 3) << 4 );
 
 	uint16 const animation_time = obj.get_int("animation_time", 300);
 

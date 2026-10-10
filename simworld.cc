@@ -3487,6 +3487,8 @@ DBG_MESSAGE( "karte_t::rotate90()", "called" );
 	FOR(vector_tpl<convoihandle_t>, const i, convoi_array) {
 		i->rotate90(cached_size.x);
 	}
+	// fork: the owners of the bus layover bays are kept by position
+	convoi_t::restore_layover_bays();
 
 	for(  int i=0;  i<MAX_PLAYER_COUNT;  i++  ) {
 		if(  players[i]  ) {
@@ -5786,6 +5788,8 @@ DBG_MESSAGE("karte_t::load()", "%d convois/trains loaded", convoi_array.get_coun
 	// fork: the id goes in front of a convoi name only when the owner has several with that name
 	convoi_t::refresh_all_name_ids();
 	convoi_t::reset_deadlock_check();
+	// fork: the bays of the bus layovers
+	convoi_t::restore_layover_bays();
 
 	// now the player can be loaded
 	for(int i=0; i<MAX_PLAYER_COUNT; i++) {

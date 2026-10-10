@@ -1721,3 +1721,9 @@ Deadlock in %s: %i trains wait for each other in a circle and cannot move.
 %i more are stuck behind them.
 Deadlock in %s: %i road vehicles wait for each other in a circle and cannot move.
 Deadlock in %s: %i road vehicles wait for each other in a circle and cannot move.
+Waiting for a free layover bay at %s
+Waiting for a free layover bay at %s
+%s has been waiting for a free layover bay at %s for half an hour.
+%s has been waiting for a free layover bay at %s for half an hour.
+A bus is parked in a layover bay here.
+A bus is parked in a layover bay here.

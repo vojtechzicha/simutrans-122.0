@@ -208,7 +208,8 @@ through a terminus (A-B-C-E, then E-D-B-A: nobody boards at B for D, they change
 `convoi_t::hat_gehalten` applies them when stopping. The schedule dialog shows the type as a
 lettered badge in front of each entry row; left click cycles forward, right click back. A single
 terminus entry with a timetable is Terminal; a bus station with arrival, waiting and departure
-tiles of one halt uses All off on the arrival tile and Regular on the rest.
+tiles of one halt uses All off on the arrival tile and Regular on the rest. Road schedules may use
+Hold too (bus layover, see below); the passing-train logic of Hold stays rail only.
 
 ## Passing standing buses (fork feature)
 
@@ -805,6 +806,57 @@ the destructor; `refresh_all_name_ids` once in `karte_t::load`). `name_and_id` h
 `get_internal_name()` the name without the id, which is what is saved, as in stock. A leading
 "(number) " is never part of a name (`skip_shown_ids` on rename and on load), which also cleans
 names that kept another convoy's id from pasting a shown name. Stock exes show the id always.
+
+## Bus layover (fork feature, savegame 122.12)
+
+A place for timetabled buses to wait for their departure without blocking the lane or using a stop
+position: exit stop (All off) -> layover (Hold with its own interval/offset) -> start stop. Road
+schedules may use the Hold stop type (`schedule_t::allows_hold`; coupling has its own
+`allows_coupling`, still rail only). Hold at an ordinary stop is the curbside layover: the bus stands
+in the lane and others pass it (passing standing buses, only while LOADING/ROUTING_1/NO_ROUTE).
+- Layover tile: a road stop building with the building flag `layover=1|2|3` (makeobj key, flag bits
+  16|32, `building_desc_t::get_layover_kind`; enables nothing, so no passengers wait there; a stock
+  exe ignores the bits). 1 = one side: through road, both bays beside one lane (4 layouts, 0 = N-S bays
+  east, 1 = E-W north, 2 = N-S west, 3 = E-W south, rotation-consistent; the build tool picks the side
+  without a road next to it, building it again on its tile flips it). 2 = both sides: one bay beside
+  each lane, a bus uses only the one on its driving side (2 layouts). 3 = dead end: two bays either
+  side of the road (4 layouts as a terminal stop). Bay centres in tiles from the road centre line
+  (`convoi_t::get_bay_offset`): 0.275/0.415, ±0.40, ±0.25; the bus image sits 0.135 right of its
+  direction and 0.045 further north-west (measured on pak128.cs buses; in game within 0.02). Art: pakset repo
+  `station-road/odstavne-stani` (`VZ-Stations-BusLayover-{OneSide,BothSides,DeadEnd}`).
+- Each tile has two bays; owners are in `convoi_t::layover_bays` (keyed by position, rebuilt after
+  loading and rotation by `restore_layover_bays`), each bus holds a record (`layover_pos`, `_bay`,
+  `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile and that is one tile
+  long uses bays; longer ones stand in the lane as at any stop. Ordinary stop reservations and choose
+  signs never use layover tiles (`haltestelle_t::is_reservable` etc., `road_vehicle_t::choose_route`).
+- Choice (`plan_layover`, after `drive_to`): the scheduled tile if a bay is free, else the nearest
+  layover tile of the waiting area with a free bay and a way on to the next stop (route replaced;
+  not with waypoints on the way). The waiting area (`get_layover_group`) is every layover tile of the
+  owner's stops reached over road tiles that are layover tiles or next to one (the junctions of a
+  cluster), so rows of bays that became separate stops still count as one. No bay: QUEUED, the bus
+  drives on and stops before the first layover tile or junction next to one (`layover_gate` from
+  `road_vehicle_t::can_enter_tile`), joining the queue there (`layover_since`, first come first
+  served); the first in the queue takes a freed bay, on another tile by changing the route after the
+  next tile. 30 calendar minutes there: one warning. Convoy window "Waiting for a free layover bay at X".
+  On a one-side or both-sides tile along a main road the queued bus waits in that road's lane, so more
+  buses than bays there hold up the traffic behind them; a cluster on a side road keeps them off it.
+- Parked (`is_parked_in_bay`, from arrival in `ziel_erreicht` until it moves): the bus is off the lane
+  (`vehicle_base_t::is_off_lane`, skipped by `no_cars_blocking`, `is_free_for_passing` and the
+  overtaking checks, so through traffic, city cars and other buses drive past) and drawn in its bay at
+  the middle of the tile. It keeps the bay through ROUTING_1, NO_ROUTE, CAN_START and schedule edits;
+  it pulls out when its lane on the tile is free (one side: the whole tile, it may cross the other
+  lane) and the next tile can be entered (`may_leave_bay`, `leave_bay` in the `can_enter_tile` wrapper).
+  Depot and deletion release the bay. Removing or rebuilding (also flipping) the stop building is
+  refused while a bus is parked in it ("A bus is parked in a layover bay here."); buses on their way
+  choose again when they arrive. A line edit that moves the entry off the layover within the same stop
+  (stock keeps the route for the same stop) releases the bay and routes the bus anew. Queue order
+  compares the time waited, so the tick counter may wrap.
+- Export: `layover` {pos, bay, parked} per convoy, `waiting_for.reason` `layover_bay`.
+Tested headless (pak128.cs + the art as add-on): a 10-bay cluster (two junctions, five dead-end tiles,
+two stops) with five timetabled lines; 18 buses for 10 bays (queue, every bay used, save/load);
+one-side and both-sides tiles with through buses both ways; an articulated bus; curbside Hold;
+rotation, deletion, depot, schedule edits, saves for 0.122.11 and 0.122.0; the 39 rail and road
+regression scenarios byte-identical.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

@@ -141,7 +141,16 @@ public:
 			FLAG_NO_INFO     = 1, ///< do not show info window
 			FLAG_NO_PIT      = 2, ///< do not show construction pit
 			FLAG_NEED_GROUND = 4, ///< needs ground drawn below
-			FLAG_HAS_CURSOR  = 8  ///< there is cursor/icon for this
+			FLAG_HAS_CURSOR  = 8, ///< there is cursor/icon for this
+			FLAG_LAYOVER     = 16|32 ///< fork: bus layover kind (layover_kind_t) in these two bits
+		};
+
+		/// fork: a road stop whose tile holds two parked buses beside the lanes (makeobj key layover)
+		enum layover_kind_t {
+			LAYOVER_NONE       = 0,
+			LAYOVER_ONE_SIDE   = 1, ///< through road, both bays on the side of the layout (4 layouts)
+			LAYOVER_BOTH_SIDES = 2, ///< through road, one bay beside each lane (2 layouts)
+			LAYOVER_DEAD_END   = 3  ///< end of a road, the bays either side of it (4 layouts)
 		};
 private:
 	/**
@@ -245,6 +254,9 @@ public:
 
 	// do not open info for this
 	bool no_info_window() const { return (flags & FLAG_NO_INFO) != 0; }
+
+	/// fork: bus layover kind (layover_kind_t), only for road stops
+	uint8 get_layover_kind() const { return (type==generic_stop  &&  get_extra()==road_wt) ? (uint8)((flags & FLAG_LAYOVER) >> 4) : 0; }
 
 	// never replace this building for renovation (to create historic city centres)
 	uint16 no_renovation_month() const { return preservation_year_month; }

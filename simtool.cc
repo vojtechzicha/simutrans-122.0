@@ -569,6 +569,11 @@ DBG_MESSAGE("tool_remover()", "bound=%i",halt.is_bound());
 		// halt and not a factory (oil rig etc.)
 		const player_t* owner = halt->get_owner();
 		if(  player_t::check_owner( owner, player )  ) {
+			if(  convoi_t::is_bay_occupied( gr->get_pos() )  ) {
+				// fork: it would drop the parked buses into the lane
+				msg = "A bus is parked in a layover bay here.";
+				return false;
+			}
 			return haltestelle_t::remove(player, gr->get_pos());
 		}
 	}
@@ -4214,7 +4219,33 @@ DBG_MESSAGE("tool_station_aux()", "building %s on square %d,%d for waytype %x", 
 	// find out orientation ...
 	uint32 layout = 0;
 	ribi_t::ribi ribi=ribi_t::none;
-	if(  desc->get_all_layouts()==2  ||  desc->get_all_layouts()==8  ||  desc->get_all_layouts()==16  ) {
+	// fork: the one-side bus layover again on its tile turns its bays to the other side of the road
+	bool flip_layover = false;
+	if(  desc->get_layover_kind()==building_desc_t::LAYOVER_ONE_SIDE  ) {
+		// through road with both bays on one side: layout 0 = east, 1 = north, 2 = west, 3 = south of it
+		p_error = "No through station here!";
+		if(  bd->hat_wege()  ) {
+			ribi = bd->get_weg_nr(0)->get_ribi_unmasked();
+		}
+		if(  bd->has_two_ways()  ||  !ribi_t::is_straight(ribi)  ) {
+			return p_error;
+		}
+		const bool ns = (ribi & ribi_t::northsouth)!=0;
+		const gebaeude_t *old_gb = bd->get_halt().is_bound() ? bd->find<gebaeude_t>() : NULL;
+		if(  old_gb  &&  old_gb->get_tile()->get_desc()==desc  ) {
+			layout = old_gb->get_tile()->get_layout() ^ 2;
+			flip_layover = true;
+		}
+		else {
+			// the side without a road next to it (east or north first)
+			layout = ns ? 0 : 1;
+			grund_t *side;
+			if(  bd->get_neighbour( side, road_wt, ns ? ribi_t::east : ribi_t::north )  ||  (ns  &&  welt->lookup_kartenboden( k+koord(1,0) )  &&  welt->lookup_kartenboden( k+koord(1,0) )->hat_wege())  ||  (!ns  &&  welt->lookup_kartenboden( k+koord(0,-1) )  &&  welt->lookup_kartenboden( k+koord(0,-1) )->hat_wege())  ) {
+				layout ^= 2;
+			}
+		}
+	}
+	else if(  desc->get_all_layouts()==2  ||  desc->get_all_layouts()==8  ||  desc->get_all_layouts()==16  ) {
 		// through station
 		if(  bd->has_two_ways()  ) {
 			// a crossing or maybe just a tram track on a road ...
@@ -4338,14 +4369,24 @@ DBG_MESSAGE("tool_station_aux()", "building %s on square %d,%d for waytype %x", 
 	if(  old_halt.is_bound()  ) {
 		gebaeude_t* gb = bd->find<gebaeude_t>();
 		const building_desc_t *old_desc = gb->get_tile()->get_desc();
-		if(  old_desc == desc  ) {
+		if(  old_desc == desc  &&  !flip_layover  ) {
 			// already has the same station
 			return NULL;
 		}
-		if(  old_desc->get_capacity() >= desc->get_capacity()  &&  !is_ctrl_pressed()  ) {
+		if(  convoi_t::is_bay_occupied( bd->get_pos() )  ) {
+			// fork: replacing it would drop the parked buses into the lane
+			return "A bus is parked in a layover bay here.";
+		}
+		if(  old_desc->get_capacity() >= desc->get_capacity()  &&  !is_ctrl_pressed()  &&  !flip_layover  ) {
 			return "Upgrade must have\na higher level";
 		}
 		old_cost = old_desc->get_price(welt)*old_desc->get_x()*old_desc->get_y();
+		if(  flip_layover  ) {
+			// turning it round costs nothing
+			old_cost = 2*desc->get_price(welt)*desc->get_x()*desc->get_y();
+		}
+		// fork: buses on their way to a bay here choose again when they arrive
+		convoi_t::release_bays_at( bd->get_pos() );
 		gb->cleanup( NULL );
 		delete gb;
 		halt = old_halt;

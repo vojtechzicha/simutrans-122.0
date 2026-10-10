@@ -178,6 +178,9 @@ public:
 
 	virtual overtaker_t *get_overtaker() { return NULL; }
 
+	/// fork: a bus parked in a layover bay, beside the lanes: road traffic ignores it
+	virtual bool is_off_lane() const { return false; }
+
 	vehicle_base_t();
 
 	vehicle_base_t(koord3d pos);
@@ -513,6 +516,9 @@ private:
 	// fork: frees a position of target_halt reserved by a convoi that must pass our tile to get there
 	bool take_reservation_from_behind();
 
+	// the stock checks of can_enter_tile (fork: that one adds the bus layover around them)
+	bool can_enter_tile_lane(const grund_t *gr_next, sint32 &restart_speed, uint8 second_check_count);
+
 protected:
 	bool check_next_tile(const grund_t *bd) const OVERRIDE;
 
@@ -550,6 +556,8 @@ public:
 	schedule_t * generate_new_schedule() const OVERRIDE;
 
 	overtaker_t* get_overtaker() OVERRIDE;
+
+	bool is_off_lane() const OVERRIDE;
 };
 
 

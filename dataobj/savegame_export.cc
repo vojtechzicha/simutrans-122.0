@@ -953,6 +953,11 @@ static void export_convoy_wait( json_writer_t &w, karte_t *welt, convoihandle_t 
 	else if(  cnv->is_waiting_for_coupling()  ) {
 		reason = "coupling_partner";
 	}
+	else if(  cnv->is_queued_for_bay()  &&  cnv->is_waiting()  ) {
+		// fork: every bay of the bus layover is taken
+		reason = "layover_bay";
+		at_halt = haltestelle_t::get_halt( cnv->get_layover_pos(), cnv->get_owner() );
+	}
 
 	if(  reason  ) {
 		w.object_key( "waiting_for" );
@@ -1147,6 +1152,14 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 		if(  cnv->has_claim()  ) {
 			// fork: station boundary of the track claimed at the next station of a single-track section
 			w.kv_string( "claim_boundary", cnv->get_claim_boundary().get_str() );
+		}
+		if(  cnv->get_layover_pos()!=koord3d::invalid  &&  !cnv->is_queued_for_bay()  ) {
+			// fork: the bay it holds at a bus layover, parked in it or on its way there
+			w.object_key( "layover" );
+			w.kv_koord3d( "pos", cnv->get_layover_pos() );
+			w.kv_int( "bay", cnv->get_layover_bay() );
+			w.kv_bool( "parked", cnv->is_parked_in_bay() );
+			w.end_object();
 		}
 
 		const koord3d depot = cnv->get_home_depot();

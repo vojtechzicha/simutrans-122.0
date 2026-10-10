@@ -1102,6 +1102,7 @@ function waitReasonText(w, links) {
     case "yielding": return "Letting a train from " + stop(w.halt_id) + " through";
     case "coupling_partner": return "Waiting for the train to couple with";
     case "platform_after_uncoupling": return "Uncoupled, waiting for the platform";
+    case "layover_bay": return "Waiting for a free layover bay at " + stop(w.halt_id);
   }
   if (w.reason) return esc(titleOf(w.reason));
   return "";
@@ -1518,6 +1519,8 @@ function viewConvoyDetail(host, id) {
       ' <span class="dim">(left its last stop with a timetable)</span></dd>' : "") +
     (c.hold_marker ? "<dt>Hold marker</dt><dd>lets passing trains overtake</dd>" : "") +
     (c.hold_divert ? "<dt>Diverted</dt><dd>heading for a platform to let a passing train by</dd>" : "") +
+    (c.layover ? "<dt>Layover</dt><dd>" + (obj(c.layover).parked ? "parked in" : "on its way to") + " bay " + (num(obj(c.layover).bay) + 1) +
+      ' <span class="mono">' + esc(posText(obj(c.layover).pos)) + "</span></dd>" : "") +
     (c.claim_boundary ? "<dt>Claimed track</dt><dd>at the next station, boundary " +
       '<span class="mono">(' + esc(c.claim_boundary) + ")</span></dd>" : "") +
     "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +

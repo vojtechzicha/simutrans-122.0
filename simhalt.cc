@@ -3463,6 +3463,10 @@ bool haltestelle_t::find_free_position(const waytype_t w,convoihandle_t cnv,cons
 			// not reserved
 			grund_t* const gr = i.grund;
 			assert(gr);
+			if(  convoi_t::get_layover_kind( gr )  ) {
+				// fork: bus layover bays are not stop positions (see convoi_t::plan_layover)
+				continue;
+			}
 			// found a stop for this waytype but without object d ...
 			if(gr->hat_weg(w)  &&  gr->suche_obj(d)==NULL) {
 				// not occupied
@@ -3478,6 +3482,10 @@ bool haltestelle_t::find_free_position(const waytype_t w,convoihandle_t cnv,cons
  */
 bool haltestelle_t::reserve_position(grund_t *gr,convoihandle_t cnv)
 {
+	if(  convoi_t::get_layover_kind( gr )  ) {
+		// fork: bus layover bays are not stop positions
+		return false;
+	}
 	slist_tpl<tile_t>::iterator i = std::find(tiles.begin(), tiles.end(), gr);
 	if (i != tiles.end()) {
 		if (i->reservation == cnv) {
@@ -3524,6 +3532,10 @@ DBG_MESSAGE("haltestelle_t::unreserve_position()","failed for gr=%p",gr);
  */
 bool haltestelle_t::is_reservable(const grund_t *gr, convoihandle_t cnv) const
 {
+	if(  convoi_t::get_layover_kind( gr )  ) {
+		// fork: bus layover bays are not stop positions
+		return false;
+	}
 	FOR(slist_tpl<tile_t>, const& i, tiles) {
 		if (gr == i.grund) {
 			if (i.reservation == cnv) {
