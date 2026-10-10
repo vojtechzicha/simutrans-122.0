@@ -824,7 +824,8 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   exe ignores the bits). 1 = one side: through road, both bays beside one lane (4 layouts, 0 = N-S bays
   east, 1 = E-W north, 2 = N-S west, 3 = E-W south, rotation-consistent; the build tool picks the side
   without a road next to it, building it again on its tile flips it). 2 = both sides: one bay beside
-  each lane, a bus uses only the one on its driving side (2 layouts). 3 = dead end: two bays either
+  each lane, a bus takes the one on its driving side first and the one beyond the other lane only when
+  that is taken, so a one-way loop of them still holds two buses per tile (2 layouts). 3 = dead end: two bays either
   side of the road (4 layouts as a terminal stop). Bay centres in tiles from the road centre line
   (`convoi_t::get_bay_offset`): 0.275/0.415, ±0.40, ±0.25; the bus image sits 0.135 right of its
   direction and 0.045 further north-west (measured on pak128.cs buses; in game within 0.02). Art: pakset repo
@@ -849,8 +850,8 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   (`vehicle_base_t::is_off_lane`, skipped by `no_cars_blocking`, `is_free_for_passing` and the
   overtaking checks, so through traffic, city cars and other buses drive past) and drawn in its bay at
   the middle of the tile. It keeps the bay through ROUTING_1, NO_ROUTE, CAN_START and schedule edits;
-  it pulls out when its lane on the tile is free (one side: the whole tile, it may cross the other
-  lane) and the next tile can be entered (`may_leave_bay`, `leave_bay` in the `can_enter_tile` wrapper).
+  it pulls out when its lane on the tile is free (one side, or the far bay of both sides: the whole
+  tile, it crosses the other lane) and the next tile can be entered (`may_leave_bay`, `leave_bay` in the `can_enter_tile` wrapper).
   Depot and deletion release the bay. Removing or rebuilding (also flipping) the stop building is
   refused while a bus is parked in it ("A bus is parked in a layover bay here."); buses on their way
   choose again when they arrive. A line edit that moves the entry off the layover within the same stop

@@ -7266,33 +7266,46 @@ convoihandle_t convoi_t::get_bay_owner(koord3d pos, uint8 bay)
 }
 
 
+// the bay lies beyond the other lane for a bus heading dir (it crosses that lane to get in and out)
+static bool is_far_bay(const grund_t *gr, uint8 bay, ribi_t::ribi dir)
+{
+	sint16 dx, dy;
+	if(  !convoi_t::get_bay_offset( gr, bay, dx, dy )  ) {
+		return false;
+	}
+	sint16 rx = 0, ry = 0;
+	if(  dir==ribi_t::north  ) { rx = 1; }
+	else if(  dir==ribi_t::south  ) { rx = -1; }
+	else if(  dir==ribi_t::east  ) { ry = 1; }
+	else if(  dir==ribi_t::west  ) { ry = -1; }
+	if(  world()->get_settings().is_drive_left()  ) {
+		rx = -rx;
+		ry = -ry;
+	}
+	return (rx  ||  ry)  &&  dx*rx + dy*ry < 0;
+}
+
+
 sint8 convoi_t::find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const
 {
 	const uint8 kind = get_layover_kind( gr );
 	if(  kind==0  ) {
 		return -1;
 	}
-	for(  uint8 bay=0;  bay<2;  bay++  ) {
-		if(  kind==building_desc_t::LAYOVER_BOTH_SIDES  ) {
-			// only the bay on our driving side: we never cross the other lane
-			sint16 dx, dy;
-			get_bay_offset( gr, bay, dx, dy );
-			sint16 rx = 0, ry = 0;
-			if(  arrive_dir==ribi_t::north  ) { rx = 1; }
-			else if(  arrive_dir==ribi_t::south  ) { rx = -1; }
-			else if(  arrive_dir==ribi_t::east  ) { ry = 1; }
-			else if(  arrive_dir==ribi_t::west  ) { ry = -1; }
-			if(  welt->get_settings().is_drive_left()  ) {
-				rx = -rx;
-				ry = -ry;
-			}
-			if(  (rx  ||  ry)  &&  dx*rx + dy*ry < 0  ) {
+	// both sides: the bay on our driving side first, the one beyond the other lane only when it is taken
+	// (a one-way loop has all buses on one side)
+	for(  uint8 pass=0;  pass<2;  pass++  ) {
+		for(  uint8 bay=0;  bay<2;  bay++  ) {
+			if(  kind==building_desc_t::LAYOVER_BOTH_SIDES  &&  is_far_bay( gr, bay, arrive_dir )!=(pass==1)  ) {
 				continue;
 			}
-		}
-		const convoihandle_t holder = get_bay_owner( gr->get_pos(), bay );
-		if(  !holder.is_bound()  ||  holder==self  ) {
-			return bay;
+			if(  kind!=building_desc_t::LAYOVER_BOTH_SIDES  &&  pass==1  ) {
+				continue;
+			}
+			const convoihandle_t holder = get_bay_owner( gr->get_pos(), bay );
+			if(  !holder.is_bound()  ||  holder==self  ) {
+				return bay;
+			}
 		}
 	}
 	return -1;
@@ -7646,9 +7659,11 @@ bool convoi_t::may_leave_bay() const
 	if(  !gr  ) {
 		return true;
 	}
-	// the one-side bays lie beyond one lane: cross only when the tile is clear; else mind our lane only
-	const bool crosses = get_layover_kind( gr )==building_desc_t::LAYOVER_ONE_SIDE;
+	// the one-side bays and the far bay of both sides lie beyond one lane: cross only when the tile is
+	// clear; else mind our lane only
 	const ribi_t::ribi dir = fahr[0]->get_direction();
+	const uint8 kind = get_layover_kind( gr );
+	const bool crosses = kind==building_desc_t::LAYOVER_ONE_SIDE  ||  (kind==building_desc_t::LAYOVER_BOTH_SIDES  &&  is_far_bay( gr, layover_bay, dir ));
 	for(  uint8 i=1;  i<gr->get_top();  i++  ) {
 		const vehicle_base_t *v = obj_cast<vehicle_base_t>( gr->obj_bei(i) );
 		if(  !v  ||  v->get_typ()==obj_t::pedestrian  ||  v->get_waytype()!=road_wt  ||  v->is_off_lane()  ) {
