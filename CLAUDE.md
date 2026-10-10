@@ -409,8 +409,12 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   minutes (1/8 month without the calendar) because its platform stays occupied (`uncouple_since`, not saved).
 - Joining (`couple`, from `laden()` when both stand at the stop): the two rows of tiles
   become one, the primary's vehicles first, then the joining train's, laid out anew along it in the
-  primary's direction (`lay_out_on_route( true )`: the front stays where the front train stood, halfway through its tile heading north or west as `hop()` stops it, the rest packed behind; the stock reversal code packs from the rear instead), all tiles reserved for the
-  primary. Revenue for the trip in is booked before the move, and moving vehicles count as no
+  primary's direction (`lay_out_on_route( true )`: the front stays where the front train stood, halfway through its tile heading north or west as `hop()` stops it, the rest packed behind; the stock reversal code packs from the rear instead), the tiles it stands on reserved for the
+  primary. The row goes on over free tiles of the stop at both ends (`free_platform_beyond`), and
+  the train is put where it covers the most tiles of the stop, nearest to where the front stood: a
+  train stopping right behind its partner (whole tiles, halfway heading north or west) can stand
+  partly beyond the platform, e.g. R18/1 on the switch 5297,3537 at Staré Město with a free platform
+  tile at the other end, and the coupled train then held that switch until it left. Revenue for the trip in is booked before the move, and moving vehicles count as no
   trip (`last_stop_pos` is reset). The joining train goes to state COUPLED: out of the sync list, its `fahr` still points to
   its vehicles (for its window, finances, save) but the vehicles belong to the primary
   (`coupled_first`, `get_vehicle_owner`, `get_own_vehicle_count`). Fixed costs, goods categories,

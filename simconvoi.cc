@@ -6211,6 +6211,32 @@ static bool tiles_connected(koord3d a, koord3d b, waytype_t wt)
 }
 
 
+// the tiles of this halt that go on straight from `from` (coming from `prev`) and are free or held by a or b
+static void free_platform_beyond(koord3d prev, koord3d from, halthandle_t halt, waytype_t wt, convoihandle_t a, convoihandle_t b, uint32 max, vector_tpl<koord3d> &out)
+{
+	karte_ptr_t welt;
+	out.clear();
+	if(  !halt.is_bound()  ||  koord_distance( prev.get_2d(), from.get_2d() )!=1  ) {
+		return;
+	}
+	const ribi_t::ribi dir = ribi_type( prev, from );
+	koord3d pos = from;
+	while(  out.get_count() < max  ) {
+		grund_t *gr = welt->lookup( pos );
+		grund_t *to;
+		if(  gr==NULL  ||  !gr->get_neighbour( to, wt, dir )  ||  to->get_halt()!=halt  ) {
+			return;
+		}
+		const schiene_t *sch = obj_cast<schiene_t>( to->get_weg( wt ) );
+		if(  sch==NULL  ||  (sch->is_reserved()  &&  sch->get_reserved_convoi()!=a  &&  sch->get_reserved_convoi()!=b)  ) {
+			return;
+		}
+		pos = to->get_pos();
+		out.append( pos );
+	}
+}
+
+
 void convoi_t::get_train_tiles(vector_tpl<koord3d> &tiles) const
 {
 	tiles.clear();
@@ -6550,13 +6576,56 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 	C->coupled_convoi = primary;
 	P->recalc_catg_index();
 
-	// the whole train anew on the row of tiles: primary first, then the joined train
-	P->route.clear();
-	FOR( vector_tpl<koord3d>, const k, chain ) {
-		P->route.append( k );
+	// the whole train anew on the row of tiles: primary first, then the joined train.
+	// The row goes on over free tiles of the stop at both ends: a train that stopped right behind its
+	// partner may stand partly beyond the platform (on a switch, which it would hold until it leaves)
+	// while the platform has room at the other end.
+	// (the stop of the schedule entry: the front may stand beyond the platform)
+	const halthandle_t halt = haltestelle_t::get_halt( P->schedule->get_current_entry().pos, P->owner );
+	vector_tpl<koord3d> row, ext;
+	if(  chain.get_count()>=2  ) {
+		free_platform_beyond( chain[1], chain[0], halt, wt, primary, joining, 64, ext );
+		for(  uint32 i=ext.get_count();  i-- > 0;  ) { row.append( ext[i] ); }
+	}
+	const uint32 chain_start = row.get_count();
+	FOR( vector_tpl<koord3d>, const k, chain ) { row.append( k ); }
+	if(  chain.get_count()>=2  ) {
+		free_platform_beyond( chain[chain.get_count()-2], chain.back(), halt, wt, primary, joining, 64, ext );
+		FOR( vector_tpl<koord3d>, const k, ext ) { row.append( k ); }
 	}
 	// the front stays at the end of the row, where the train at the front stood (not packed from the rear)
+	const uint32 front0 = chain_start + chain.get_count() - 1;
+	P->route.clear();
+	for(  uint32 i=0;  i<=front0;  i++  ) {
+		P->route.append( row[i] );
+	}
 	P->lay_out_on_route( true );
+	if(  halt.is_bound()  ) {
+		// how many tiles it covers there, and the place covering most tiles of the stop, as near as possible
+		vector_tpl<koord3d> on;
+		P->get_train_tiles( on );
+		const uint32 len = on.get_count();
+		sint32 best = -1, best_score = -1;
+		for(  uint32 e=len-1;  e<row.get_count();  e++  ) {
+			sint32 score = 0;
+			for(  uint32 i=e+1-len;  i<=e;  i++  ) {
+				const grund_t *gr = welt->lookup( row[i] );
+				score += gr  &&  gr->get_halt()==halt;
+			}
+			const sint32 dist = abs( (sint32)e - (sint32)front0 );
+			if(  score > best_score  ||  (score == best_score  &&  dist < abs( best - (sint32)front0 ))  ) {
+				best = e;
+				best_score = score;
+			}
+		}
+		if(  best >= 0  &&  (uint32)best != front0  ) {
+			P->route.clear();
+			for(  sint32 i=0;  i<=best;  i++  ) {
+				P->route.append( row[i] );
+			}
+			P->lay_out_on_route( true );
+		}
+	}
 	for(  uint8 i=0;  i<P->anz_vehikel;  i++  ) {
 		P->fahr[i]->last_stop_pos = P->fahr[i]->get_pos();
 	}
@@ -6564,10 +6633,13 @@ bool convoi_t::couple(convoihandle_t primary, convoihandle_t joining)
 	P->recalc_traction( false );
 	P->calc_loading();
 	P->freight_info_resort = true;
-	for(  uint32 i=0;  i<chain.get_count();  i++  ) {
-		if(  grund_t *gr = welt->lookup( chain[i] )  ) {
+	// it holds the tiles it stands on, from its rear to its front
+	const route_t &laid = P->route;
+	const uint32 rear_index = P->back()->get_route_index() > 0 ? P->back()->get_route_index()-1 : 0;
+	for(  uint32 i=rear_index;  i<laid.get_count();  i++  ) {
+		if(  grund_t *gr = welt->lookup( laid.at(i) )  ) {
 			if(  schiene_t *sch = obj_cast<schiene_t>( gr->get_weg( wt ) )  ) {
-				sch->reserve( primary, ribi_type( chain[max(1u,i)-1u], chain[min(chain.get_count()-1u,i+1u)] ) );
+				sch->reserve( primary, ribi_type( laid.at(max(1u,i)-1u), laid.at(min(laid.get_count()-1u,i+1u)) ) );
 			}
 		}
 	}
