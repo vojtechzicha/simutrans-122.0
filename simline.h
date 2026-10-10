@@ -75,8 +75,8 @@ private:
 	 * Timetable (fork): per schedule entry the calendar minute of the slot a convoy last
 	 * left in, so every slot is used by one convoy only. A schedule edit keeps it for the entries
 	 * that stayed with the same timetable (keep_slots_across_edit).
-	 * Below 0 nobody left there yet: -1 since when is unknown, else (fresh_slots) -2 - the minute
-	 * the timetable came into force there (new line, or that stop or the way to it edited).
+	 * -1: nobody left there since the timetable came into force. On a new line (fresh_slots, and
+	 * edits before its first departure) -2 - the minute the line was made or the entry edited.
 	 */
 	vector_tpl<sint64> last_departure_slot;
 
