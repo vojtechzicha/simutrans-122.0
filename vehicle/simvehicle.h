@@ -819,7 +819,10 @@ private:
 	bool station_can_release(halthandle_t s, int depth, section_check_t &ck);
 	// the station of the train before its platform signal (the tracks behind it), if any
 	halthandle_t get_section_origin(uint16 next_block) const;
-	// taking the last free track of halt x (claimed_tile on it) could lock the stations up
+	// no track of halt x is free but the one with claimed_tile (bays count only at a station of bays)
+	bool is_last_free_track(halthandle_t x, koord3d claimed_tile) const;
+	// taking the last free track of halt x (claimed_tile on it) could lock the stations up;
+	// next_block: our platform signal (0 at a choose signal)
 	bool keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block);
 	// the train has waited long for a track at x: tell the player once if the stations are locked
 	void check_section_lock(halthandle_t x, uint16 next_block);

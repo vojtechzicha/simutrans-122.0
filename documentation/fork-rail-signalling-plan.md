@@ -198,6 +198,11 @@ away from anyone, but it can hold a train back when the way out is more than two
 after 30 calendar minutes at the `P` the check looks through all stations, so the rule never
 causes a lock by itself.
 
+The same check runs at a choose signal for a train that stops in its area, before it takes the
+last free track of its stop: a station on a double-track line from which a single-track branch
+leaves (Šakvice - Hustopeče) is entered without any `P`, so without it trains for the branch could
+fill every platform while the train on the branch can only come back there.
+
 What it cannot prevent: more trains than the group of stations holds. Trains leaving a depot inside
 a station, for example, fill it without asking. For that case a train that has waited 30 minutes for
 a track checks whether its stations are really locked (the same search through all stations,

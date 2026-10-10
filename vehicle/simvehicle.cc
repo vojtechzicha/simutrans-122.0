@@ -3618,8 +3618,15 @@ skip_choose:
 		overtaker_ways.clear();
 		overtaker_routes.clear();
 	}
-	// fork: the last free track maybe kept for a train coming the other way
-	if(  !may_take_last_track( keeps_track_for_other_side( target_halt, start_block, INVALID_INDEX, next_stop ), target_halt, sig, restart_speed )  ) {
+	// fork: the last free track maybe kept for a train coming the other way, or, if it is the last free
+	// track of the station, for the trains there to get away (3.8): we come in from a double track, but
+	// we or they may go on over a single-track line from there (Šakvice - Hustopeče)
+	uint8 keep = keeps_track_for_other_side( target_halt, start_block, INVALID_INDEX, next_stop );
+	if(  keep==KEEP_TAKE  &&  planned_ok  &&  !step_aside  &&  is_last_free_track( target_halt, cnv->get_route()->back() )  ) {
+		// that needs route searches, i.e. a step: come to the signal first
+		keep = !cnv->is_waiting() ? KEEP_STEP : keeps_last_track( target_halt, cnv->get_route()->back(), 0 ) ? KEEP_HOLD : KEEP_TAKE;
+	}
+	if(  !may_take_last_track( keep, target_halt, sig, restart_speed )  ) {
 		target_halt = halthandle_t();
 		overtaker_ways.clear();
 		overtaker_routes.clear();
@@ -3751,6 +3758,17 @@ skip_choose:
 		}
 		else if(  !found  ) {
 			// nothing empty or not route with less than get_max_choose_route_steps() tiles
+			if(  cnv->get_section_wait()==convoi_t::SECTION_WAIT_LAST_TRACK  ) {
+				cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+			}
+			target_halt = halthandle_t();
+			sig->set_state(  roadsign_t::rot );
+			restart_speed = 0;
+			return false;
+		}
+		else if(  keeps_last_track( target_halt, target_rt.back(), 0 )  ) {
+			// fork: the last free track there, see above
+			cnv->set_section_wait( convoi_t::SECTION_WAIT_LAST_TRACK, target_halt );
 			target_halt = halthandle_t();
 			sig->set_state(  roadsign_t::rot );
 			restart_speed = 0;
@@ -3769,6 +3787,9 @@ skip_choose:
 			}
 		}
 		// reserved route to target
+	}
+	if(  cnv->get_section_wait()==convoi_t::SECTION_WAIT_LAST_TRACK  ) {
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
 	}
 	sig->set_state(  roadsign_t::gruen );
 	cnv->set_next_stop_index( min( next_crossing, next_signal ) );
@@ -5526,7 +5547,7 @@ halthandle_t rail_vehicle_t::get_section_origin(uint16 next_block) const
 }
 
 
-bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block)
+bool rail_vehicle_t::is_last_free_track(halthandle_t x, koord3d claimed_tile) const
 {
 	if(  !x.is_bound()  ) {
 		return false;
@@ -5534,12 +5555,19 @@ bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint
 	station_tracks_t st;
 	get_station_tracks( x, get_waytype(), st );
 	// a free bay is of no use to a train that runs through, so only other tracks count here
-	if(  count_free_tracks( st, get_waytype(), claimed_tile, false )>0  ) {
+	return count_free_tracks( st, get_waytype(), claimed_tile, false )==0;
+}
+
+
+bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block)
+{
+	if(  !is_last_free_track( x, claimed_tile )  ) {
 		return false;
 	}
 	section_check_t ck;
 	ck.full = x;
-	ck.freed = get_section_origin( next_block );
+	// (next_block 0: not at a platform signal, no station behind us gets a track free)
+	ck.freed = next_block>0 ? get_section_origin( next_block ) : halthandle_t();
 	ck.newcomer = cnv->self;
 	ck.claimed = claimed_tile;
 	ck.visited.append( x );

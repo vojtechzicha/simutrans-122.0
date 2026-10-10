@@ -652,6 +652,13 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   free when no tile is reserved, and a train counts as leaving only if it is alone on a track (short
   trains share platforms). After 30 calendar minutes at the `P` (1/8 month without the calendar)
   the look goes through all stations, so the rule never holds everyone up by itself.
+  A stopping train at a choose signal does the same check before it takes the last free track of
+  its stop (`is_choose_signal_clear`, `keeps_last_track` with next_block 0: no station behind it
+  gets a track free): a station entered from a double track but left over a single-track line.
+  Found at Šakvice (2026-10-10): four S3 trains for Hustopeče came in from Brno by the choose
+  signal and took all four through platforms while the one train at Hustopeče's single platform
+  could only come back to Šakvice. The check needs route searches, so a train taking the last free
+  through track there pauses at the signal for one step (seen as a minute's delay in `bay_t5`).
 - Bay platforms (plan 3.10, no save change): a platform whose track ends in a buffer stop (or a
   depot) before any switch or station boundary (`is_bay_tile`) is used only by trains that turn back
   there (`reverses_at_stop`: the way on to the next stop starts back the way the train came, judged
