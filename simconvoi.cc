@@ -205,6 +205,7 @@ void convoi_t::init(player_t *player)
 	departure_delay = NO_DEPARTURE_DELAY;
 	departure_pending = false;
 	departure_standing = 0;
+	departing_entry = 255;
 	uncouple_since = 0;
 	uncouple_warned = false;
 	layover_pos = koord3d::invalid;
@@ -2156,6 +2157,9 @@ void convoi_t::suche_neue_route()
  */
 void convoi_t::step()
 {
+	// fork, timetable: ready to leave a timetabled stop, but still standing
+	book_slots_while_held();
+
 	// fork, coupling: not in the sync list, so wait_lock would never run down
 	if(  state==COUPLED  ) {
 		// the primary drives us; only follow changes of our line's schedule
@@ -2905,6 +2909,7 @@ bool convoi_t::set_schedule(schedule_t * f)
 		if(  !same_schedule_entries( schedule, f )  ) {
 			departure_delay = NO_DEPARTURE_DELAY;
 			departure_pending = false;
+			departing_entry = 255;
 		}
 		// now check, we we have been bond to a line we are about to lose:
 		bool changed = false;
@@ -3796,6 +3801,7 @@ void convoi_t::rdwr(loadsave_t *file)
 		else {
 			file->rdwr_long( departure_delay );
 			departure_pending = false;
+			departing_entry = 255;
 		}
 	}
 	else if(  file->is_loading()  ) {
@@ -4473,8 +4479,10 @@ station_tile_search_ready: ;
 			return;
 		}
 
+		departing_entry = 255;
 		if(  timetabled  &&  slot >= 0  ) {
 			line->book_departure_slot( schedule->get_current_stop(), slot );
+			departing_entry = schedule->get_current_stop();
 			// fork: how late we leave, shown in the convoy window until the next stop with a timetable
 			departure_delay = minutes_after_slot( slot );
 			if(  missed_partner  &&  partner_line.is_bound()  &&  partner_entry != 255  ) {
@@ -4501,6 +4509,7 @@ station_tile_search_ready: ;
 					&&  joined->line->can_take_departure_slot( joined->self, joined_slot )  ) {
 					joined->line->book_departure_slot( joined->schedule->get_current_stop(), joined_slot );
 					joined->departure_delay = minutes_after_slot( joined_slot );
+					joined->departing_entry = joined->schedule->get_current_stop();
 				}
 				else if(  timetabled  &&  slot >= 0  &&  joined->schedule->get_current_entry().has_timetable()  ) {
 					// timetabled here, but no slot of its own: it is as late as we are
@@ -4986,6 +4995,7 @@ void convoi_t::start_departure_delay_count()
 void convoi_t::finish_departure_delay()
 {
 	if(  !departure_pending  ) {
+		departing_entry = 255;
 		return;
 	}
 	departure_delay = get_departure_delay();
@@ -4994,9 +5004,33 @@ void convoi_t::finish_departure_delay()
 		joined->departure_delay = joined->get_departure_delay();
 		joined->departure_pending = false;
 		joined->departure_standing = 0;
+		joined->departing_entry = 255;
 	}
 	departure_pending = false;
 	departure_standing = 0;
+	departing_entry = 255;
+}
+
+
+bool convoi_t::is_leaving_stop(uint8 entry) const
+{
+	if(  !departure_pending  ||  departing_entry != entry  ||  state == NO_ROUTE  ) {
+		return false;
+	}
+	// held at the platform or standing before its exit signal (a joined train stands with its primary);
+	// once it moves, every slot that began while it stood is booked already (book_slots_while_held)
+	const convoi_t *const mover = state == COUPLED  &&  coupled_convoi.is_bound() ? coupled_convoi.get_rep() : this;
+	return mover->akt_speed == 0;
+}
+
+
+void convoi_t::book_slots_while_held()
+{
+	// held past the start of the next slot, we leave in that one: the next train of the line waits for
+	// the slot after it instead of leaving right behind us
+	if(  departing_entry != 255  &&  line.is_bound()  &&  is_leaving_stop( departing_entry )  ) {
+		line->book_slot_left_in( departing_entry );
+	}
 }
 
 
@@ -5660,6 +5694,7 @@ void convoi_t::check_pending_updates()
 			// fork: the delay of the last timetabled departure belongs to the old schedule
 			departure_delay = NO_DEPARTURE_DELAY;
 			departure_pending = false;
+			departing_entry = 255;
 		}
 		int current_stop = schedule->get_current_stop(); // save current position of schedule
 		bool is_same = false;

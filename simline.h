@@ -168,6 +168,9 @@ public:
 	/// Timetable (fork): marks the slot as used at this schedule entry
 	void book_departure_slot(uint8 entry, sint64 slot);
 
+	/// Timetable (fork): a train that booked its slot at this entry still stands there: the slot that began last is its own too
+	void book_slot_left_in(uint8 entry);
+
 	/// Timetable (fork): a new line's schedule, filled in place: no slot that opened before now counts
 	void fresh_slots();
 
@@ -191,8 +194,9 @@ public:
 	/// Coupling (fork): takes the oldest slot missed at this entry, if any
 	bool take_missed_coupling(uint8 entry, sint64 &slot);
 
-	/// Timetable (fork): convoys of the line loading at the same schedule entry that arrived before cnv
-	uint32 count_earlier_waiting(convoihandle_t cnv) const;
+	/// Timetable (fork): convoys of the line loading at the same schedule entry that arrived before cnv, and those
+	/// that got their slot there but still stand (leaving: how many of these)
+	uint32 count_earlier_waiting(convoihandle_t cnv, uint32 *leaving = NULL) const;
 
 	/**
 	 * Timetable (fork): the calendar minute of the slot cnv is expected to leave in, after the

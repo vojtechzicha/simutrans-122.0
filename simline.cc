@@ -363,8 +363,34 @@ void simline_t::fresh_slots()
 }
 
 
-uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
+// fork: other leaves entry idx before cnv: it booked its slot there and has not left yet, or it loads
+// there and arrived earlier (and, if ready_only, is ready to go)
+static bool leaves_before(convoihandle_t other, convoihandle_t cnv, uint8 idx, bool ready_only)
 {
+	if(  other == cnv  ||  !other.is_bound()  ) {
+		return false;
+	}
+	if(  other->is_leaving_stop( idx )  ) {
+		// held at the platform or at its exit signal: it goes first, and a slot that begins while it
+		// stands is its own (convoi_t::book_slots_while_held)
+		return true;
+	}
+	if(  other->get_state() != convoi_t::LOADING  ) {
+		return false;
+	}
+	const schedule_t *other_schedule = other->get_schedule();
+	if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
+		return false;
+	}
+	return other->arrived_before( cnv.get_rep() )  &&  (!ready_only  ||  other->is_ready_to_depart());
+}
+
+
+uint32 simline_t::count_earlier_waiting(convoihandle_t cnv, uint32 *leaving) const
+{
+	if(  leaving  ) {
+		*leaving = 0;
+	}
 	const schedule_t *cnv_schedule = cnv->get_schedule();
 	if(  cnv_schedule == NULL  ||  cnv_schedule->empty()  ) {
 		return 0;
@@ -372,15 +398,11 @@ uint32 simline_t::count_earlier_waiting(convoihandle_t cnv) const
 	const uint8 idx = cnv_schedule->get_current_stop();
 	uint32 count = 0;
 	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
-		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
-			continue;
-		}
-		const schedule_t *other_schedule = other->get_schedule();
-		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
-			continue;
-		}
-		if(  other->arrived_before( cnv.get_rep() )  ) {
+		if(  leaves_before( other, cnv, idx, false )  ) {
 			count ++;
+			if(  leaving  &&  other->is_leaving_stop( idx )  ) {
+				(*leaving) ++;
+			}
 		}
 	}
 	return count;
@@ -408,8 +430,11 @@ bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint6
 		// the first train after the timetable came into force waits for a whole slot
 		s = next_departure_slot( entry, s );
 	}
-	// every convoy that arrived earlier takes one slot before us
-	for(  uint32 n = count_earlier_waiting( cnv );  n > 0;  n --  ) {
+	// every convoy that arrived earlier takes one slot before us; one held after it got its slot here takes
+	// another only if it still stands when that one begins (booked then), so we expect it gone by then
+	uint32 leaving;
+	const uint32 ahead = count_earlier_waiting( cnv, &leaving );
+	for(  uint32 n = ahead - leaving;  n > 0;  n --  ) {
 		s = next_departure_slot( entry, s );
 	}
 	slot = s;
@@ -461,20 +486,39 @@ bool simline_t::can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const
 		// the first train after the timetable came into force: not late in a slot that opened before
 		return false;
 	}
-	// first come, first served: a ready convoy that arrived earlier at this stop goes first
+	// first come, first served: a ready convoy that arrived earlier at this stop goes first, and one
+	// that got its slot here but has not left yet
 	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
-		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
-			continue;
-		}
-		const schedule_t *other_schedule = other->get_schedule();
-		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
-			continue;
-		}
-		if(  other->arrived_before( cnv.get_rep() )  &&  other->is_ready_to_depart()  ) {
+		if(  leaves_before( other, cnv, idx, true )  ) {
 			return false;
 		}
 	}
 	return true;
+}
+
+
+void simline_t::book_slot_left_in(uint8 idx)
+{
+	if(  idx >= schedule->get_count()  ||  !welt->has_calendar()  ) {
+		return;
+	}
+	const schedule_entry_t &entry = schedule->entries[idx];
+	if(  !entry.has_timetable()  ) {
+		return;
+	}
+	uint16 offsets[schedule_entry_t::MAX_EXTRA_OFFSETS + 1];
+	const uint8 n = entry.get_departure_offsets( offsets );
+	sint64 day, minute_of_day;
+	split_day( welt->get_calendar_minutes(), day, minute_of_day );
+	sint64 prev;
+	if(  !slot_at_or_before( entry, offsets, n, minute_of_day, prev )  ) {
+		// before the first slot of the day: the last one of yesterday
+		day --;
+		if(  !slot_at_or_before( entry, offsets, n, 1439, prev )  ) {
+			return;
+		}
+	}
+	book_departure_slot( idx, day * 1440 + prev );
 }
 
 
@@ -564,16 +608,9 @@ bool simline_t::get_late_departure_slot(convoihandle_t cnv, sint64 inherited, si
 		// nothing known, or the slot is still ahead: on time again
 		return false;
 	}
-	// a ready convoy of the line that arrived earlier goes first
+	// a ready convoy of the line that arrived earlier goes first (or one that has not left with its slot yet)
 	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
-		if(  other == cnv  ||  !other.is_bound()  ||  other->get_state() != convoi_t::LOADING  ) {
-			continue;
-		}
-		const schedule_t *other_schedule = other->get_schedule();
-		if(  other_schedule == NULL  ||  other_schedule->get_current_stop() != idx  ) {
-			continue;
-		}
-		if(  other->arrived_before( cnv.get_rep() )  &&  other->is_ready_to_depart()  ) {
+		if(  leaves_before( other, cnv, idx, true )  ) {
 			slot = -1;
 			return true;
 		}

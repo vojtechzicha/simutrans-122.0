@@ -355,6 +355,13 @@ private:
 	bool departure_pending;
 	uint32 departure_standing;
 
+	/**
+	 * Fork, timetable: the schedule entry whose slot it booked when it got ready to leave (255 = none), kept
+	 * while departure_pending. While it stands, the next train of the line there books no slot, and a slot
+	 * that begins meanwhile is used up by it (is_leaving_stop, book_slots_while_held). Not saved.
+	 */
+	uint8 departing_entry;
+
 	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
 	uint32 uncouple_since;
 	bool uncouple_warned;
@@ -1222,6 +1229,10 @@ public:
 	/// fork, timetable: it passed its exit signal (or arrived): the time it stood is part of the delay now
 	void finish_departure_delay();
 	bool is_departure_pending() const { return departure_pending; }
+	/// fork, timetable: booked its slot at that entry of its line's schedule and still stands there (or at its exit signal)
+	bool is_leaving_stop(uint8 entry) const;
+	/// fork, timetable: while it is_leaving_stop, a slot of that entry that begins is used up by it (called in step)
+	void book_slots_while_held();
 	/// fork, timetable: waits at a stop with a timetable whose last slot closed unused (see simline_t::is_last_slot_missed)
 	bool has_missed_slot() const;
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }

@@ -153,7 +153,12 @@ maximum wait, unchanged) and a slot is open that no other convoy of the line use
 keeps it, and the missed couplings, for the entries that stayed: `keep_slots_across_edit` matches
 old and new entries as the longest run of the same stops in order, and resets an entry whose
 interval or offsets changed); among ready convoys the earliest arrival goes first
-(`convoi_t::arrived_before`, the same tick goes by convoy number). Fork saves keep `arrived_time`
+(`convoi_t::arrived_before`, the same tick goes by convoy number). A train that got its slot but still
+stands at the platform or before its exit signal (held for the single track, a passing train, ...) goes
+first too (`convoi_t::departing_entry`, `is_leaving_stop`, not saved): the next train of the line there
+books no slot and boards nobody until it moves, and a slot that begins while it stands is booked for it
+(`book_slots_while_held`, from `step`), so the next train takes the slot after that one instead of
+leaving right behind it. Fork saves keep `arrived_time`
 also at stops without a waiting time (stock wrote a dummy there, so every train waiting at such a
 stop came back with one tick); a slot already in `last_departure_slot` is never booked twice. On a new line (tool `c` and the
 depot's new line call `fresh_slots`; a line made empty in the GUI gets it with its first schedule) the first train at
