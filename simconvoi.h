@@ -1233,6 +1233,8 @@ public:
 	bool is_leaving_stop(uint8 entry) const;
 	/// fork, timetable: while it is_leaving_stop, a slot of that entry that begins is used up by it (called in step)
 	void book_slots_while_held();
+	/// fork, timetable: its route on from its front runs over a tile a vehicle of other stands on
+	bool is_way_out_over(const convoi_t *other) const;
 	/// fork, timetable: waits at a stop with a timetable whose last slot closed unused (see simline_t::is_last_slot_missed)
 	bool has_missed_slot() const;
 	bool is_waiting_for_coupling() const { return couple_wait_since!=0; }

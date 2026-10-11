@@ -5024,11 +5024,33 @@ bool convoi_t::is_leaving_stop(uint8 entry) const
 }
 
 
+bool convoi_t::is_way_out_over(const convoi_t *other) const
+{
+	// (a joined train runs on its primary's route)
+	const convoi_t *const mover = state == COUPLED  &&  coupled_convoi.is_bound() ? coupled_convoi.get_rep() : this;
+	if(  mover->anz_vehikel == 0  ||  other->anz_vehikel == 0  ) {
+		return false;
+	}
+	const route_t *const r = mover->get_route();
+	for(  uint32 i = mover->fahr[0]->get_route_index();  i < r->get_count();  i++  ) {
+		const koord3d &pos = r->at( i );
+		for(  uint8 j = 0;  j < other->anz_vehikel;  j++  ) {
+			if(  other->fahr[j]->get_pos() == pos  ) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 void convoi_t::book_slots_while_held()
 {
 	// held past the start of the next slot, we leave in that one: the next train of the line waits for
-	// the slot after it instead of leaving right behind us
-	if(  departing_entry != 255  &&  line.is_bound()  &&  is_leaving_stop( departing_entry )  ) {
+	// the slot after it instead of leaving right behind us (not while departing_entry may still be one
+	// of the old schedule)
+	if(  departing_entry != 255  &&  line.is_bound()  &&  !line_update_pending.is_bound()  &&  is_leaving_stop( departing_entry )
+		&&  !line->is_way_out_over_waiting( this, departing_entry )  ) {
 		line->book_slot_left_in( departing_entry );
 	}
 }

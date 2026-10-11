@@ -363,8 +363,9 @@ void simline_t::fresh_slots()
 }
 
 
-// fork: other leaves entry idx before cnv: it booked its slot there and has not left yet, or it loads
-// there and arrived earlier (and, if ready_only, is ready to go)
+// fork: other leaves entry idx before cnv: it booked its slot there and has not left yet (unless its way
+// out runs over cnv, which then must leave first), or it loads there and arrived earlier (and, if
+// ready_only, is ready to go)
 static bool leaves_before(convoihandle_t other, convoihandle_t cnv, uint8 idx, bool ready_only)
 {
 	if(  other == cnv  ||  !other.is_bound()  ) {
@@ -373,7 +374,7 @@ static bool leaves_before(convoihandle_t other, convoihandle_t cnv, uint8 idx, b
 	if(  other->is_leaving_stop( idx )  ) {
 		// held at the platform or at its exit signal: it goes first, and a slot that begins while it
 		// stands is its own (convoi_t::book_slots_while_held)
-		return true;
+		return !other->is_way_out_over( cnv.get_rep() );
 	}
 	if(  other->get_state() != convoi_t::LOADING  ) {
 		return false;
@@ -400,7 +401,7 @@ uint32 simline_t::count_earlier_waiting(convoihandle_t cnv, uint32 *leaving) con
 	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
 		if(  leaves_before( other, cnv, idx, false )  ) {
 			count ++;
-			if(  leaving  &&  other->is_leaving_stop( idx )  ) {
+			if(  leaving  &&  other->get_state() != convoi_t::LOADING  ) {
 				(*leaving) ++;
 			}
 		}
@@ -494,6 +495,21 @@ bool simline_t::can_take_departure_slot(convoihandle_t cnv, sint64 &slot) const
 		}
 	}
 	return true;
+}
+
+
+bool simline_t::is_way_out_over_waiting(const convoi_t *cnv, uint8 idx) const
+{
+	FOR(vector_tpl<convoihandle_t>, const &other, line_managed_convoys) {
+		if(  !other.is_bound()  ||  other.get_rep() == cnv  ||  other->get_state() != convoi_t::LOADING  ) {
+			continue;
+		}
+		const schedule_t *other_schedule = other->get_schedule();
+		if(  other_schedule != NULL  &&  other_schedule->get_current_stop() == idx  &&  cnv->is_way_out_over( other.get_rep() )  ) {
+			return true;
+		}
+	}
+	return false;
 }
 
 

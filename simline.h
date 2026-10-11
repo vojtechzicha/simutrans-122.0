@@ -171,6 +171,9 @@ public:
 	/// Timetable (fork): a train that booked its slot at this entry still stands there: the slot that began last is its own too
 	void book_slot_left_in(uint8 entry);
 
+	/// Timetable (fork): cnv's way out runs over a train of this line loading at that entry (that one leaves first)
+	bool is_way_out_over_waiting(const convoi_t *cnv, uint8 entry) const;
+
 	/// Timetable (fork): a new line's schedule, filled in place: no slot that opened before now counts
 	void fresh_slots();
 

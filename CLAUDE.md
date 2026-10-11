@@ -158,7 +158,9 @@ stands at the platform or before its exit signal (held for the single track, a p
 first too (`convoi_t::departing_entry`, `is_leaving_stop`, not saved): the next train of the line there
 books no slot and boards nobody until it moves, and a slot that begins while it stands is booked for it
 (`book_slots_while_held`, from `step`), so the next train takes the slot after that one instead of
-leaving right behind it. Fork saves keep `arrived_time`
+leaving right behind it. Not when its way out runs over the tiles of the waiting train
+(`is_way_out_over`, e.g. a far-side platform whose exit crosses another platform): that one goes first,
+as before. Fork saves keep `arrived_time`
 also at stops without a waiting time (stock wrote a dummy there, so every train waiting at such a
 stop came back with one tick); a slot already in `last_departure_slot` is never booked twice. On a new line (tool `c` and the
 depot's new line call `fresh_slots`; a line made empty in the GUI gets it with its first schedule) the first train at
