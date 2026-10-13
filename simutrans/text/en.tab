@@ -1719,6 +1719,8 @@ Deadlock in %s: %i trains wait for each other in a circle and cannot move.
 Deadlock in %s: %i trains wait for each other in a circle and cannot move.
 %i more are stuck behind them.
 %i more are stuck behind them.
+Still stuck after %s.
+Still stuck after %s.
 Deadlock in %s: %i road vehicles wait for each other in a circle and cannot move.
 Deadlock in %s: %i road vehicles wait for each other in a circle and cannot move.
 Waiting for a free layover bay at %s

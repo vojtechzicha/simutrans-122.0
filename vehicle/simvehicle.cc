@@ -5093,6 +5093,21 @@ static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t
 }
 
 
+void rail_vehicle_t::get_station_occupants(halthandle_t halt, waytype_t wt, vector_tpl<convoihandle_t> &trains)
+{
+	trains.clear();
+	station_tracks_t st;
+	get_station_tracks( halt, wt, st );
+	FOR( vector_tpl<koord3d>, const &k, st.tiles ) {
+		grund_t const* const gr = world()->lookup( k );
+		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( wt ) : NULL;
+		if(  sch  &&  sch->is_reserved()  ) {
+			trains.append_unique( sch->get_reserved_convoi() );
+		}
+	}
+}
+
+
 // tracks of the station with no tile reserved, not counting the one with tile except;
 // bays count only with bays set, or when the station has nothing else (a terminus)
 static uint16 count_free_tracks(const station_tracks_t &st, waytype_t wt, koord3d except, bool bays)

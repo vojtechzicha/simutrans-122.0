@@ -788,18 +788,28 @@ joined part; the 34 rail regression scenarios unchanged.
 `convoi_t::check_deadlocks()` (simconvoi.cc, called after the convoy loop of `karte_t::step`) runs
 every 5 calendar minutes (1/64 month without the calendar) and builds a wait-for graph, one edge per
 vehicle:
-- Rail and tram convoys waiting at a signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*, not in a
-  section wait or passing hold, which time out or have `check_section_lock`) point at the convoy
-  holding the first tile on their route ahead that they have not reserved (up to the second signal).
+- Rail and tram convoys waiting at a signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*) point at the
+  convoy holding the first tile on their route ahead that they have not reserved (up to the second
+  signal). Section waits count too (since 2026-10-13), except ENTRY, YIELD, HOLD and the passing
+  holds, which time out: waiting for the single-track line (LINE) points at the holder of
+  `section_wait_tile`; waiting for a track at a station (TRACK, LAST_TRACK) at the trains on its
+  tracks (`rail_vehicle_t::get_station_occupants`), and a circle through such a train counts only
+  when every one of them is stuck too (in a circle or behind one). `check_section_lock` misses locks
+  where the line ends at a plain signal (Brno-Chrlice, S2: Os 4727 at the `LT` with no free track,
+  the three trains on Chrlice's tracks waiting for the line it stands on; `get_section_after` finds
+  no station at the Brno end and calls it a wait), and is never asked at an `LT`.
 - Road convoys in those states point at the vehicle that stopped them at their last try:
   `overtaker_t::set_blocked_by` (not saved) is set in `road_vehicle_t::can_enter_tile` and, for city
   cars, in `private_car_t::ist_weg_frei` (`note_blocker`), and cleared when the way is free. The
   stored pointer is only compared with the objects on the stored tile, so a vehicle that left or was
   deleted gives no edge. Standing city cars (speed 0) and waiting convoys found that way become nodes
   too, so a circle of buses and city cars counts; city cars alone are never looked at.
-A circle that stays on the same tiles for 30 calendar minutes (1/16 month) posts one `warnings`
+A circle that stays on the same tiles for 30 calendar minutes (1/16 month) posts a `warnings`
 message ("Deadlock in Brno: 4 trams wait for each other in a circle and cannot move. 162 more are
-stuck behind them.", or "... road vehicles ..."; click jumps there) and lists the circle in the log.
+stuck behind them.", or "... road vehicles ..."; click jumps there) and lists the circle in the log,
+and again every 60 minutes (1/8 month) while it stays, adding "Still stuck after 2h30." (time since
+first seen; `warned_at`, kept with the warned tiles so a changing circle keeps its times). A single
+message was easy to miss: the owner's message list had it under ~350 "stop too short" messages.
 Circles are keyed by their tiles, not vehicles, and a circle touching a tile of one already warned
 about is the same jam (buses reaching a stop tile of a jammed ring against the flow replaced the stuck
 one there each hour and re-warned). The record lives in memory only (`reset_deadlock_check` on
