@@ -24,6 +24,7 @@ class signal_t;
 class roadsign_t;
 class ware_t;
 class route_t;
+struct station_tracks_t;
 
 /*----------------------- Movables ------------------------------------*/
 
@@ -822,6 +823,23 @@ private:
 	bool keeps_last_track(halthandle_t x, koord3d claimed_tile, uint16 next_block);
 	// the train has waited long for a track at x: tell the player once if the stations are locked
 	void check_section_lock(halthandle_t x, uint16 next_block);
+	// fork, choose signals: whether the last free track of halt may be taken (KEEP_TAKE), is kept
+	// for a train coming the other way (KEEP_HOLD) or the check needs a step (KEEP_STEP)
+	enum { KEEP_TAKE = 0, KEEP_HOLD, KEEP_STEP };
+	uint8 keeps_track_for_other_side(halthandle_t halt, uint16 start_block, uint32 through_at, koord3d next_stop);
+	uint8 check_track_for_other_side(halthandle_t halt, uint16 start_block, uint32 through_at, koord3d next_stop);
+	// the side (direction along axis) by which train c leaves the station tracks st, from path[from]
+	// on or, when path ends there, its way on to schedule entry next_entry; none if not known, or if
+	// that way out runs over a tile of avoid
+	ribi_t::ribi get_leaving_side(convoihandle_t c, const vector_tpl<koord3d> &path, uint32 from, uint8 next_entry, const station_tracks_t &st, ribi_t::ribi axis, const vector_tpl<koord3d> *avoid = NULL);
+	// the way of train c from from to to over any track (needs a step)
+	bool calc_leg(convoihandle_t c, koord3d from, koord3d to, route_t &leg);
+	// the last answer of keeps_track_for_other_side (not saved)
+	uint32 keep_check_tick;
+	halthandle_t keep_check_halt;
+	uint8 keep_check_result;
+	// applies its result at the choose signal sig: false while the signal stays red
+	bool may_take_last_track(uint8 keep, halthandle_t halt, signal_t *sig, sint32 &restart_speed);
 
 	// cache of get_section_after (on the leading vehicle, not saved)
 	halthandle_t section_after_at, section_after_next;

@@ -2895,6 +2895,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	section_after_stop = 0;
 	section_after_found = false;
 	section_after_tick = 0;
+	keep_check_tick = 0;
 	vehicle_t::rdwr_from_convoi(file);
 
 	if(  file->is_loading()  ) {
@@ -2958,6 +2959,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	section_after_stop = 0;
 	section_after_found = false;
 	section_after_tick = 0;
+	keep_check_tick = 0;
 }
 
 
@@ -3492,6 +3494,17 @@ skip_choose:
 				}
 			}
 		}
+		if(  through_at!=INVALID_INDEX  ) {
+			// fork: the station we pass, its last free track maybe kept for the other direction
+			halthandle_t through_halt;
+			for(  uint32 i=through_at+1;  i-- > (uint32)start_block+1  &&  !through_halt.is_bound();  ) {
+				grund_t const* const gr = welt->lookup( cnv->get_route()->at(i) );
+				through_halt = gr ? gr->get_halt() : halthandle_t();
+			}
+			if(  !may_take_last_track( keeps_track_for_other_side( through_halt, start_block, through_at, koord3d::invalid ), through_halt, sig, restart_speed )  ) {
+				return false;
+			}
+		}
 		// just act as normal signal
 		if(  block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 0, true, false )  ) {
 			sig->set_state(  roadsign_t::gruen );
@@ -3592,6 +3605,13 @@ skip_choose:
 	if(  !step_aside  ) {
 		overtaker_ways.clear();
 		overtaker_routes.clear();
+	}
+	// fork: the last free track maybe kept for a train coming the other way
+	if(  !may_take_last_track( keeps_track_for_other_side( target_halt, start_block, INVALID_INDEX, next_stop ), target_halt, sig, restart_speed )  ) {
+		target_halt = halthandle_t();
+		overtaker_ways.clear();
+		overtaker_routes.clear();
+		return false;
 	}
 	bool planned_taken = false;
 	if(  step_aside  ||  !planned_ok  ||  !block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false )  ) {
@@ -5528,6 +5548,328 @@ bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint
 	}
 	// two stations ahead; after a long wait all of them, so this rule never holds everybody up by itself
 	return !station_can_release( x, section_waited_long( cnv ) ? 64 : 1, ck );
+}
+
+
+/* fork: a station entered through choose signals (double track) must not fill up with trains that all
+ * leave it the same way while a train comes from that way to run on through it: they wait for the line
+ * it holds, it waits for a track here, and with the station at the other end of the line full of trains
+ * coming here the two lock up (Brno hl.n. and Brno-Zidenice, 2026-10-13). So while such a train comes, a
+ * train leaving that way takes a track only if afterwards one stays free or held only by trains leaving
+ * the other way.
+ */
+
+// the side of the station a way leaves by: the direction along the platform axis from path[from] to
+// path[to] (none when it does not move along the axis)
+static ribi_t::ribi side_along(const vector_tpl<koord3d> &path, uint32 from, uint32 to, ribi_t::ribi axis)
+{
+	if(  from>=path.get_count()  ||  to>=path.get_count()  ) {
+		return ribi_t::none;
+	}
+	const sint32 d = axis==ribi_t::northsouth ? path[to].y - path[from].y : path[to].x - path[from].x;
+	if(  d==0  ) {
+		return ribi_t::none;
+	}
+	if(  axis==ribi_t::northsouth  ) {
+		return d>0 ? ribi_t::south : ribi_t::north;
+	}
+	return d>0 ? ribi_t::east : ribi_t::west;
+}
+
+
+// the side by which a way from path[start] on leaves the station tracks, none if it does not
+static ribi_t::ribi leaving_side(const vector_tpl<koord3d> &path, uint32 start, const station_tracks_t &st, ribi_t::ribi axis)
+{
+	for(  uint32 j=start;  j+1<path.get_count();  j++  ) {
+		if(  st.tiles.is_contained( path[j] )  &&  !st.tiles.is_contained( path[j+1] )  ) {
+			// over the last tiles of the station on to the next few after it
+			const uint32 from = j>=start+4 ? j-4 : start;
+			const uint32 to = j+8<path.get_count() ? j+8 : path.get_count()-1;
+			return side_along( path, from, to, axis );
+		}
+	}
+	return ribi_t::none;
+}
+
+
+// the way from path[from] on out of the station tracks (and 16 tiles further) runs over a tile of avoid
+static bool way_out_over(const vector_tpl<koord3d> &path, uint32 from, const station_tracks_t &st, const vector_tpl<koord3d> &avoid)
+{
+	uint32 end = path.get_count();
+	for(  uint32 j=from;  j+1<path.get_count();  j++  ) {
+		if(  st.tiles.is_contained( path[j] )  &&  !st.tiles.is_contained( path[j+1] )  ) {
+			end = min( j+17, path.get_count() );
+			break;
+		}
+	}
+	for(  uint32 i=from;  i<end;  i++  ) {
+		if(  avoid.is_contained( path[i] )  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+bool rail_vehicle_t::calc_leg(convoihandle_t c, koord3d from, koord3d to, route_t &leg)
+{
+	rail_vehicle_t *const f = (rail_vehicle_t *)c->front();
+	const uint8 old_search = f->track_search;
+	f->track_search = 3;
+	const bool ok = leg.calc_route( welt, from, to, f, speed_to_kmh( c->get_min_top_speed() ), 0 )!=route_t::no_route;
+	f->track_search = old_search;
+	return ok  &&  leg.get_count()>=2;
+}
+
+
+ribi_t::ribi rail_vehicle_t::get_leaving_side(convoihandle_t c, const vector_tpl<koord3d> &path, uint32 from, uint8 next_entry, const station_tracks_t &st, ribi_t::ribi axis, const vector_tpl<koord3d> *avoid)
+{
+	const ribi_t::ribi side = leaving_side( path, from, st, axis );
+	schedule_t const* const schedule = c->get_schedule();
+	if(  side!=ribi_t::none  ||  path.empty()  ||  schedule==NULL  ||  schedule->empty()  ) {
+		return avoid  &&  way_out_over( path, from, st, *avoid ) ? (ribi_t::ribi)ribi_t::none : side;
+	}
+	// it stops here: the way on to its next stop
+	route_t on;
+	if(  !calc_leg( c, path.back(), schedule->entries[ next_entry % schedule->get_count() ].pos, on )  ||  (avoid  &&  way_out_over( on.get_route(), 0, st, *avoid ))  ) {
+		return ribi_t::none;
+	}
+	return leaving_side( on.get_route(), 0, st, axis );
+}
+
+
+// the schedule entry a train goes to after the end of its route (see get_section_after: the route leads
+// to the current entry; a train standing there goes on to the next one)
+static uint8 entry_after_route(const convoi_t *c)
+{
+	schedule_t const* const schedule = c->get_schedule();
+	const uint8 entry = schedule->get_current_stop();
+	const route_t *r = c->get_route();
+	const koord3d at = r->empty() ? c->front()->get_pos() : r->back();
+	const koord3d goal = schedule->entries[entry].pos;
+	const halthandle_t goal_halt = haltestelle_t::get_halt( goal, c->get_owner() );
+	if(  at==goal  ||  (goal_halt.is_bound()  &&  haltestelle_t::get_halt( at, c->get_owner() )==goal_halt)  ) {
+		return (entry+1) % schedule->get_count();
+	}
+	return entry;
+}
+
+
+uint8 rail_vehicle_t::keeps_track_for_other_side(halthandle_t halt, uint16 start_block, uint32 through_at, koord3d next_stop)
+{
+	if(  !halt.is_bound()  ) {
+		return KEEP_TAKE;
+	}
+	// a train waiting at the signal asks every step: the answer holds for a minute (1/1024 month)
+	const uint32 now = welt->get_ticks();
+	sint64 valid = welt->calendar_minutes_to_ticks( 1 );
+	if(  valid==0  ) {
+		valid = welt->ticks_per_world_month >> 10;
+	}
+	if(  keep_check_tick!=0  &&  keep_check_halt==halt  &&  (sint64)(uint32)(now - keep_check_tick) < valid  ) {
+		return keep_check_result;
+	}
+	const uint8 keep = check_track_for_other_side( halt, start_block, through_at, next_stop );
+	if(  keep!=KEEP_STEP  ) {
+		keep_check_tick = now ? now : 1;
+		keep_check_halt = halt;
+		keep_check_result = keep;
+	}
+	return keep;
+}
+
+
+uint8 rail_vehicle_t::check_track_for_other_side(halthandle_t halt, uint16 start_block, uint32 through_at, koord3d next_stop)
+{
+	station_tracks_t st;
+	get_station_tracks( halt, get_waytype(), st );
+	if(  st.tiles.empty()  ||  count_free_tracks( st, get_waytype(), koord3d::invalid, false )>1  ) {
+		// another stays free (none free: a short train may still find room behind another one)
+		return KEEP_TAKE;
+	}
+	if(  cnv->get_section_wait()==convoi_t::SECTION_WAIT_LAST_TRACK  &&  section_waited_long( cnv )  ) {
+		// held long enough: this rule never holds anybody up for good
+		return KEEP_TAKE;
+	}
+	// the platform axis: the way of a straight platform tile
+	ribi_t::ribi axis = ribi_t::none;
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
+		weg_t const* const way = tile.grund->get_weg( get_waytype() );
+		if(  way  ) {
+			const ribi_t::ribi r = way->get_ribi_unmasked();
+			if(  r==ribi_t::northsouth  ||  r==ribi_t::eastwest  ) {
+				axis = r;
+				break;
+			}
+		}
+	}
+	if(  axis==ribi_t::none  ) {
+		return KEEP_TAKE;
+	}
+
+	// trains that may come in: on their way here (route), or standing at a stop near by (their way on
+	// from there may lead here); only those within 160 tiles of the station tracks (a route is at least
+	// as long as the distance)
+	koord lo = st.tiles[0].get_2d(), hi = lo;
+	FOR( vector_tpl<koord3d>, const &k, st.tiles ) {
+		lo.x = min( lo.x, k.x );  lo.y = min( lo.y, k.y );
+		hi.x = max( hi.x, k.x );  hi.y = max( hi.y, k.y );
+	}
+	const koord here = halt->get_basis_pos();
+	vector_tpl<convoihandle_t> routed, near;
+	FOR( vector_tpl<convoihandle_t>, const c, welt->convoys() ) {
+		if(  c==cnv->self  ||  c->get_vehicle_count()==0  ||  c->in_depot()  ||  c->get_state()==convoi_t::COUPLED  ||  c->front()->get_waytype()!=get_waytype()
+			||  c->get_schedule()==NULL  ||  c->get_schedule()->empty()  ) {
+			continue;
+		}
+		const koord pos = c->front()->get_pos().get_2d();
+		if(  pos.x < lo.x-160  ||  pos.x > hi.x+160  ||  pos.y < lo.y-160  ||  pos.y > hi.y+160  ) {
+			continue;
+		}
+		bool is_there = false;
+		for(  uint8 v=0;  !is_there  &&  v<c->get_vehicle_count();  v++  ) {
+			is_there = st.tiles.is_contained( c->get_vehikel(v)->get_pos() );
+		}
+		if(  is_there  ) {
+			continue;
+		}
+		const vector_tpl<koord3d> &r = c->get_route()->get_route();
+		const uint32 first = c->front()->get_route_index();
+		bool enters = false;
+		for(  uint32 k=first;  !enters  &&  k<r.get_count()  &&  k<first+160;  k++  ) {
+			enters = r[k].x>=lo.x  &&  r[k].x<=hi.x  &&  r[k].y>=lo.y  &&  r[k].y<=hi.y  &&  st.tiles.is_contained( r[k] );
+		}
+		if(  enters  ) {
+			routed.append( c );
+		}
+		else if(  r.get_count()<first+160  &&  koord_distance( r.empty() ? c->front()->get_pos().get_2d() : r.back().get_2d(), here ) <= 96  ) {
+			near.append( c );
+		}
+	}
+	if(  routed.empty()  &&  near.empty()  ) {
+		return KEEP_TAKE;
+	}
+	if(  !cnv->is_waiting()  ) {
+		// the ways on need route searches, that needs a step
+		return KEEP_STEP;
+	}
+
+	// the side we leave by
+	ribi_t::ribi ours = ribi_t::none;
+	if(  through_at!=INVALID_INDEX  ) {
+		ours = leaving_side( cnv->get_route()->get_route(), start_block, st, axis );
+	}
+	else if(  next_stop!=koord3d::invalid  ) {
+		route_t on;
+		if(  calc_leg( cnv->self, cnv->get_route()->back(), next_stop, on )  ) {
+			ours = leaving_side( on.get_route(), 0, st, axis );
+		}
+	}
+	if(  ours==ribi_t::none  ) {
+		return KEEP_TAKE;
+	}
+	const ribi_t::ribi against = ribi_t::backward( ours );
+	// where we stand while held: a train whose way out runs over it could not leave the track it takes
+	vector_tpl<koord3d> standing;
+	const uint32 length = cnv->get_tile_length() + 1;
+	for(  uint32 i = start_block>length ? start_block-length : 0;  i<=start_block  &&  i<cnv->get_route()->get_count();  i++  ) {
+		standing.append( cnv->get_route()->at(i) );
+	}
+
+	// a train coming in from that side, i.e. against our way out, that runs on through the station:
+	// for it a track here frees the way for the trains here
+	bool through_comer = false;
+	for(  uint32 i=0;  !through_comer  &&  i<routed.get_count()+near.get_count();  i++  ) {
+		const bool is_routed = i<routed.get_count();
+		const convoihandle_t c = is_routed ? routed[i] : near[i-routed.get_count()];
+		route_t leg;
+		uint8 entry = entry_after_route( c.get_rep() );
+		const vector_tpl<koord3d> *path = &c->get_route()->get_route();
+		uint32 first = c->front()->get_route_index();
+		if(  !is_routed  ) {
+			// its way on from the end of its route
+			if(  !calc_leg( c, path->empty() ? c->front()->get_pos() : path->back(), c->get_schedule()->entries[entry].pos, leg )  ) {
+				continue;
+			}
+			path = &leg.get_route();
+			first = 0;
+			entry = (entry+1) % c->get_schedule()->get_count();
+		}
+		for(  uint32 k=first;  k<path->get_count()  &&  k<first+160;  k++  ) {
+			if(  st.tiles.is_contained( (*path)[k] )  ) {
+				// over the last tiles before it, and the first of the station
+				const ribi_t::ribi dir = side_along( *path, k>=first+8 ? k-8 : first, k+2<path->get_count() ? k+2 : path->get_count()-1, axis );
+				if(  dir==against  ) {
+					const ribi_t::ribi side = get_leaving_side( c, *path, k, entry, st, axis, &standing );
+					through_comer = side!=ribi_t::none  &&  side!=ours;
+				}
+				break;
+			}
+		}
+	}
+	if(  !through_comer  ) {
+		return KEEP_TAKE;
+	}
+
+	// the tracks free or held only by trains leaving the other way (they free them for the train coming
+	// in): taking one, at least one must stay
+	vector_tpl<convoihandle_t> seen;
+	vector_tpl<ribi_t::ribi> seen_side;
+	uint16 usable = 0;
+	for(  uint16 t=0;  t<st.count;  t++  ) {
+		if(  st.bay[t]  &&  st.has_through  ) {
+			continue;
+		}
+		bool ours_there = false;
+		for(  uint32 i=0;  !ours_there  &&  i<st.tiles.get_count();  i++  ) {
+			if(  st.track[i]!=t  ) {
+				continue;
+			}
+			grund_t const* const gr = welt->lookup( st.tiles[i] );
+			schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
+			const convoihandle_t c = sch ? sch->get_reserved_convoi() : convoihandle_t();
+			if(  !c.is_bound()  ||  c==cnv->self  ) {
+				continue;
+			}
+			sint32 k = seen.is_contained( c ) ? (sint32)seen.index_of( c ) : -1;
+			if(  k<0  ) {
+				ribi_t::ribi side = ribi_t::none;
+				if(  c->get_vehicle_count()>0  &&  c->front()->get_waytype()==get_waytype()  &&  c->get_schedule()  &&  !c->get_schedule()->empty()  ) {
+					const uint32 index = c->front()->get_route_index();
+					side = get_leaving_side( c, c->get_route()->get_route(), index>0 ? index-1 : 0, entry_after_route( c.get_rep() ), st, axis );
+				}
+				k = seen.get_count();
+				seen.append( c );
+				seen_side.append( side );
+			}
+			// (a train we cannot tell about counts as leaving the other way)
+			ours_there = seen_side[k]==ours;
+		}
+		if(  !ours_there  &&  ++usable >= 2  ) {
+			return KEEP_TAKE;
+		}
+	}
+	return KEEP_HOLD;
+}
+
+
+bool rail_vehicle_t::may_take_last_track(uint8 keep, halthandle_t halt, signal_t *sig, sint32 &restart_speed)
+{
+	if(  keep==KEEP_STEP  ) {
+		// the check needs a route search, that needs a step: come to the signal first
+		restart_speed = -1;
+		return false;
+	}
+	if(  keep==KEEP_HOLD  ) {
+		sig->set_state( roadsign_t::rot );
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_LAST_TRACK, halt );
+		restart_speed = 0;
+		return false;
+	}
+	if(  cnv->get_section_wait()==convoi_t::SECTION_WAIT_LAST_TRACK  ) {
+		cnv->set_section_wait( convoi_t::SECTION_WAIT_NONE, halthandle_t() );
+	}
+	return true;
 }
 
 

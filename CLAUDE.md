@@ -284,6 +284,28 @@ train pauses at the signal for one. Tested headless (pak128.cs): main plus loop,
 loops, double track with crossovers only (keeps its main), express too far behind, timetable dwell
 alone, loop taken; the 33 rail regression and 12 overtaking scenarios unchanged.
 
+Keeping a track for the other direction (no save change, 2026-10-13): at a choose signal, a train
+(stopping, or passing through on a platform track up to its `P`) may not take a track of a station
+when afterwards fewer than one track would stay free or held only by trains leaving the other way,
+while a train comes in from the side we leave by and will run on through the station (leave by the
+other side). Without it a double-track pair of stations locked up: Brno-Židenice held four southbound
+trains (one only passing on a platform track), Brno hl.n. trains for the north, both lines between
+queued. `rail_vehicle_t::keeps_track_for_other_side` (cached a minute per train) /
+`check_track_for_other_side`: only when at most one track is free (`count_free_tracks`; short trains
+share tracks, so also at none); sides are directions along the platform axis (a straight platform
+tile's way) of the way out over the station tracks (`get_station_tracks`), from the route or, for a
+train that stops there, its next leg (`get_leaving_side`, `calc_leg`, any track); trains coming are
+those whose route enters the station within 160 tiles, and trains standing at a stop near by whose
+next leg does (that is how the Brno ones came: loading at the station before); one whose way out runs
+over the tiles we would stand on while held does not count (it could not leave the track kept for it). Route searches need a
+step, so a train that could be held pauses at the signal for one (as stock does for a platform
+search). Held: red, `SECTION_WAIT_LAST_TRACK` with the halt ("Keeping the last track at X free"),
+let go after 30 minutes of it, cleared when the rule lets it in (`may_take_last_track`). Tested
+headless on a rebuild (two 3-track stations on a signalled double track, turning loops with halts at
+both ends, locals stopping and expresses passing; 5 mixes of 10-16 trains): base locked in all within
+1-2 hours, new ran 8 hours in all; the 39 regression scenarios byte-identical but `bay_t5` (a train
+pausing a step at a choose signal, same outcome). About 4 % slower on the owner's game.
+
 ## Platform types, Hold and waiting for passing trains (fork feature, savegame 122.5)
 
 All rail only, in `vehicle/simvehicle.cc` unless noted.
