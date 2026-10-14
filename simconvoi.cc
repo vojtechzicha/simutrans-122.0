@@ -4541,7 +4541,10 @@ station_tile_search_ready: ;
 	if(  depart  &&  !no_load  &&  late_slot < 0  ) {
 		// (a train with a slot inherited here knows its primary is gone already)
 		uint16 max_wait;
-		if(  expects_partner( max_wait, partner_line, partner_entry )  ) {
+		if(  expects_partner( max_wait, partner_line, partner_entry )
+			&&  !(slot >= 0  &&  partner_entry != 255  &&  partner_line->is_departure_slot_used( partner_entry, slot ))  ) {
+			// (the joining line left in our slot from its entry here: its train waited for us and is gone, so
+			// we neither wait nor hand it a missed slot, e.g. a unit left at Kralupy for the next S4 to Praha)
 			if(  couple_wait_since==0  ) {
 				couple_wait_since = nonzero_ticks( welt->get_ticks() );
 				couple_hold_slot = slot;

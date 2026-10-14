@@ -487,6 +487,17 @@ primary line carries no setting, it learns from the stop's `registered_lines`. A
   it (`late_slot`, `running_late`), does not wait for the gone partner, and leaves at once. While
   late it takes the oldest unused due slot at timetabled stops (`get_late_departure_slot`) until a
   slot lies ahead again or it couples; spare time at the branch terminus recovers it.
+  A primary does not wait at all, and hands over nothing, when the joining line already left in the
+  slot it would take from its coupling entry there (`is_departure_slot_used`): the joining train
+  waited for it and is gone. That is the S4 case (planned 2026-10-14): "S4 Ústí 2nd unit" runs
+  Bubny - Kralupy only, is left at Kralupy by one S4 Ústí and taken back to Praha by the next one
+  from Ústí; a late S4 Ústí used to wait another 10 minutes for the unit that had left, and its
+  stale missed slot later sent a unit off from Kralupy without waiting for its train. Tested on a
+  rebuild with the real minutes (3 primaries, 2 units, 960 minutes per month for real running
+  times): pairs part and recouple every hour, a primary held 23 minutes at the far end leaves
+  Kralupy on arrival (still late). On that layout the inbound primary does not fit in front of the unit (the pair
+  stopped with its front at the platform end) and they couple across platforms, i.e. the unit
+  is moved behind it; expect the same at Kralupy unless the platform has room.
 - Other: depot entry of a coupled primary takes both trains in as two convoys; deleting either
   train keeps the other (a deleted primary leaves the joined train standing where it is); the joined
   train's schedule window is refused while coupled; the convoy window shows
