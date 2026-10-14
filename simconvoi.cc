@@ -107,7 +107,7 @@ static bool same_schedule_entries(const schedule_t *a, const schedule_t *b)
 		return a == b;
 	}
 	for(  uint8 i=0;  i<a->get_count();  i++  ) {
-		if(  !(a->entries[i] == b->entries[i])  ) {
+		if(  !a->entries[i].same_except_board( b->entries[i] )  ) {
 			return false;
 		}
 	}

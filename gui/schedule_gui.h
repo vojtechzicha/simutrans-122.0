@@ -23,6 +23,7 @@
 #include "../linehandle_t.h"
 #include "simwin.h"
 #include "../tpl/vector_tpl.h"
+#include "../dataobj/schedule_entry.h"
 
 
 class schedule_t;
@@ -98,6 +99,18 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_label_minw_t lb_couple_wait_fmt;
 	uint32 couple_line_count;        // lines in couple_selector, to notice new or deleted lines
 	void init_couple_selector();       // all lines of this type but our own (a line never couples with itself)
+
+	/// departure board texts (fork): the line number and the destination boards and signs show from the current
+	/// entry on; the inputs show what applies there (greyed while it is not set here), Auto goes back to the board's own
+	gui_aligned_container_t cont_board;
+	gui_label_t lb_board[schedule_entry_t::MAX_BOARD_TEXTS];
+	gui_textinput_t input_board[schedule_entry_t::MAX_BOARD_TEXTS];
+	char board_buf[schedule_entry_t::MAX_BOARD_TEXTS][128];
+	button_t bt_board_auto[schedule_entry_t::MAX_BOARD_TEXTS];
+	gui_label_minw_t lb_board_from[schedule_entry_t::MAX_BOARD_TEXTS];
+	sint16 board_shown_entry;          // the entry the inputs show (-1: none yet)
+	void show_board_texts(bool force); // force: also an input being edited
+	void read_board_text(uint8 what);  // the typed text into the current entry
 
 	/// the schedule belongs to a line (timetable slots only work with lines)
 	bool has_line() const;

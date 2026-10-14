@@ -126,8 +126,14 @@ void simline_t::set_schedule(schedule_t* schedule)
 		last_departure_slot.clear();
 		missed_couplings.clear();
 	}
-	// fork, departure board: running times belong to the old stops
-	run_times.clear();
+	// fork, departure board: running times belong to the old stops (board texts change nothing there)
+	bool same_stops = this->schedule  &&  schedule  &&  this->schedule->get_count() == schedule->get_count();
+	for(  uint8 i = 0;  same_stops  &&  i < schedule->get_count();  i++  ) {
+		same_stops = this->schedule->entries[i].same_except_board( schedule->entries[i] );
+	}
+	if(  !same_stops  ) {
+		run_times.clear();
+	}
 	if (this->schedule) {
 		unregister_stops();
 		delete this->schedule;

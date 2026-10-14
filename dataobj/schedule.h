@@ -200,6 +200,17 @@ public:
 
 	/// appends "[Terminal]" etc. for non-regular stop types (fork)
 	static void append_stop_type( cbuffer_t &buf, schedule_entry_t const& entry );
+
+	/// fork, departure board: " {line S22, to Brno hl.n.}" for the board texts this entry sets (nothing if none)
+	static void append_board_texts( cbuffer_t &buf, schedule_entry_t const& entry );
+
+	/**
+	 * Fork, departure board: the text (schedule_entry_t::BOARD_...) shown for departures from entry: the one
+	 * set at the nearest entry at or before it that sets one (from, if not NULL, is that entry), going round
+	 * the schedule; NULL if none, or if that entry goes back to the board's own (from 255 if none at all).
+	 * skip_self starts at the entry before.
+	 */
+	const char *get_board_text(uint8 entry, uint8 what, uint8 *from = NULL, bool skip_self = false) const;
 };
 
 

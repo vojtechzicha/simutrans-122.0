@@ -9,6 +9,7 @@
 
 #include <string.h>
 #include "koord3d.h"
+#include "../utils/plainstring.h"
 
 /**
  * A schedule entry.
@@ -36,7 +37,7 @@ public:
 	/// departure_window value: a slot stays open for half the gap to the next slot (fork)
 	static const uint16 WINDOW_AUTO = 0xFFFF;
 
-	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), departure_window(WINDOW_AUTO), stop_type(regular), couple_line_id(0), couple_max_wait(0) {}
+	schedule_entry_t() : minimum_loading(0), waiting_time_shift(0), waiting_time(0), departure_interval(0), departure_offset(0), extra_offset_count(0), departure_window(WINDOW_AUTO), stop_type(regular), couple_line_id(0), couple_max_wait(0), board_auto(0) { memset( extra_offsets, 0, sizeof(extra_offsets) ); }
 
 	schedule_entry_t(koord3d const& pos, uint const minimum_loading, sint8 const waiting_time_shift, uint16 const waiting_time = 0, uint16 const departure_interval = 0, uint16 const departure_offset = 0, uint8 const stop_type = regular) :
 		pos(pos),
@@ -49,8 +50,11 @@ public:
 		departure_window(WINDOW_AUTO),
 		stop_type(stop_type < max_stop_type ? stop_type : (uint8)regular),
 		couple_line_id(0),
-		couple_max_wait(0)
-	{}
+		couple_max_wait(0),
+		board_auto(0)
+	{
+		memset( extra_offsets, 0, sizeof(extra_offsets) );
+	}
 
 	/**
 	 * target position
@@ -153,15 +157,49 @@ public:
 	uint16 couple_max_wait;
 
 	bool has_coupling() const { return couple_line_id != 0; }
+
+	/**
+	 * Departure board (fork): the line number and the destination that departure boards and destination
+	 * signs show for departures from this stop on, until a later stop of the schedule sets its own. An
+	 * empty text keeps what the stops before set; a bit in board_auto goes back to what the board works
+	 * out by itself. Saved (122.14).
+	 */
+	enum { BOARD_LINE = 0, BOARD_DESTINATION, MAX_BOARD_TEXTS };
+	plainstring board_text[MAX_BOARD_TEXTS];
+	uint8 board_auto;   ///< bit (1 << BOARD_...)
+
+	bool has_board_text(uint8 what) const { return board_text[what].c_str()  &&  board_text[what].c_str()[0]; }
+	bool sets_board_text(uint8 what) const { return has_board_text( what )  ||  (board_auto & (1 << what)); }
+
+	/// the same stop with the same settings, the board texts aside (they change no driving)
+	bool same_except_board(const schedule_entry_t &b) const
+	{
+		return pos == b.pos  &&  minimum_loading == b.minimum_loading  &&  waiting_time_shift == b.waiting_time_shift  &&  waiting_time == b.waiting_time
+			&&  departure_interval == b.departure_interval  &&  departure_offset == b.departure_offset  &&  stop_type == b.stop_type
+			&&  extra_offset_count == b.extra_offset_count  &&  memcmp( extra_offsets, b.extra_offsets, extra_offset_count * sizeof(uint16) ) == 0
+			&&  departure_window == b.departure_window
+			&&  couple_line_id == b.couple_line_id  &&  couple_max_wait == b.couple_max_wait;
+	}
+
+	bool same_board(const schedule_entry_t &b) const
+	{
+		if(  board_auto != b.board_auto  ) {
+			return false;
+		}
+		for(  int i = 0;  i < MAX_BOARD_TEXTS;  i++  ) {
+			const char *x = has_board_text( i ) ? board_text[i].c_str() : "";
+			const char *y = b.has_board_text( i ) ? b.board_text[i].c_str() : "";
+			if(  strcmp( x, y ) != 0  ) {
+				return false;
+			}
+		}
+		return true;
+	}
 };
 
 inline bool operator ==(const schedule_entry_t &a, const schedule_entry_t &b)
 {
-	return a.pos == b.pos  &&  a.minimum_loading == b.minimum_loading  &&  a.waiting_time_shift == b.waiting_time_shift  &&  a.waiting_time == b.waiting_time
-		&&  a.departure_interval == b.departure_interval  &&  a.departure_offset == b.departure_offset  &&  a.stop_type == b.stop_type
-		&&  a.extra_offset_count == b.extra_offset_count  &&  memcmp( a.extra_offsets, b.extra_offsets, a.extra_offset_count * sizeof(uint16) ) == 0
-		&&  a.departure_window == b.departure_window
-		&&  a.couple_line_id == b.couple_line_id  &&  a.couple_max_wait == b.couple_max_wait;
+	return a.same_except_board( b )  &&  a.same_board( b );
 }
 
 

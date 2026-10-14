@@ -1759,3 +1759,27 @@ No departures
 No departures
 Not in service
 Not in service
+Line number
+Line number
+Board
+Board
+Auto
+Auto
+From this stop on, what the board works out by itself
+From this stop on, show what the board works out by itself
+automatic from here
+automatic from here
+set here
+set here
+from stop %i
+from stop %i
+automatic
+automatic
+line automatic
+line automatic
+destination automatic
+destination automatic
+line %s
+line %s
+to %s
+to %s

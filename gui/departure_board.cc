@@ -806,6 +806,14 @@ bool gui_departure_board_view_t::fill_stream_texts(stream_t &s, const schedule_t
 	s.dest_halt = dest;
 	buf.clear();
 
+	// the line number and destination the schedule sets for departures from here
+	if(  const char *t = schedule->get_board_text( s.entry, schedule_entry_t::BOARD_LINE )  ) {
+		tstrncpy( s.line_number, t, lengthof(s.line_number) );
+	}
+	if(  const char *t = schedule->get_board_text( s.entry, schedule_entry_t::BOARD_DESTINATION )  ) {
+		tstrncpy( s.destination, t, lengthof(s.destination) );
+	}
+
 	// the most important stops on the way: served by the most lines of this kind
 	const uint32 max_vias = train ? MAX_VIAS_TRAIN : MAX_VIAS_OTHER;
 	vector_tpl<halthandle_t> vias;
@@ -1922,6 +1930,13 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 		board_names_t::get_stop_name( buf, dest->get_name(), train_style, town );
 		tstrncpy( destination, buf, lengthof(destination) );
 		dest_halt = dest;
+		// the destination the schedule sets for this trip
+		if(  const char *t = schedule->get_board_text( e, schedule_entry_t::BOARD_DESTINATION )  ) {
+			tstrncpy( destination, t, lengthof(destination) );
+		}
+	}
+	if(  const char *t = schedule->get_board_text( e, schedule_entry_t::BOARD_LINE )  ) {
+		tstrncpy( line_number, t, lengthof(line_number) );
 	}
 
 	// its row on the board of the stop it is at or goes to (that trip only)
@@ -2064,4 +2079,25 @@ scr_size gui_convoy_sign_t::get_min_size() const
 {
 	const scr_coord_val w = width_of ? width_of->get_min_size().w : proportional_string_width( "MMMMMMMMMM" );
 	return scr_size( w, LINESPACE + D_V_SPACE + 2 );
+}
+
+
+void gui_departure_board_view_t::get_auto_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, cbuffer_t &line_number, cbuffer_t &destination)
+{
+	if(  line.is_bound()  ) {
+		board_names_t::get_line_number( line_number, line->get_name() );
+	}
+	if(  schedule == NULL  ||  entry >= schedule->get_count()  ) {
+		return;
+	}
+	const waytype_t wt = schedule->get_waytype();
+	const bool train = wt == track_wt  ||  wt == monorail_wt  ||  wt == maglev_wt  ||  wt == narrowgauge_wt;
+	const halthandle_t start = entry_halt( schedule, entry, owner );
+	halthandle_t dest;
+	vector_tpl<halthandle_t> on_the_way;
+	if(  start.is_bound()  &&  find_destination( schedule, entry, owner, start, train, dest, on_the_way )  ) {
+		cbuffer_t town;
+		board_names_t::get_stop_town( town, start->get_name(), train );
+		board_names_t::get_stop_name( destination, dest->get_name(), train, town );
+	}
 }

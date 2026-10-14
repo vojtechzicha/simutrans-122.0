@@ -30,6 +30,7 @@
 
 #include "depot_frame.h"
 #include "schedule_gui.h"
+#include "departure_board.h"
 #include "line_item.h"
 
 #include "components/gui_button.h"
@@ -151,6 +152,8 @@ public:
 			}
 			stop.buf().printf( " [+ %s]", name );
 		}
+		// departure board texts set here: {line S22, to Brno hl.n.}
+		schedule_t::append_board_texts( stop.buf(), entry );
 		stop.update();
 	}
 
@@ -575,6 +578,30 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		}
 		tabs.add_tab( &cont_coupling, translator::translate("Coupling") );
 	}
+
+	// departure board (fork): the line number and destination shown from this stop on
+	cont_board.set_table_layout(4,2);
+	cont_board.set_margin( page_margin_tl, page_margin_br );
+	{
+		static const char *board_labels[schedule_entry_t::MAX_BOARD_TEXTS] = { "Line number", "Board destination" };
+		for(  int k = 0;  k < schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+			lb_board[k].set_text( board_labels[k] );
+			cont_board.add_component( &lb_board[k] );
+			board_buf[k][0] = 0;
+			input_board[k].set_text( board_buf[k], sizeof(board_buf[k]) );
+			input_board[k].set_width( k == schedule_entry_t::BOARD_LINE ? 84 : 180 );
+			input_board[k].add_listener( this );
+			cont_board.add_component( &input_board[k] );
+			bt_board_auto[k].init( button_t::roundbox_state, "Auto" );
+			bt_board_auto[k].set_tooltip( "From this stop on, what the board works out by itself" );
+			bt_board_auto[k].add_listener( this );
+			cont_board.add_component( &bt_board_auto[k] );
+			lb_board_from[k].set_min_width( proportional_string_width( translator::translate("automatic from here") ) + proportional_string_width( "MMMM" ) );
+			cont_board.add_component( &lb_board_from[k] );
+		}
+	}
+	board_shown_entry = -1;
+	tabs.add_tab( &cont_board, translator::translate("Board") );
 	tabs.set_active_tab_index( 0 );
 
 	// action button row, with the return tickets where they are offered
@@ -864,6 +891,110 @@ void schedule_gui_t::update_selection()
 			extra_buf[0] = 0;
 		}
 	}
+	show_board_texts( false );
+}
+
+
+
+// fork, departure board: the inputs show what applies at the current entry: its own text, else what an
+// earlier entry set, else what the board works out (greyed unless set here); the label says where from
+void schedule_gui_t::show_board_texts(bool force)
+{
+	const bool any = schedule  &&  !schedule->empty();
+	for(  uint8 k = 0;  k < schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+		if(  any  ) {
+			bt_board_auto[k].enable();
+			lb_board[k].set_color( SYSCOL_TEXT );
+		}
+		else {
+			bt_board_auto[k].disable();
+			lb_board[k].set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+		}
+	}
+	if(  !any  ) {
+		return;
+	}
+	const uint8 cur = schedule->get_current_stop();
+	const schedule_entry_t &entry = schedule->entries[cur];
+	cbuffer_t auto_text[schedule_entry_t::MAX_BOARD_TEXTS];
+	gui_departure_board_view_t::get_auto_texts( schedule, cur, player, get_schedule_line(), auto_text[schedule_entry_t::BOARD_LINE], auto_text[schedule_entry_t::BOARD_DESTINATION] );
+
+	for(  uint8 k = 0;  k < schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+		const bool own_auto = (entry.board_auto & (1 << k)) != 0;
+		const char *own = entry.has_board_text( k ) ? entry.board_text[k].c_str() : NULL;
+		uint8 from = 255;
+		const char *inherited = schedule->get_board_text( cur, k, &from, true );
+		const char *shown = own_auto ? (const char *)auto_text[k] : own ? own : inherited ? inherited : (const char *)auto_text[k];
+
+		lb_board_from[k].buf().clear();
+		if(  own_auto  ) {
+			lb_board_from[k].buf().append( translator::translate("automatic from here") );
+		}
+		else if(  own  ) {
+			lb_board_from[k].buf().append( translator::translate("set here") );
+		}
+		else if(  inherited  &&  from < schedule->get_count()  ) {
+			lb_board_from[k].buf().printf( translator::translate("from stop %i"), (int)from + 1 );
+		}
+		else {
+			lb_board_from[k].buf().append( translator::translate("automatic") );
+		}
+		lb_board_from[k].update();
+		bt_board_auto[k].pressed = own_auto;
+		input_board[k].set_color( own ? SYSCOL_EDIT_TEXT : SYSCOL_EDIT_TEXT_DISABLED );
+
+		// an input keeps what the player types while the entry stays the same
+		if(  force  ||  cur != board_shown_entry  ||  get_focus() != &input_board[k]  ) {
+			if(  strcmp( board_buf[k], shown ) != 0  ) {
+				tstrncpy( board_buf[k], shown, sizeof(board_buf[k]) );
+				input_board[k].set_text( board_buf[k], sizeof(board_buf[k]) ); // resets the cursor
+			}
+		}
+	}
+	board_shown_entry = cur;
+}
+
+
+// fork, departure board: the typed text becomes the current entry's own, unless it is empty (back to what
+// the stops before set) or what would show there anyway
+void schedule_gui_t::read_board_text(uint8 what)
+{
+	if(  schedule->empty()  ) {
+		return;
+	}
+	const uint8 cur = schedule->get_current_stop();
+	schedule_entry_t &entry = schedule->entries[cur];
+	// without spaces at either end
+	const char *a = board_buf[what];
+	while(  *a == ' '  ) {
+		a++;
+	}
+	size_t len = strlen( a );
+	while(  len > 0  &&  a[len - 1] == ' '  ) {
+		len--;
+	}
+	cbuffer_t text;
+	text.append( a, len );
+	cbuffer_t auto_text[schedule_entry_t::MAX_BOARD_TEXTS];
+	gui_departure_board_view_t::get_auto_texts( schedule, cur, player, get_schedule_line(), auto_text[schedule_entry_t::BOARD_LINE], auto_text[schedule_entry_t::BOARD_DESTINATION] );
+	const char *inherited = schedule->get_board_text( cur, what, NULL, true );
+	const bool own_auto = (entry.board_auto & (1 << what)) != 0;
+	const char *base = own_auto  ||  !inherited ? (const char *)auto_text[what] : inherited;
+
+	if(  text.len() == 0  ) {
+		// nothing set here: what the stops before set
+		entry.board_text[what] = NULL;
+		entry.board_auto &= ~(1 << what);
+	}
+	else if(  strcmp( text, base ) == 0  ) {
+		// what shows here anyway
+		entry.board_text[what] = NULL;
+	}
+	else {
+		entry.board_text[what] = (const char *)text;
+		entry.board_auto &= ~(1 << what);
+	}
+	show_board_texts( true );
 }
 
 
@@ -959,6 +1090,24 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 		bt_insert.pressed = false;
 		bt_remove.pressed = true;
 		update_tool( false );
+	}
+	else if(  comp == &input_board[schedule_entry_t::BOARD_LINE]  ||  comp == &input_board[schedule_entry_t::BOARD_DESTINATION]  ) {
+		read_board_text( comp == &input_board[schedule_entry_t::BOARD_LINE] ? schedule_entry_t::BOARD_LINE : schedule_entry_t::BOARD_DESTINATION );
+	}
+	else if(  comp == &bt_board_auto[schedule_entry_t::BOARD_LINE]  ||  comp == &bt_board_auto[schedule_entry_t::BOARD_DESTINATION]  ) {
+		// from this stop on what the board works out by itself, or (again) what the stops before set
+		if(  !schedule->empty()  ) {
+			const uint8 what = comp == &bt_board_auto[schedule_entry_t::BOARD_LINE] ? schedule_entry_t::BOARD_LINE : schedule_entry_t::BOARD_DESTINATION;
+			schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+			if(  entry.board_auto & (1 << what)  ) {
+				entry.board_auto &= ~(1 << what);
+			}
+			else {
+				entry.board_auto |= (1 << what);
+				entry.board_text[what] = NULL;
+			}
+			show_board_texts( true );
+		}
 	}
 	else if(comp == &bt_no_standing) {
 		schedule->set_no_standing( !schedule->is_no_standing() );

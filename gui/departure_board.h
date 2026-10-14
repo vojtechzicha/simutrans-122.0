@@ -79,6 +79,10 @@ public:
 	/// the convoy's row on the board of halt h, if its trip goes to dest: the time as the board shows it, and the delay
 	static bool find_convoy_departure(convoihandle_t cnv, halthandle_t h, halthandle_t dest, char *time, size_t time_len, sint32 &delay);
 
+	/// what the board shows by itself (no texts of the schedule) for departures from entry: the line number of
+	/// line (empty without one) and the destination (empty: not in service)
+	static void get_auto_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, cbuffer_t &line_number, cbuffer_t &destination);
+
 public:
 	struct row_t {
 		convoihandle_t cnv;  ///< unbound: a timetable slot no train is known for yet

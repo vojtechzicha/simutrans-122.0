@@ -294,6 +294,18 @@ void schedule_t::rdwr(loadsave_t *file)
 				// fork: how late a convoy may still leave in its timetable slot
 				file->rdwr_short(entries[i].departure_window);
 			}
+			if(file->is_version_atleast(122, 14)) {
+				// fork: line number and destination for the departure boards
+				file->rdwr_byte(entries[i].board_auto);
+				for(  int k=0;  k<schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+					plainstring text = entries[i].board_text[k];
+					file->rdwr_str(text);
+					if(  file->is_loading()  ) {
+						// (most entries set nothing: keep no empty strings around)
+						entries[i].board_text[k] = text.c_str()  &&  text.c_str()[0] ? text.c_str() : NULL;
+					}
+				}
+			}
 		}
 	}
 	if(  file->is_version_atleast(122, 8)  ) {
@@ -447,7 +459,9 @@ void schedule_t::add_return_way()
 {
 	if(  entries.get_count()<127  &&  entries.get_count()>1  ) {
 		for(  uint8 maxi=entries.get_count()-2;  maxi>0;  maxi--  ) {
-			entries.append(entries[maxi]);
+			// (a copy first: appending may move the entries, and theirs texts with them)
+			const schedule_entry_t entry = entries[maxi];
+			entries.append(entry);
 		}
 	}
 }
@@ -464,6 +478,19 @@ void schedule_t::sprintf_schedule( cbuffer_t &buf ) const
 			buf.printf(",%i", (int)i.extra_offsets[k]);
 		}
 		buf.printf(",%i,%i,%i", (int)i.couple_line_id, (int)i.couple_max_wait, (int)i.departure_window);
+		// fork: board texts, with the separators escaped
+		buf.printf(",%i", (int)i.board_auto);
+		for(  int k=0;  k<schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+			buf.append(",");
+			for(  const char *c = i.has_board_text(k) ? i.board_text[k].c_str() : "";  *c;  c++  ) {
+				if(  *c==','  ||  *c=='|'  ||  *c=='%'  ) {
+					buf.printf("%%%02X", (unsigned)(uint8)*c);
+				}
+				else {
+					buf.append(c, 1);
+				}
+			}
+		}
 		buf.append("|");
 	}
 }
@@ -514,14 +541,16 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 	}
 	p++;
 	// now scan the entries: nine fixed values, then the number of extra offsets and those offsets,
-	// then the coupling line and its maximum wait, then the departure window
+	// then the coupling line and its maximum wait, then the departure window, then the board texts
 	while(  *p>0  ) {
-		const int max_values = 13 + schedule_entry_t::MAX_EXTRA_OFFSETS;
+		const int max_values = 16 + schedule_entry_t::MAX_EXTRA_OFFSETS;
 		sint32 values[max_values];
+		const char *fields[max_values];
 		int count = 0;
 		while(  *p  &&  *p != '|'  ) {
 			if(  count < max_values  ) {
 				values[count] = atoi( p );
+				fields[count] = p;
 			}
 			count ++;
 			while(  *p  &&  (*p!=','  &&  *p!='|')  ) {
@@ -529,6 +558,12 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 			}
 			if(  *p == ','  ) {
 				p++;
+				if(  *p == '|'  &&  count < max_values  ) {
+					// an empty last field (an empty board text)
+					values[count] = 0;
+					fields[count] = p;
+					count ++;
+				}
 			}
 		}
 		if(  *p != '|'  ) {
@@ -557,6 +592,26 @@ bool schedule_t::sscanf_schedule( const char *ptr )
 		}
 		if(  count >= 13 + extra_count  &&  13 + extra_count <= max_values  ) {
 			entry.departure_window = (uint16)values[12 + extra_count];
+		}
+		if(  count >= 16 + extra_count  &&  16 + extra_count <= max_values  ) {
+			// fork: board texts, unescaped
+			entry.board_auto = (uint8)values[13 + extra_count];
+			for(  int k=0;  k<schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+				char text[256];
+				size_t n = 0;
+				for(  const char *c = fields[14 + extra_count + k];  *c  &&  *c!=','  &&  *c!='|'  &&  n+1 < sizeof(text);  c++  ) {
+					if(  *c=='%'  &&  c[1]  &&  c[2]  ) {
+						const char hex[3] = { c[1], c[2], 0 };
+						text[n++] = (char)strtol( hex, NULL, 16 );
+						c += 2;
+					}
+					else {
+						text[n++] = *c;
+					}
+				}
+				text[n] = 0;
+				entry.board_text[k] = n ? text : NULL;
+			}
 		}
 		entries.append(entry);
 	}
@@ -776,5 +831,54 @@ void schedule_t::gimme_stop_name(cbuffer_t& buf, karte_t* welt, player_t const* 
 	// position (when no length restriction)
 	if (max_chars <= 0) {
 		buf.printf(" (%s)", entry.pos.get_str());
+	}
+}
+
+
+const char *schedule_t::get_board_text(uint8 entry, uint8 what, uint8 *from, bool skip_self) const
+{
+	const uint8 n = entries.get_count();
+	if(  from  ) {
+		*from = 255;
+	}
+	if(  entry >= n  ) {
+		return NULL;
+	}
+	for(  uint8 k = skip_self ? 1 : 0;  k < n;  k++  ) {
+		const uint8 i = (entry + n - k) % n;
+		if(  entries[i].sets_board_text( what )  ) {
+			if(  from  ) {
+				*from = i;
+			}
+			return entries[i].has_board_text( what )  &&  !(entries[i].board_auto & (1 << what)) ? entries[i].board_text[what].c_str() : NULL;
+		}
+	}
+	return NULL;
+}
+
+
+void schedule_t::append_board_texts( cbuffer_t &buf, schedule_entry_t const& entry )
+{
+	cbuffer_t parts;
+	if(  entry.board_auto & (1 << schedule_entry_t::BOARD_LINE)  ) {
+		parts.append( translator::translate("line automatic") );
+	}
+	else if(  entry.has_board_text( schedule_entry_t::BOARD_LINE )  ) {
+		parts.printf( translator::translate("line %s"), entry.board_text[schedule_entry_t::BOARD_LINE].c_str() );
+	}
+	if(  entry.board_auto & (1 << schedule_entry_t::BOARD_DESTINATION)  ) {
+		if(  parts.len()  ) {
+			parts.append( ", " );
+		}
+		parts.append( translator::translate("destination automatic") );
+	}
+	else if(  entry.has_board_text( schedule_entry_t::BOARD_DESTINATION )  ) {
+		if(  parts.len()  ) {
+			parts.append( ", " );
+		}
+		parts.printf( translator::translate("to %s"), entry.board_text[schedule_entry_t::BOARD_DESTINATION].c_str() );
+	}
+	if(  parts.len()  ) {
+		buf.printf( " {%s}", (const char *)parts );
 	}
 }

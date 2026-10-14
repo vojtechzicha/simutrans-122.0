@@ -914,7 +914,7 @@ one-side and both-sides tiles with through buses both ways; an articulated bus; 
 rotation, deletion, depot, schedule edits, saves for 0.122.11 and 0.122.0; the 39 rail and road
 regression scenarios byte-identical.
 
-## Departure board (fork feature, savegame 122.13)
+## Departure board (fork feature, savegames 122.13 and 122.14)
 
 The stop window's departure tab (`gui/departure_board.*`, `gui_departure_board_view_t`) has a board per
 kind: passenger trains (rail, monorail, maglev, narrow gauge; metro too), other passenger vehicles (bus,
@@ -973,6 +973,15 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
   (`gui_convoy_sign_t`); with "line name mouseover tooltips" the vehicle under the mouse shows its board row
   (time, train, line, destination, delay; `find_convoy_departure` builds its line's rows at the stop it is at or
   goes to, shown only for the same trip) with any state text below, instead of "line - convoy name".
+- Board texts (savegame 122.14, `schedule_entry_t::board_text`, `board_auto`): a stop of a schedule may set the
+  line number and the destination shown for departures from it on, until a later stop sets its own (going round
+  the schedule, `schedule_t::get_board_text`); Auto at a stop goes back to the board's own from there. Train
+  numbers stay automatic (one line schedule serves many trains). Schedule dialog tab Board: the inputs show what
+  applies there (greyed unless set at this stop; the label says set here / from stop N / automatic / automatic
+  from here); Enter sets it, empty or the value shown anyway clears it, Auto toggles. The entry list shows
+  `{line S22, to Brno hl.n.}`. They are part of the schedule string (escaped `%2C`, `%7C`, `%25`; an empty last
+  field counts) and of `operator==`, not of `same_except_board` (a text edit resets no delay, anchor or learned
+  running time). Used by the boards (`fill_stream_texts`), the sign and the hover row (`convoy_sign_t`).
 - Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a
   dark amber board for the others (coloured line badge, destination and vias, "5 min" up to an hour,
   delay; listed by when they leave, the train board by the timetable). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens
