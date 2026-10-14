@@ -126,6 +126,8 @@ void simline_t::set_schedule(schedule_t* schedule)
 		last_departure_slot.clear();
 		missed_couplings.clear();
 	}
+	// fork, departure board: running times belong to the old stops
+	run_times.clear();
 	if (this->schedule) {
 		unregister_stops();
 		delete this->schedule;
@@ -439,6 +441,63 @@ bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint6
 		s = next_departure_slot( entry, s );
 	}
 	slot = s;
+	return true;
+}
+
+
+uint8 simline_t::get_timetable_anchor(uint8 entry) const
+{
+	const uint8 n = schedule->get_count();
+	if(  entry >= n  ) {
+		return 255;
+	}
+	for(  uint8 k = 1;  k < n;  k++  ) {
+		const uint8 i = (entry + n - k) % n;
+		if(  schedule->entries[i].has_timetable()  ) {
+			return i;
+		}
+	}
+	return 255;
+}
+
+
+void simline_t::learn_run_time(uint8 anchor, uint8 entry, sint64 minutes)
+{
+	if(  minutes < 0  ||  minutes > 1440  ||  entry >= schedule->get_count()  ||  get_timetable_anchor( entry ) != anchor  ) {
+		// (the train passed a timetabled stop without booking a slot there, or the schedule changed meanwhile)
+		return;
+	}
+	while(  run_times.get_count() < schedule->get_count()  ) {
+		run_time_t r;
+		r.anchor = 255;
+		r.samples = 0;
+		r.minutes16 = 0;
+		run_times.append( r );
+	}
+	run_time_t &r = run_times[entry];
+	const sint32 sample = (sint32)minutes * 16;
+	if(  r.anchor != anchor  ||  r.samples == 0  ) {
+		r.anchor = anchor;
+		r.samples = 1;
+		r.minutes16 = sample;
+		return;
+	}
+	// a train held up for long (a jam) moves the average only a little
+	const sint32 most = r.minutes16 * 2 + 16 * 10;
+	const sint32 capped = sample < most ? sample : most;
+	r.minutes16 += (capped - r.minutes16) / 4;
+	if(  r.samples < 255  ) {
+		r.samples ++;
+	}
+}
+
+
+bool simline_t::get_run_time(uint8 anchor, uint8 entry, sint64 &minutes) const
+{
+	if(  entry >= run_times.get_count()  ||  run_times[entry].samples == 0  ||  run_times[entry].anchor != anchor  ) {
+		return false;
+	}
+	minutes = (run_times[entry].minutes16 + 8) / 16;
 	return true;
 }
 
@@ -884,6 +943,27 @@ void simline_t::rdwr(loadsave_t *file)
 			file->rdwr_longlong(m.slot);
 			if(  file->is_loading()  ) {
 				missed_couplings.append( m );
+			}
+		}
+	}
+
+	if(  file->is_version_atleast(122, 13)  ) {
+		// fork: running times learned for the stops without a timetable (departure board)
+		uint8 count = (uint8)min( run_times.get_count(), 255 );
+		file->rdwr_byte(count);
+		if(  file->is_loading()  ) {
+			run_times.clear();
+		}
+		for(  uint8 i=0;  i<count;  i++  ) {
+			run_time_t r;
+			if(  file->is_saving()  ) {
+				r = run_times[i];
+			}
+			file->rdwr_byte(r.anchor);
+			file->rdwr_byte(r.samples);
+			file->rdwr_long(r.minutes16);
+			if(  file->is_loading()  ) {
+				run_times.append( r );
 			}
 		}
 	}

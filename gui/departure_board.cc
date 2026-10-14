@@ -870,15 +870,50 @@ struct known_t {
 };
 
 
+// is the convoy on the map and running its schedule? (mover: the one that drives, see get_mover)
+static bool is_running(const convoi_t *mover)
+{
+	const convoi_t::states state = (convoi_t::states)mover->get_state();
+	return state != convoi_t::INITIAL  &&  state != convoi_t::EDIT_SCHEDULE  &&  state != convoi_t::SELF_DESTRUCT  &&  state != convoi_t::ENTERING_DEPOT  &&  state != convoi_t::UNCOUPLING;
+}
+
+
+// is it driving or waiting at a signal (so its route leads to its next stop)?
+static bool is_on_its_way(const convoi_t *mover)
+{
+	const convoi_t::states state = (convoi_t::states)mover->get_state();
+	return state == convoi_t::DRIVING  ||  (state >= convoi_t::WAITING_FOR_CLEARANCE  &&  state <= convoi_t::CAN_START_TWO_MONTHS  &&  state != convoi_t::SELF_DESTRUCT);
+}
+
+
+// calendar minutes for a number of ticks
+static sint64 ticks_to_minutes(sint64 ticks)
+{
+	if(  !welt->has_calendar()  ||  welt->ticks_per_world_month == 0  ) {
+		return 0;
+	}
+	return ticks * welt->get_settings().get_minutes_per_month() / (sint64)welt->ticks_per_world_month;
+}
+
+
 /**
- * Rows of the departures from schedule entry e at this halt (line, or a convoy without a line).
+ * Rows of the departures from schedule entry e at halt `at` (line, or a convoy without a line).
  * Entries right before e at which nobody boards (an All off arrival track, a siding, a layover) or
- * at this halt lead in to it: trains there count as coming to e. The timetable is e's own.
+ * at this halt lead in to it: trains there count as coming to e. The timetable is e's own; an entry
+ * without one of a line with a timetable elsewhere is timed from the last one before it (add_timed_rows).
  */
-void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, linehandle_t line, convoihandle_t lineless, uint8 e, vector_tpl<row_t> &out)
+void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, linehandle_t line, convoihandle_t lineless, uint8 e, halthandle_t at, vector_tpl<row_t> &out)
 {
 	const uint8 n = schedule->get_count();
 	const schedule_entry_t &entry = schedule->entries[e];
+
+	if(  line.is_bound()  &&  !entry.has_timetable()  &&  welt->has_calendar()  ) {
+		const uint8 anchor = line->get_timetable_anchor( e );
+		if(  anchor != 255  ) {
+			add_timed_rows( schedule, line, e, anchor, out );
+			return;
+		}
+	}
 
 	// how many entries before e the lead-in starts (0 = e itself): entries nobody boards at, waypoints,
 	// and the entries of this stop before (an arrival track, a siding run)
@@ -887,7 +922,7 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 	while(  lead_in + 1 < n  ) {
 		const uint8 i = (e + n - lead_in - 1) % n;
 		const halthandle_t h = entry_halt( schedule, i, owner );
-		if(  schedule->entries[i].loads()  &&  h.is_bound()  &&  h != halt  ) {
+		if(  schedule->entries[i].loads()  &&  h.is_bound()  &&  h != at  ) {
 			break;
 		}
 		lead_in++;
@@ -916,7 +951,7 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 		}
 		const convoi_t *mover = get_mover( cnv );
 		const convoi_t::states state = (convoi_t::states)mover->get_state();
-		if(  state == convoi_t::INITIAL  ||  state == convoi_t::EDIT_SCHEDULE  ||  state == convoi_t::SELF_DESTRUCT  ||  state == convoi_t::ENTERING_DEPOT  ||  state == convoi_t::UNCOUPLING  ) {
+		if(  !is_running( mover )  ) {
 			continue;
 		}
 		any_running = true;
@@ -927,14 +962,11 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 		row.cnv = cnv;
 		row.line = line;
 		row.stream = stream_idx;
-		row.group = 0;
-		row.alt = -1;
-		row.scheduled = -1;
-		row.delay = -1;
 
-		if(  mover->get_leaving_halt() == halt  &&  (cur + n - 1) % n == e  ) {
+		if(  mover->get_leaving_halt() == at  &&  (cur + n - 1) % n == e  ) {
 			// finished loading here, still standing at the platform or before its exit signal
 			row.expected = now;
+			row.booked = true;
 			if(  timetable  ) {
 				const sint32 d = cnv->get_departure_delay();
 				row.delay = d > 0 ? d : 0;
@@ -969,7 +1001,7 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 				k.ready = later( known_departure ? minutes : now, now ) + dist * dwell;
 			}
 		}
-		else if(  state == convoi_t::DRIVING  ||  (state >= convoi_t::WAITING_FOR_CLEARANCE  &&  state <= convoi_t::CAN_START_TWO_MONTHS  &&  state != convoi_t::SELF_DESTRUCT)  ) {
+		else if(  is_on_its_way( mover )  ) {
 			k.ready = ticks_to_board_time( ticks_until_arrival( mover ) ) + (dist + 1) * dwell;
 		}
 		else {
@@ -1013,10 +1045,6 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 			row.cnv = k.cnv;
 			row.line = line;
 			row.stream = stream_idx;
-			row.group = 0;
-			row.alt = -1;
-			row.scheduled = -1;
-			row.delay = -1;
 			row.expected = k.ready > now ? k.ready : now;
 			out.append( row );
 		}
@@ -1063,8 +1091,6 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 		row.cnv = k.cnv;
 		row.line = line;
 		row.stream = stream_idx;
-		row.group = 0;
-		row.alt = -1;
 		if(  found >= 0  ) {
 			taken[found] = true;
 			row.scheduled = slots[found];
@@ -1090,11 +1116,147 @@ void gui_departure_board_view_t::add_stream_rows(const schedule_t *schedule, lin
 		row_t row;
 		row.line = line;
 		row.stream = stream_idx;
-		row.group = 0;
-		row.alt = -1;
 		row.scheduled = slots[i];
 		row.expected = later( slots[i], now );
 		row.delay = (sint32)(row.expected - row.scheduled);
+		out.append( row );
+	}
+}
+
+
+/**
+ * Running times from the anchor (an entry with a timetable) to each entry of the stretch after it, in
+ * calendar minutes from being ready to leave there to being ready to leave the entry: run[k] for the k-th
+ * entry after the anchor. Learned by the line where its trains have shown them, else estimated: the
+ * distance (a quarter more than straight across the tiles) at three quarters of the average top speed of
+ * the line's trains, and a minute at every stop.
+ */
+void gui_departure_board_view_t::estimate_run_times(const schedule_t *schedule, linehandle_t line, uint8 anchor, uint8 stretch, sint64 *run) const
+{
+	const uint8 n = schedule->get_count();
+	sint64 speed_sum = 0;
+	sint64 speeds = 0;
+	FOR( vector_tpl<convoihandle_t>, c, line->get_convoys() ) {
+		if(  c.is_bound()  &&  c->get_min_top_speed() > 0  ) {
+			speed_sum += c->get_min_top_speed();
+			speeds ++;
+		}
+	}
+	sint64 speed = speeds > 0 ? speed_sum * 3 / (speeds * 4) : kmh_to_speed( 50 );
+	if(  speed < 1  ) {
+		speed = 1;
+	}
+
+	run[0] = 0;
+	sint64 base = 0;      // learned time of the last learned entry before
+	sint64 ticks = 0;     // estimated driving since then
+	sint64 stops = 0;     // stops since then (this one included)
+	koord last = schedule->entries[anchor].pos.get_2d();
+	for(  uint8 k = 1;  k <= stretch;  k++  ) {
+		const uint8 i = (anchor + k) % n;
+		const koord p = schedule->entries[i].pos.get_2d();
+		const sint64 tiles = (sint64)koord_distance( last, p ) * 5 / 4;
+		ticks += (tiles << (8+12)) / speed;
+		last = p;
+		if(  entry_halt( schedule, i, line->get_owner() ).is_bound()  ) {
+			stops ++;
+		}
+		sint64 learned;
+		if(  line->get_run_time( anchor, i, learned )  ) {
+			run[k] = learned;
+			base = learned;
+			ticks = 0;
+			stops = 0;
+		}
+		else {
+			run[k] = base + ticks_to_minutes( ticks ) + stops;
+		}
+		if(  run[k] < run[k-1]  ) {
+			run[k] = run[k-1];
+		}
+	}
+}
+
+
+/**
+ * Departures from entry e (no timetable) of a line with a timetable at `anchor`, the last entry with one
+ * before e: its slots, each with the running time from there on. Slots no train booked yet come from
+ * the anchor's rows, without a train (it shows once it left there); trains that booked their slot there
+ * and have not left here yet show with their own slot and when they are expected here, from where
+ * they are now.
+ */
+void gui_departure_board_view_t::add_timed_rows(const schedule_t *schedule, linehandle_t line, uint8 e, uint8 anchor, vector_tpl<row_t> &out)
+{
+	const uint8 n = schedule->get_count();
+	const player_t *owner = line->get_owner();
+	const uint16 stream_idx = streams.get_count() - 1;
+	const uint8 stretch = (e + n - anchor) % n;
+
+	sint64 run[256];
+	estimate_run_times( schedule, line, anchor, stretch, run );
+	const sint64 to_here = run[stretch];
+
+	// the anchor's slots nobody booked yet, moved on by the running time
+	vector_tpl<row_t> at_anchor;
+	add_stream_rows( schedule, line, convoihandle_t(), anchor, entry_halt( schedule, anchor, owner ), at_anchor );
+	FOR( vector_tpl<row_t>, r, at_anchor ) {
+		if(  r.booked  ||  r.scheduled < 0  ) {
+			continue;
+		}
+		r.cnv = convoihandle_t();
+		r.stream = stream_idx;
+		r.scheduled += to_here;
+		r.expected += to_here;
+		out.append( r );
+	}
+
+	// trains that booked their slot at the anchor and have not left here yet
+	FOR( vector_tpl<convoihandle_t>, cnv, line->get_convoys() ) {
+		if(  !cnv.is_bound()  ||  cnv->get_schedule() == NULL  ||  cnv->get_schedule()->get_count() != n  ) {
+			continue;
+		}
+		const convoi_t *mover = get_mover( cnv );
+		if(  !is_running( mover )  ) {
+			continue;
+		}
+		const uint8 cur = cnv->get_schedule()->get_current_stop();
+		const uint8 after_anchor = (cur + n - anchor) % n;   // 0: on its way to the anchor or still there
+		const bool recorded = cnv->get_anchor_entry() == anchor  &&  cnv->get_anchor_slot() >= 0;
+		const sint32 delay = cnv->get_departure_delay();
+
+		row_t row;
+		row.cnv = cnv;
+		row.line = line;
+		row.stream = stream_idx;
+
+		sint64 expected;
+		if(  mover->get_leaving_halt() == halt  &&  (cur + n - 1) % n == e  ) {
+			// finished loading here, still standing at the platform or before its exit signal
+			expected = now;
+			row.booked = true;
+		}
+		else if(  after_anchor == 0  ||  after_anchor > stretch  ) {
+			continue;
+		}
+		else if(  mover->get_state() == convoi_t::LOADING  ) {
+			// at a stop of the stretch (here, or on the way): when it may leave, then on from there
+			sint64 minutes;
+			bool latest;
+			const sint64 ready = mover->get_planned_departure( minutes, latest ) ? later( minutes, now ) : now;
+			expected = ready + to_here - run[after_anchor];
+		}
+		else if(  is_on_its_way( mover )  ) {
+			// arriving at its next stop, ready to leave it a minute later, then on from there
+			expected = ticks_to_board_time( ticks_until_arrival( mover ) ) + 1 + to_here - run[after_anchor];
+		}
+		else {
+			// finding its route: no telling yet
+			continue;
+		}
+
+		row.scheduled = recorded ? cnv->get_anchor_slot() + to_here : expected - (delay > 0 ? delay : 0);
+		row.expected = later( expected, now );
+		row.delay = row.expected > row.scheduled ? (sint32)(row.expected - row.scheduled) : 0;
 		out.append( row );
 	}
 }
@@ -1122,7 +1284,7 @@ void gui_departure_board_view_t::add_line_streams(linehandle_t line, vector_tpl<
 			continue;
 		}
 		streams.append( s );
-		add_stream_rows( schedule, line, convoihandle_t(), e, out );
+		add_stream_rows( schedule, line, convoihandle_t(), e, halt, out );
 	}
 }
 
@@ -1149,7 +1311,7 @@ void gui_departure_board_view_t::add_convoy_stream(convoihandle_t cnv, vector_tp
 			continue;
 		}
 		streams.append( s );
-		add_stream_rows( schedule, linehandle_t(), cnv, e, out );
+		add_stream_rows( schedule, linehandle_t(), cnv, e, halt, out );
 	}
 }
 
@@ -1158,6 +1320,13 @@ void gui_departure_board_view_t::add_convoy_stream(convoihandle_t cnv, vector_tp
 static sint64 row_time(sint64 scheduled, sint64 expected)
 {
 	return scheduled >= 0 ? scheduled : expected;
+}
+
+
+// a train board lists by the timetable (late trains keep their place), a stop that counts the minutes by when they leave
+static sint64 list_time(const gui_departure_board_view_t::row_t &r, bool train)
+{
+	return train ? row_time( r.scheduled, r.expected ) : r.expected;
 }
 
 
@@ -1199,7 +1368,7 @@ void gui_departure_board_view_t::rebuild()
 		first_row.append( -1 );
 	}
 	for(  uint32 i = 0;  i < all.get_count();  i++  ) {
-		const sint64 t = row_time( all[i].scheduled, all[i].expected );
+		const sint64 t = list_time( all[i], is_train_board() );
 		const uint16 st = all[i].stream;
 		if(  first_row[st] < 0  ||  t < first_time[st]  ) {
 			first_time[st] = t;
@@ -1236,7 +1405,7 @@ void gui_departure_board_view_t::rebuild()
 	for(  uint32 i = 1;  i < order.get_count();  i++  ) {
 		for(  uint32 j = i;  j > 0;  j--  ) {
 			const row_t &a = all[order[j-1]], &b = all[order[j]];
-			if(  row_time( b.scheduled, b.expected ) >= row_time( a.scheduled, a.expected )  ) {
+			if(  list_time( b, is_train_board() ) >= list_time( a, is_train_board() )  ) {
 				break;
 			}
 			const uint32 t = order[j-1];
@@ -1246,7 +1415,7 @@ void gui_departure_board_view_t::rebuild()
 	}
 	FOR( vector_tpl<uint32>, i, order ) {
 		const row_t &r = all[i];
-		if(  !chosen[i]  &&  row_time( r.scheduled, r.expected ) <= horizon  &&  per_group[r.group] < MAX_ROWS_PER_LINE  ) {
+		if(  !chosen[i]  &&  list_time( r, is_train_board() ) <= horizon  &&  per_group[r.group] < MAX_ROWS_PER_LINE  ) {
 			chosen[i] = true;
 			per_group[r.group]++;
 		}

@@ -206,6 +206,9 @@ void convoi_t::init(player_t *player)
 	departure_pending = false;
 	departure_standing = 0;
 	departing_entry = 255;
+	anchor_entry = 255;
+	anchor_slot = -1;
+	anchor_ready = -1;
 	uncouple_since = 0;
 	uncouple_warned = false;
 	layover_pos = koord3d::invalid;
@@ -3011,6 +3014,7 @@ bool convoi_t::set_schedule(schedule_t * f)
 			departure_delay = NO_DEPARTURE_DELAY;
 			departure_pending = false;
 			departing_entry = 255;
+			anchor_entry = 255;
 		}
 		// now check, we we have been bond to a line we are about to lose:
 		bool changed = false;
@@ -3924,6 +3928,18 @@ void convoi_t::rdwr(loadsave_t *file)
 		layover_pos = koord3d::invalid;
 	}
 
+	if(  file->is_version_atleast(122, 13)  ) {
+		// fork: the last stop with a timetable it left, its slot there and when it was ready (departure board)
+		file->rdwr_byte( anchor_entry );
+		file->rdwr_longlong( anchor_slot );
+		file->rdwr_longlong( anchor_ready );
+	}
+	else if(  file->is_loading()  ) {
+		anchor_entry = 255;
+		anchor_slot = -1;
+		anchor_ready = -1;
+	}
+
 	if(  file->is_loading()  ) {
 		reserve_route();
 		recalc_catg_index();
@@ -4589,10 +4605,19 @@ station_tile_search_ready: ;
 			departing_entry = schedule->get_current_stop();
 			// fork: how late we leave, shown in the convoy window until the next stop with a timetable
 			departure_delay = minutes_after_slot( slot );
+			// fork, departure board: the stops on to the next timetable are timed from here
+			anchor_entry = schedule->get_current_stop();
+			anchor_slot = slot;
+			anchor_ready = welt->get_calendar_minutes();
 			if(  missed_partner  &&  partner_line.is_bound()  &&  partner_entry != 255  ) {
 				// fork, coupling: the train that should have joined us runs late with this slot
 				partner_line->add_missed_coupling( partner_entry, slot );
 			}
+		}
+		else if(  line.is_bound()  &&  !no_load  &&  anchor_entry != 255  &&  !line_update_pending.is_bound()  &&  welt->has_calendar()
+			&&  !schedule->get_current_entry().has_timetable()  ) {
+			// fork, departure board: a stop without a timetable learns how long after the last one with a timetable trains leave it
+			line->learn_run_time( anchor_entry, schedule->get_current_stop(), welt->get_calendar_minutes() - anchor_ready );
 		}
 		couple_wait_since = 0;
 		couple_hold_slot = -1;
@@ -4614,6 +4639,9 @@ station_tile_search_ready: ;
 					joined->line->book_departure_slot( joined->schedule->get_current_stop(), joined_slot );
 					joined->departure_delay = minutes_after_slot( joined_slot );
 					joined->departing_entry = joined->schedule->get_current_stop();
+					joined->anchor_entry = joined->schedule->get_current_stop();
+					joined->anchor_slot = joined_slot;
+					joined->anchor_ready = welt->get_calendar_minutes();
 				}
 				else if(  timetabled  &&  slot >= 0  &&  joined->schedule->get_current_entry().has_timetable()  ) {
 					// timetabled here, but no slot of its own: it is as late as we are
@@ -5821,6 +5849,7 @@ void convoi_t::check_pending_updates()
 			departure_delay = NO_DEPARTURE_DELAY;
 			departure_pending = false;
 			departing_entry = 255;
+			anchor_entry = 255;
 		}
 		int current_stop = schedule->get_current_stop(); // save current position of schedule
 		bool is_same = false;

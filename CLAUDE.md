@@ -914,7 +914,7 @@ one-side and both-sides tiles with through buses both ways; an articulated bus; 
 rotation, deletion, depot, schedule edits, saves for 0.122.11 and 0.122.0; the 39 rail and road
 regression scenarios byte-identical.
 
-## Departure board (fork feature, no save change)
+## Departure board (fork feature, savegame 122.13)
 
 The stop window's departure tab (`gui/departure_board.*`, `gui_departure_board_view_t`) has a board per
 kind: passenger trains (rail, monorail, maglev, narrow gauge; metro too), other passenger vehicles (bus,
@@ -946,16 +946,30 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
   guess, plus a minute per lead-in entry: entries before it nobody boards at, waypoints, this stop's
   other entries; a train loading at a timetabled siding is ready after its own slot there). A slot no
   train takes shows the line only and, once it began, a growing delay until its window closes, then it
-  goes. Untimetabled lines and convoys without a line show only trains loading or held there and those
+  goes. Lines without any timetable and convoys without a line show only trains loading or held there and those
   on their way. The first departure of every stream sets the board's time span; each line (or convoy
   without a line) shows up to 5 rows within it. A long span (a line every two hours) lets frequent
   lines fill their five rows.
+- Stops without a timetable of a line with one elsewhere are timed from the last entry with a timetable
+  before them (the anchor, `simline_t::get_timetable_anchor`): its slots plus the running time from there
+  (`add_timed_rows`). Running time = learned (`simline_t::learn_run_time`/`get_run_time`, `run_times`: per
+  entry, minutes from being ready to leave the anchor to being ready to leave the stop, averaged a quarter
+  per sample, a sample capped at twice the average + 10 min) from the trains' `convoi_t::anchor_entry`,
+  `anchor_slot`, `anchor_ready` (set where a train books its slot; the sample is taken where it is ready to
+  leave a stop without a timetable); until then estimated (`estimate_run_times`: the distance over the
+  tiles + 25% at three quarters of the average top speed of the line's trains, a minute per stop, going on
+  from the last learned stop). Rows: the anchor's slots nobody booked yet, moved by the running time, line
+  only; trains that booked their slot at the anchor and have not left here yet: their slot + running time,
+  expected from where they are (arrival at the next stop + 1 minute + the running time left, or its loading),
+  delay the difference (an early train shows on time). Saved (122.13): `run_times` with the line, the anchor
+  fields with the convoy; a line's schedule edit clears its times (`set_schedule`), a convoy's schedule
+  change its anchor.
 - Coupled pairs leaving together (`is_coupled`, not parting here per `get_uncouple_halt`) and slots of
   lines linked by "Couple with" at the same minute with the same next stop are one row that shows each
   train for 3 s in turn ("1/2", "2/2").
 - Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a
   dark amber board for the others (coloured line badge, destination and vias, "5 min" up to an hour,
-  delay). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens
+  delay; listed by when they leave, the train board by the timetable). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens
   its train. Without the calendar times are `tick_to_string` and nothing is timetabled.
 Tested on a copy of the owner's game (Brno hl.n., Praha hl.n., Staré Město, Ostrava-Svinov, Zábřeh,
 Brno Mendlovo nám.) with a throwaway hook that opens the windows and dumps the rows.

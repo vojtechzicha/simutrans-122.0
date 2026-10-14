@@ -96,6 +96,19 @@ private:
 	void keep_slots_across_edit(const schedule_t *old_schedule, const schedule_t *new_schedule);
 
 	/**
+	 * Departure board (fork): running times learned for the stops without a timetable. Per schedule entry,
+	 * how many calendar minutes after being ready to leave `anchor` (the last entry with a timetable before
+	 * it) the trains of the line were ready to leave this one, averaged, in 16ths of a minute; samples 0 =
+	 * not learned yet. Saved (122.13); a schedule edit clears it.
+	 */
+	struct run_time_t {
+		uint8 anchor;
+		uint8 samples;
+		sint32 minutes16;
+	};
+	vector_tpl<run_time_t> run_times;
+
+	/**
 	 * a list of all catg_index, which can be transported by this line.
 	 */
 	minivec_tpl<uint8> goods_catg_index;
@@ -197,6 +210,15 @@ public:
 	 * is on time again (the slot lies ahead), it then waits for its slot like any other.
 	 */
 	bool get_late_departure_slot(convoihandle_t cnv, sint64 inherited, sint64 &slot) const;
+
+	/// Departure board (fork): the last entry with a timetable before entry (255 = none in the schedule)
+	uint8 get_timetable_anchor(uint8 entry) const;
+
+	/// Departure board (fork): a train of the line was ready to leave entry this many minutes after it was ready to leave anchor
+	void learn_run_time(uint8 anchor, uint8 entry, sint64 minutes);
+
+	/// Departure board (fork): the running time learned from anchor to entry, false if none yet
+	bool get_run_time(uint8 anchor, uint8 entry, sint64 &minutes) const;
 
 	/// Coupling (fork): the primary left alone in this slot; the next train of this line at entry inherits it
 	void add_missed_coupling(uint8 entry, sint64 slot);

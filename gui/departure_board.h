@@ -75,7 +75,7 @@ public:
 	/// bit (1 << kind) for every kind of departures served at the halt
 	static uint8 get_kinds_at(halthandle_t halt);
 
-private:
+public:
 	struct row_t {
 		convoihandle_t cnv;  ///< unbound: a timetable slot no train is known for yet
 		linehandle_t line;
@@ -85,9 +85,13 @@ private:
 		sint64 scheduled;    ///< board time of the slot; -1: no timetable
 		sint64 expected;     ///< board time it is expected to leave
 		sint32 delay;        ///< minutes after the slot, 0 = on time; -1 without a timetable
+		bool booked;         ///< it finished loading and booked its slot, but still stands there
 		char train[48];
+
+		row_t() : stream(0), group(0), alt(-1), scheduled(-1), expected(0), delay(-1), booked(false) { train[0] = 0; }
 	};
 
+private:
 	struct stream_t {
 		linehandle_t line;
 		convoihandle_t cnv;  ///< the convoy, for a convoy without a line
@@ -122,7 +126,9 @@ private:
 	void rebuild();
 	void add_line_streams(linehandle_t line, vector_tpl<row_t> &line_rows);
 	void add_convoy_stream(convoihandle_t cnv, vector_tpl<row_t> &line_rows);
-	void add_stream_rows(const schedule_t *schedule, linehandle_t line, convoihandle_t lineless, uint8 entry, vector_tpl<row_t> &stream_rows);
+	void add_stream_rows(const schedule_t *schedule, linehandle_t line, convoihandle_t lineless, uint8 entry, halthandle_t at, vector_tpl<row_t> &stream_rows);
+	void add_timed_rows(const schedule_t *schedule, linehandle_t line, uint8 entry, uint8 anchor, vector_tpl<row_t> &stream_rows);
+	void estimate_run_times(const schedule_t *schedule, linehandle_t line, uint8 anchor, uint8 stretch, sint64 *run) const;
 	bool fill_stream_texts(stream_t &s, const schedule_t *schedule, player_t *owner);
 	void merge_coupled_rows();
 	void layout();

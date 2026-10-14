@@ -346,6 +346,16 @@ private:
 	sint32 departure_delay;
 
 	/**
+	 * Fork, departure board: the last schedule entry with a timetable this convoy left (255 = none), the slot
+	 * it booked there and the calendar minute it was ready to leave in it. The line learns from it how long
+	 * after that its trains leave the stops without a timetable (simline_t::learn_run_time); the board times
+	 * those stops from it. Saved (122.13), cleared with the departure delay.
+	 */
+	uint8 anchor_entry;
+	sint64 anchor_slot;
+	sint64 anchor_ready;
+
+	/**
 	 * Fork, timetable: departure_delay was set when the convoy got ready to leave its stop (a slot
 	 * booked, or loading done at a stop without a timetable); until it passes the first signal or
 	 * station boundary after the stop (rail; other convoys: until they move), the ticks it stands still
@@ -1231,6 +1241,10 @@ public:
 	/// fork, timetable: it passed its exit signal (or arrived): the time it stood is part of the delay now
 	void finish_departure_delay();
 	bool is_departure_pending() const { return departure_pending; }
+	/// fork, departure board: the last entry with a timetable it left (255 = none), its slot there and when it was ready to leave
+	uint8 get_anchor_entry() const { return anchor_entry; }
+	sint64 get_anchor_slot() const { return anchor_slot; }
+	sint64 get_anchor_ready() const { return anchor_ready; }
 	/// fork, timetable: booked its slot at that entry of its line's schedule and still stands there (or at its exit signal)
 	bool is_leaving_stop(uint8 entry) const;
 	/// fork, timetable: while it is_leaving_stop, a slot of that entry that begins is used up by it (called in step)
