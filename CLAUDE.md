@@ -967,6 +967,12 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
 - Coupled pairs leaving together (`is_coupled`, not parting here per `get_uncouple_halt`) and slots of
   lines linked by "Couple with" at the same minute with the same next stop are one row that shows each
   train for 3 s in turn ("1/2", "2/2").
+- Destination sign (`convoy_sign_t`, cached a game minute per convoy): line badge and where the convoy's trip
+  goes (the board's rules, from the stop it boards at or last boarded at; "Not in service" on a run to a
+  siding). The convoy window shows it in one line under the vehicle picture, as wide as the picture
+  (`gui_convoy_sign_t`); with "line name mouseover tooltips" the vehicle under the mouse shows its board row
+  (time, train, line, destination, delay; `find_convoy_departure` builds its line's rows at the stop it is at or
+  goes to, shown only for the same trip) with any state text below, instead of "line - convoy name".
 - Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a
   dark amber board for the others (coloured line badge, destination and vias, "5 min" up to an hour,
   delay; listed by when they leave, the train board by the timetable). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens

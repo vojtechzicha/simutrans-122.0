@@ -232,6 +232,9 @@ void convoi_info_t::init(convoihandle_t cnv)
 		{
 			add_component(&view);
 			view.set_obj(cnv->front());
+			// fork: which line and where to, as on the vehicle's destination sign
+			sign.set_convoy(cnv, &view);
+			add_component(&sign);
 		}
 		end_table();
 	}

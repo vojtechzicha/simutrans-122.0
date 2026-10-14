@@ -23,6 +23,7 @@
 #include "simwin.h"
 
 #include "../utils/cbuffer_t.h"
+#include "departure_board.h"
 
 class convoi_detail_t;
 
@@ -42,6 +43,7 @@ private:
 
 	gui_textarea_t text;
 	obj_view_t view;
+	gui_convoy_sign_t sign; ///< fork: line and destination, as on the vehicle
 	gui_label_buf_t speed_label, profit_label, running_cost_label, weight_label, target_label, line_label;
 	gui_label_buf_t departure_label; // timetable (fork): planned departure while waiting at a stop
 	gui_label_buf_t delay_label;     // timetable (fork): how late it left the last stop with a timetable

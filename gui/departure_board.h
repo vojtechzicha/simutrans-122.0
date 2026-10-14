@@ -14,6 +14,7 @@
 #include "../convoihandle_t.h"
 #include "../tpl/vector_tpl.h"
 #include "../tpl/minivec_tpl.h"
+#include "../simtypes.h"
 
 
 class cbuffer_t;
@@ -75,6 +76,9 @@ public:
 	/// bit (1 << kind) for every kind of departures served at the halt
 	static uint8 get_kinds_at(halthandle_t halt);
 
+	/// the convoy's row on the board of halt h, if its trip goes to dest: the time as the board shows it, and the delay
+	static bool find_convoy_departure(convoihandle_t cnv, halthandle_t h, halthandle_t dest, char *time, size_t time_len, sint32 &delay);
+
 public:
 	struct row_t {
 		convoihandle_t cnv;  ///< unbound: a timetable slot no train is known for yet
@@ -96,6 +100,7 @@ private:
 		linehandle_t line;
 		convoihandle_t cnv;  ///< the convoy, for a convoy without a line
 		uint8 entry;         ///< the schedule entry at this halt it departs from
+		halthandle_t dest_halt;
 		char line_number[32];
 		char category[16];
 		char destination[128];
@@ -153,6 +158,50 @@ public:
 
 	scr_size get_min_size() const OVERRIDE { return min_size; }
 	scr_size get_max_size() const OVERRIDE;
+};
+
+
+
+/**
+ * Fork: what the destination sign of a convoy says, in the look of the departure board: its line number,
+ * train number and where its trip goes (the board's rules: the next Terminal or All off stop, sidings,
+ * where the schedule turns), and its row on the board of the stop it is at or goes to.
+ */
+struct convoy_sign_t
+{
+	char line_number[32];
+	char train[48];          ///< train number (trains only)
+	char destination[128];   ///< empty: not in service (a run to a siding)
+	halthandle_t dest_halt;
+	bool train_style;        ///< rail: the blue train board look, else the amber stop look
+	waytype_t waytype;
+	bool departure;          ///< time and delay are its departure from the stop it is at or goes to
+	char time[16];
+	sint32 delay;            ///< minutes after its slot, -1: none
+
+	/// fills the sign (kept for a game minute); false without a schedule
+	bool update(convoihandle_t cnv);
+
+	/// one board row in a frame at x, y (time, train, line badge, destination, delay); returns its width,
+	/// with draw false only measures
+	scr_coord_val draw_row(scr_coord_val x, scr_coord_val y, bool draw) const;
+
+	/// the sign in one line filling area: line badge, then the destination
+	void draw_sign(scr_rect area) const;
+};
+
+
+/// Fork: a convoy's destination sign as a component (convoy window), as wide as the component above it
+class gui_convoy_sign_t : public gui_component_t
+{
+	convoihandle_t cnv;
+	gui_component_t *width_of;
+public:
+	gui_convoy_sign_t() : width_of(NULL) {}
+	void set_convoy(convoihandle_t c, gui_component_t *same_width) { cnv = c; width_of = same_width; }
+	void draw(scr_coord offset) OVERRIDE;
+	scr_size get_min_size() const OVERRIDE;
+	scr_size get_max_size() const OVERRIDE { return get_min_size(); }
 };
 
 #endif

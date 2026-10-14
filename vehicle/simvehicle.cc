@@ -35,6 +35,7 @@
 #include "../display/simgraph.h"
 
 #include "../simline.h"
+#include "../gui/departure_board.h"
 
 #include "../simintr.h"
 
@@ -1985,24 +1986,35 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 				break;
 		}
 
-		if(  env_t::show_vehicle_states == 2  &&  !tooltip_text[ 0 ]  ) {
-			// show line name or simply convoi name
-			color = color_idx_to_rgb( cnv->get_owner()->get_player_color1() + 7 );
-			if(  cnv->get_line().is_bound()  ) {
-				snprintf( tooltip_text, lengthof( tooltip_text ), "%s - %s", cnv->get_line()->get_name(), cnv->get_name() );
+		const int raster_width = get_current_tile_raster_width();
+		get_screen_offset( xpos, ypos, raster_width );
+		xpos += tile_raster_scale_x(get_xoff(), raster_width);
+		ypos += tile_raster_scale_y(get_yoff(), raster_width)+14;
+
+		if(  env_t::show_vehicle_states == 2  ) {
+			// fork: its row of the departure board (line, destination, departure), what it does below
+			convoy_sign_t sign;
+			if(  sign.update( cnv->self )  ) {
+				if(  ypos>LINESPACE+32  &&  ypos+LINESPACE<display_get_clip_wh().yy  ) {
+					sign.draw_row( xpos, ypos - 2, true );
+				}
+				ypos += LINESPACE + 6;
 			}
-			else {
-				snprintf( tooltip_text, lengthof( tooltip_text ), "%s", cnv->get_name() );
+			else if(  !tooltip_text[ 0 ]  ) {
+				// show line name or simply convoi name
+				color = color_idx_to_rgb( cnv->get_owner()->get_player_color1() + 7 );
+				if(  cnv->get_line().is_bound()  ) {
+					snprintf( tooltip_text, lengthof( tooltip_text ), "%s - %s", cnv->get_line()->get_name(), cnv->get_name() );
+				}
+				else {
+					snprintf( tooltip_text, lengthof( tooltip_text ), "%s", cnv->get_name() );
+				}
 			}
 		}
 
 		// something to show?
 		if(  tooltip_text[0]  ) {
 			const int width = proportional_string_width(tooltip_text)+7;
-			const int raster_width = get_current_tile_raster_width();
-			get_screen_offset( xpos, ypos, raster_width );
-			xpos += tile_raster_scale_x(get_xoff(), raster_width);
-			ypos += tile_raster_scale_y(get_yoff(), raster_width)+14;
 			if(ypos>LINESPACE+32  &&  ypos+LINESPACE<display_get_clip_wh().yy) {
 				display_ddd_proportional_clip( xpos, ypos, width, 0, color, color_idx_to_rgb(COL_BLACK), tooltip_text, true );
 			}
