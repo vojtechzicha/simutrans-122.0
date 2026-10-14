@@ -20,6 +20,7 @@
 #include "components/gui_chart.h"
 #include "components/gui_image.h"
 #include "components/gui_colorbox.h"
+#include "departure_board.h"
 
 #include "../utils/cbuffer_t.h"
 #include "../simhalt.h"
@@ -43,6 +44,16 @@ public:
 
 
 /**
+ * Fork: a row of tabs without a body (the departure board picks its kind of departures with it)
+ */
+class gui_tab_bar_t : public gui_tab_panel_t
+{
+public:
+	scr_size get_max_size() const OVERRIDE { return scr_size( scr_size::inf.w, get_min_size().h ); }
+};
+
+
+/**
  * Main class: the station info window.
  * Window with destination information for a stop
  */
@@ -61,8 +72,17 @@ private:
 	*/
 	cbuffer_t freight_info;
 
-	// departure stuff (departure and arrival times display)
+	// departure stuff (departure and arrival times display); fork: freight only
 	gui_departure_board_t *departure_board;
+
+	// fork: departure board of passenger trains and of other passenger vehicles, tabs for the kinds served here
+	gui_departure_board_view_t board_view;
+	gui_aligned_container_t container_departure;
+	gui_tab_bar_t board_tabs;
+	gui_empty_t board_tab_body[gui_departure_board_view_t::MAX_KINDS];
+	uint8 board_tab_kind[gui_departure_board_view_t::MAX_KINDS];
+	uint8 board_kinds;    ///< bits of the kinds the tabs were made for
+	uint8 board_shown;    ///< the kind shown
 
 	// halt connections plane
 	gui_halt_detail_t *halt_detail;
@@ -71,6 +91,7 @@ private:
 	gui_aligned_container_t container_freight, container_chart;
 	gui_textarea_t text_freight;
 	gui_scrollpane_t scrolly_freight, scrolly_departure, scrolly_details;
+	gui_scrollpane_t scrolly_freight_departure; ///< fork: the stock departure board, for freight
 
 	gui_textinput_t input;
 	gui_chart_t chart;
@@ -85,6 +106,10 @@ private:
 	char edit_name[256];
 
 	void update_components();
+
+	// fork: tabs for the kinds of departures served here (none if only one), and the kind shown
+	void update_board_tabs();
+	void show_board_kind(uint8 kind);
 
 	void init(halthandle_t halt);
 

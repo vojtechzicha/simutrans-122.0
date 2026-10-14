@@ -152,6 +152,13 @@ public:
 	 */
 	static bool get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot);
 
+	/// Timetable (fork): the first slot a convoy may use from now on (the open one, else the next to come), and the slot after a slot
+	static sint64 get_first_departure_slot(const schedule_entry_t &entry, sint64 now);
+	static sint64 get_next_departure_slot(const schedule_entry_t &entry, sint64 slot);
+
+	/// Timetable (fork): the slot a train of the line last left in at that entry (-1: none; below -1: a new line, see fresh_slots)
+	sint64 get_last_departure_slot(uint8 entry) const { return entry < last_departure_slot.get_count() ? last_departure_slot[entry] : -1; }
+
 	/**
 	 * Timetable (fork): may the convoy leave its current stop now? True when a slot is open
 	 * that no other convoy of the line used at this entry, and no other ready convoy of the

@@ -189,6 +189,13 @@ karte_ptr_t gui_departure_board_t::welt;
 karte_ptr_t gui_halt_detail_t::gui_line_button_t::welt;
 
 
+// fork: this board lists freight only; passengers have their own boards (gui_departure_board_view_t)
+static bool is_freight(convoihandle_t cnv)
+{
+	return gui_departure_board_view_t::get_kind( cnv ) == gui_departure_board_view_t::KIND_FREIGHT;
+}
+
+
 static const char *sort_text[4] = {
 	"Zielort",
 	"via",
@@ -284,10 +291,13 @@ halt_info_t::halt_info_t(halthandle_t halt) :
 		halt_detail( new gui_halt_detail_t(halt)),
 		text_freight(&freight_info),
 		scrolly_freight(&container_freight, true, true),
-		scrolly_departure(departure_board, true, true),
+		scrolly_departure(&board_view, true, true),
 		scrolly_details(halt_detail, true, true),
+		scrolly_freight_departure(departure_board, true, true),
 		view(koord3d::invalid, scr_size(max(64, get_base_tile_raster_width()), max(56, get_base_tile_raster_width() * 7 / 8)))
 {
+	board_kinds = 0xFF;
+	board_shown = gui_departure_board_view_t::KIND_TRAINS;
 	if (halt.is_bound()) {
 		init(halt);
 	}
@@ -387,8 +397,15 @@ void halt_info_t::init(halthandle_t halt)
 
 	container_freight.add_component(&text_freight);
 
-	// departure board
-	switch_mode.add_tab(&scrolly_departure, translator::translate("Departure board"));
+	// departure board (fork: passenger trains, other passenger vehicles and freight on their own boards)
+	container_departure.set_table_layout(1,0);
+	container_departure.add_component(&board_tabs);
+	container_departure.add_component(&scrolly_departure);
+	container_departure.add_component(&scrolly_freight_departure);
+	board_tabs.add_listener(this);
+	board_view.set_halt(halt);
+	update_board_tabs();
+	switch_mode.add_tab(&container_departure, translator::translate("Departure board"));
 	departure_board->update_departures(halt);
 	departure_board->set_size( departure_board->get_min_size() );
 
@@ -503,13 +520,73 @@ void halt_info_t::update_components()
 		container_freight.set_size(container_freight.get_min_size());
 	}
 
-	if (switch_mode.get_aktives_tab() == &scrolly_departure) {
-		departure_board->update_departures(halt);
+	if (switch_mode.get_aktives_tab() == &container_departure) {
+		update_board_tabs();
+		if(  board_shown == gui_departure_board_view_t::KIND_FREIGHT  ) {
+			departure_board->update_departures(halt);
+		}
+		else {
+			board_view.update();
+		}
 	}
 	if (switch_mode.get_aktives_tab() == &scrolly_details) {
 		halt_detail->update_connections(halt);
 	}
 	set_dirty();
+}
+
+
+// fork: one tab per kind of departures served here (trains, other passenger vehicles, freight), none
+// if there is only one kind; the kind shown stays if it is still served
+void halt_info_t::update_board_tabs()
+{
+	const uint8 kinds = gui_departure_board_view_t::get_kinds_at( halt );
+	if(  kinds == board_kinds  ) {
+		return;
+	}
+	board_kinds = kinds;
+	static const char *tab_names[gui_departure_board_view_t::MAX_KINDS] = { "Trains", "Buses & trams", "Freight" };
+	board_tabs.clear();
+	int count = 0, shown = -1;
+	for(  uint8 k = 0;  k < gui_departure_board_view_t::MAX_KINDS;  k++  ) {
+		if(  kinds & (1 << k)  ) {
+			board_tab_kind[count] = k;
+			if(  k == board_shown  ) {
+				shown = count;
+			}
+			board_tabs.add_tab( board_tab_body + count, translator::translate( tab_names[k] ) );
+			count++;
+		}
+	}
+	if(  count == 0  ) {
+		// nothing served: an empty passenger board (the tab panel needs a tab even when hidden)
+		board_tab_kind[count] = gui_departure_board_view_t::KIND_TRAINS;
+		board_tabs.add_tab( board_tab_body + count, translator::translate( tab_names[0] ) );
+		count++;
+	}
+	board_tabs.set_visible( count > 1 );
+	if(  shown < 0  ) {
+		shown = 0;
+	}
+	board_tabs.set_active_tab_index( shown );
+	show_board_kind( board_tab_kind[shown] );
+}
+
+
+void halt_info_t::show_board_kind(uint8 kind)
+{
+	board_shown = kind;
+	const bool freight = kind == gui_departure_board_view_t::KIND_FREIGHT;
+	if(  !freight  ) {
+		board_view.set_kind( (gui_departure_board_view_t::kind_t)kind );
+	}
+	else {
+		departure_board->next_refresh = -1;
+		departure_board->update_departures( halt );
+	}
+	scrolly_departure.set_visible( !freight );
+	scrolly_freight_departure.set_visible( freight );
+	container_departure.set_size( container_departure.get_size() );
 }
 
 
@@ -763,7 +840,7 @@ void gui_departure_board_t::add_coupled_destination(halthandle_t halt, convoihan
 // that is not this one (its schedule points past this stop already)
 void gui_departure_board_t::add_held_departure(halthandle_t halt, convoihandle_t cnv)
 {
-	if(  !cnv.is_bound()  ||  !cnv->is_platform_held()  ||  cnv->get_leaving_halt() != halt  ) {
+	if(  !cnv.is_bound()  ||  !is_freight( cnv )  ||  !cnv->is_platform_held()  ||  cnv->get_leaving_halt() != halt  ) {
 		return;
 	}
 	const schedule_t *sched = cnv->get_schedule();
@@ -805,7 +882,7 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 
 	// iterate over all convoys stopping here
 	FOR(  slist_tpl<convoihandle_t>, cnv, halt->get_loading_convois() ) {
-		if( !cnv.is_bound()) {
+		if( !cnv.is_bound()  ||  !is_freight( cnv )) {
 			continue;
 		}
 		halthandle_t next_halt = cnv->get_schedule()->get_next_halt(cnv->get_owner(),halt);
@@ -849,7 +926,7 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 	FOR(  vector_tpl<linehandle_t>, line, halt->registered_lines ) {
 		for(  uint j = 0;  j < line->count_convoys();  j++  ) {
 			convoihandle_t cnv = line->get_convoy(j);
-			if(  cnv.is_bound()  &&  ( cnv->get_state() == convoi_t::DRIVING  ||  cnv->is_waiting() )  &&  haltestelle_t::get_halt( cnv->get_schedule()->get_current_entry().pos, cnv->get_owner() ) == halt  ) {
+			if(  cnv.is_bound()  &&  is_freight( cnv )  &&  ( cnv->get_state() == convoi_t::DRIVING  ||  cnv->is_waiting() )  &&  haltestelle_t::get_halt( cnv->get_schedule()->get_current_entry().pos, cnv->get_owner() ) == halt  ) {
 				halthandle_t prev_halt = haltestelle_t::get_halt( cnv->front()->last_stop_pos, cnv->get_owner() );
 				sint32 delta_t = cur_ticks + calc_ticks_until_arrival( cnv );
 				if(  prev_halt.is_bound()  ) {
@@ -875,7 +952,7 @@ void gui_departure_board_t::update_departures(halthandle_t halt)
 	}
 
 	FOR( vector_tpl<convoihandle_t>, cnv, halt->registered_convoys ) {
-		if(  cnv.is_bound()  &&  ( cnv->get_state() == convoi_t::DRIVING  ||  cnv->is_waiting() )  &&  haltestelle_t::get_halt( cnv->get_schedule()->get_current_entry().pos, cnv->get_owner() ) == halt  ) {
+		if(  cnv.is_bound()  &&  is_freight( cnv )  &&  ( cnv->get_state() == convoi_t::DRIVING  ||  cnv->is_waiting() )  &&  haltestelle_t::get_halt( cnv->get_schedule()->get_current_entry().pos, cnv->get_owner() ) == halt  ) {
 			halthandle_t prev_halt = haltestelle_t::get_halt( cnv->front()->last_stop_pos, cnv->get_owner() );
 			sint32 delta_t = cur_ticks + calc_ticks_until_arrival( cnv );
 			if(  prev_halt.is_bound()  ) {
@@ -1024,6 +1101,10 @@ bool halt_info_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 	}
 	else if (comp == &switch_mode) {
 		departure_board->next_refresh = -1;
+		board_view.update( true );
+	}
+	else if(  comp == &board_tabs  ) {
+		show_board_kind( board_tab_kind[board_tabs.get_active_tab_index()] );
 	}
 
 	return true;

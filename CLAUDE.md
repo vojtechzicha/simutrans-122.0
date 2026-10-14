@@ -202,7 +202,7 @@ The label over a train (`show_vehicle_states`, `vehicle_t::display_after`) shows
 loading plus coupling wait or late running plus departure, and at a signal the passing-train or
 single-track reason instead of "Waiting for clearance" (`convoi_t::append_departure_text`,
 `append_wait_reason`, shared with the convoy window).
-Not done yet: the stop departure boards still estimate from arrival plus wait.
+The stop departure boards list the timetable slots (see "Departure board").
 
 Stop types (savegame 122.3, `schedule_entry_t::stop_type`): Regular, Terminal (everything off,
 then load; transfers allowed, nothing rides through), All off (everything off, no loading), Only
@@ -913,6 +913,52 @@ two stops) with five timetabled lines; 18 buses for 10 bays (queue, every bay us
 one-side and both-sides tiles with through buses both ways; an articulated bus; curbside Hold;
 rotation, deletion, depot, schedule edits, saves for 0.122.11 and 0.122.0; the 39 rail and road
 regression scenarios byte-identical.
+
+## Departure board (fork feature, no save change)
+
+The stop window's departure tab (`gui/departure_board.*`, `gui_departure_board_view_t`) has a board per
+kind: passenger trains (rail, monorail, maglev, narrow gauge; metro too), other passenger vehicles (bus,
+tram, ship, air) and freight (the stock board, `gui_departure_board_t` in `halt_info.cc`, now freight
+only). A line or convoy counts as passenger when its goods categories include passengers (mail only is
+freight). Tabs show only when the stop serves more than one kind (`gui_tab_bar_t`, a tab panel without
+a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::rdwr` is unchanged.
+- Names (`board_names_t`, checked against every name of the owner's game): line number = the `[XX]`
+  in the header of the line name (`R14B !! [R14] ...`, `[C] Praha,...`; markers `!`, `!!`, `<SK>`,
+  `{EC}` skipped, a `[SK]` after the route is not the header), else a licence number's last three
+  digits (`100167` -> 167, `600008N` -> 8), else a category with a one or two digit number
+  (`Ex1/1` -> Ex1, `R08` -> R8; `Os041/1` is a timetable table, no number). Category = the letters
+  of that code (Os, Sp, R), shown for a slot whose train is not known. Train number = the start of
+  the convoy name (`R 802 "Moravan": ...` -> R 802 Moravan, `Os 3002/3`), else the convoy id (metro
+  and `S3 Tišnov - ...` show ids). Stop names are split at ` / `; trains take the part with `<tracks>`
+  (else the first without a comma), others the first `Town, Stop` part; `[lines]`, `[district]`,
+  `<tracks>` and `(Ex1,R18)` are dropped (`(Gródek)`, `(smyčka)` stay); the town is dropped when it is
+  the board stop's town.
+- Departures: one stream per schedule entry at the stop that loads, not followed by another entry of
+  the same stop (arrival track, then departure track: the last one counts) and with a destination.
+  Destination: the next Terminal or All off entry; an All off stop reached from a stop T that leads
+  back to T is a siding (destination T; T = this stop right away: a run to the siding, no row).
+  Without such entries (buses mostly): the last stop before the schedule comes back to a stop with
+  the same board name. Vias: up to 3 (others 2) stops on the way served by the most lines of the kind.
+- Rows: a timetabled entry lists every slot (`simline_t::get_first/next_departure_slot`) not used yet
+  (`get_last_departure_slot`; fresh-line marks only future slots). Known trains take them in order:
+  held at the platform after loading here (delay = its departure delay), loading here
+  (`get_planned_departure`), then those coming by arrival estimate (`ticks_until_arrival`, the stock
+  guess, plus a minute per lead-in entry: entries before it nobody boards at, waypoints, this stop's
+  other entries; a train loading at a timetabled siding is ready after its own slot there). A slot no
+  train takes shows the line only and, once it began, a growing delay until its window closes, then it
+  goes. Untimetabled lines and convoys without a line show only trains loading or held there and those
+  on their way. The first departure of every stream sets the board's time span; each line (or convoy
+  without a line) shows up to 5 rows within it. A long span (a line every two hours) lets frequent
+  lines fill their five rows.
+- Coupled pairs leaving together (`is_coupled`, not parting here per `get_uncouple_halt`) and slots of
+  lines linked by "Couple with" at the same minute with the same next stop are one row that shows each
+  train for 3 s in turn ("1/2", "2/2").
+- Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a
+  dark amber board for the others (coloured line badge, destination and vias, "5 min" up to an hour,
+  delay). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens
+  its train. Without the calendar times are `tick_to_string` and nothing is timetabled.
+Tested on a copy of the owner's game (Brno hl.n., Praha hl.n., Staré Město, Ostrava-Svinov, Zábřeh,
+Brno Mendlovo nám.) with a throwaway hook that opens the windows and dumps the rows.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

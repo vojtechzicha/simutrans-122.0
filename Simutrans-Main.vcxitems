@@ -146,6 +146,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\curiosity_edit.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\curiositylist_frame_t.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\curiositylist_stats_t.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)gui\departure_board.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\depot_frame.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\depotlist_frame.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\display_settings.cc" />
@@ -495,6 +496,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\curiosity_edit.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\curiositylist_frame_t.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\curiositylist_stats_t.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)gui\departure_board.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\depot_frame.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\depotlist_frame.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\display_settings.h" />

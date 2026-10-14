@@ -443,6 +443,18 @@ bool simline_t::get_planned_departure(convoihandle_t cnv, sint64 ready_at, sint6
 }
 
 
+sint64 simline_t::get_first_departure_slot(const schedule_entry_t &entry, sint64 now)
+{
+	return first_departure_slot( entry, now );
+}
+
+
+sint64 simline_t::get_next_departure_slot(const schedule_entry_t &entry, sint64 slot)
+{
+	return next_departure_slot( entry, slot );
+}
+
+
 bool simline_t::get_open_departure_slot(const schedule_entry_t &entry, sint64 &slot)
 {
 	if(  !entry.has_timetable()  ||  !welt->has_calendar()  ) {
