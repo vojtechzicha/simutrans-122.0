@@ -1030,6 +1030,13 @@ bool schedule_gui_t::infowin_event(const event_t *ev)
 {
 	// couple_selector sits on a tab page, so its position is relative to that page
 	const scr_coord couple_off = tabs.get_pos() + cont_coupling.get_pos();
+	if(  (IS_WHEELUP(ev)  ||  IS_WHEELDOWN(ev))  &&  !line_selector.is_dropped()  &&  !couple_selector.is_dropped()  &&  !wait_load.is_dropped()  ) {
+		// the wheel always scrolls the entry list, it never changes a value of the inputs above it
+		event_t ev2 = *ev;
+		translate_event( &ev2, -scrolly.get_pos().x, -scrolly.get_pos().y - D_TITLEBAR_HEIGHT );
+		scrolly.infowin_event( &ev2 );
+		return true;
+	}
 	if( (ev)->ev_class == EVENT_CLICK  &&  !((ev)->ev_code==MOUSE_WHEELUP  ||  (ev)->ev_code==MOUSE_WHEELDOWN)  &&  !line_selector.getroffen(ev->cx, ev->cy-D_TITLEBAR_HEIGHT)  &&  !couple_selector.getroffen(ev->cx-couple_off.x, ev->cy-D_TITLEBAR_HEIGHT-couple_off.y)  )  {
 
 		// close combo box; we must do it ourselves, since the box does not receive outside events ...
