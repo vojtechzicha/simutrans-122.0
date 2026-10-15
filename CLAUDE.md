@@ -970,9 +970,9 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
 - Destination sign (`convoy_sign_t`, cached a game minute per convoy): line badge and where the convoy's trip
   goes (the board's rules, from the stop it boards at or last boarded at; "Not in service" on a run to a
   siding). The convoy window shows it in one line under the vehicle picture, as wide as the picture
-  (`gui_convoy_sign_t`); with "line name mouseover tooltips" the vehicle under the mouse shows its board row
-  (time, train, line, destination, delay; `find_convoy_departure` builds its line's rows at the stop it is at or
-  goes to, shown only for the same trip) with any state text below, instead of "line - convoy name".
+  (`gui_convoy_sign_t`); with "line name mouseover tooltips" the vehicle under the mouse shows the sign in a
+  frame (`draw_row`: train number for trains, line badge, destination; no time or delay, the window and the state
+  labels have those) with any state text below, instead of "line - convoy name".
 - Board texts (savegame 122.14, `schedule_entry_t::board_text`, `board_auto`): a stop of a schedule may set the
   line number and the destination shown for departures from it on, until a later stop sets its own (going round
   the schedule, `schedule_t::get_board_text`); Auto at a stop goes back to the board's own from there. Train
@@ -982,7 +982,7 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
   number only, a bit in `board_auto`, no save change: `get_board_text` gives "") shows no line number from there,
   empty Enter keeps it. The entry list shows `{line S22, to Brno hl.n.}` / `{no line number}`. They are part of the schedule string (escaped `%2C`, `%7C`, `%25`; an empty last
   field counts) and of `operator==`, not of `same_except_board` (a text edit resets no delay, anchor or learned
-  running time). Used by the boards (`fill_stream_texts`), the sign and the hover row (`convoy_sign_t`).
+  running time). Used by the boards (`fill_stream_texts`), the sign and the hover sign (`convoy_sign_t`).
 - Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a
   dark amber board for the others (coloured line badge, destination and vias, "5 min" up to an hour,
   delay; listed by when they leave, the train board by the timetable). Rebuilt once a calendar minute (or when lines or convoys come or go); clicking a row opens

@@ -76,9 +76,6 @@ public:
 	/// bit (1 << kind) for every kind of departures served at the halt
 	static uint8 get_kinds_at(halthandle_t halt);
 
-	/// the convoy's row on the board of halt h, if its trip goes to dest: the time as the board shows it, and the delay
-	static bool find_convoy_departure(convoihandle_t cnv, halthandle_t h, halthandle_t dest, char *time, size_t time_len, sint32 &delay);
-
 	/// what the board shows by itself (no texts of the schedule) for departures from entry: the line number of
 	/// line (empty without one) and the destination (empty: not in service)
 	static void get_auto_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, cbuffer_t &line_number, cbuffer_t &destination);
@@ -169,7 +166,7 @@ public:
 /**
  * Fork: what the destination sign of a convoy says, in the look of the departure board: its line number,
  * train number and where its trip goes (the board's rules: the next Terminal or All off stop, sidings,
- * where the schedule turns), and its row on the board of the stop it is at or goes to.
+ * where the schedule turns).
  */
 struct convoy_sign_t
 {
@@ -179,15 +176,12 @@ struct convoy_sign_t
 	halthandle_t dest_halt;
 	bool train_style;        ///< rail: the blue train board look, else the amber stop look
 	waytype_t waytype;
-	bool departure;          ///< time and delay are its departure from the stop it is at or goes to
-	char time[16];
-	sint32 delay;            ///< minutes after its slot, -1: none
 
 	/// fills the sign (kept for a game minute); false without a schedule
 	bool update(convoihandle_t cnv);
 
-	/// one board row in a frame at x, y (time, train, line badge, destination, delay); returns its width,
-	/// with draw false only measures
+	/// the sign in a frame at x, y (train number, line badge, destination; over the vehicle); returns its
+	/// width, with draw false only measures
 	scr_coord_val draw_row(scr_coord_val x, scr_coord_val y, bool draw) const;
 
 	/// the sign in one line filling area: line badge, then the destination

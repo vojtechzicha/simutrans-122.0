@@ -1992,7 +1992,7 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 		ypos += tile_raster_scale_y(get_yoff(), raster_width)+14;
 
 		if(  env_t::show_vehicle_states == 2  ) {
-			// fork: its row of the departure board (line, destination, departure), what it does below
+			// fork: its destination sign (train number, line, destination), what it does below
 			convoy_sign_t sign;
 			if(  sign.update( cnv->self )  ) {
 				if(  ypos>LINESPACE+32  &&  ypos+LINESPACE<display_get_clip_wh().yy  ) {

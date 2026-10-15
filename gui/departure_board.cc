@@ -1833,36 +1833,6 @@ static sint64 board_stamp()
 }
 
 
-bool gui_departure_board_view_t::find_convoy_departure(convoihandle_t cnv, halthandle_t h, halthandle_t dest, char *time, size_t time_len, sint32 &delay)
-{
-	const kind_t k = get_kind( cnv );
-	if(  k == KIND_FREIGHT  ||  !h.is_bound()  ) {
-		return false;
-	}
-	gui_departure_board_view_t board;
-	board.kind = k;
-	board.halt = h;
-	board.now = welt->has_calendar() ? welt->get_calendar_minutes() : 0;
-	vector_tpl<row_t> stream_rows;
-	if(  cnv->get_line().is_bound()  ) {
-		board.add_line_streams( cnv->get_line(), stream_rows );
-	}
-	else {
-		board.add_convoy_stream( cnv, stream_rows );
-	}
-	FOR( vector_tpl<row_t>, const &r, stream_rows ) {
-		if(  r.cnv == cnv  &&  board.streams[r.stream].dest_halt == dest  ) {
-			cbuffer_t buf;
-			board.format_time( buf, r );
-			tstrncpy( time, buf, time_len );
-			delay = r.delay;
-			return true;
-		}
-	}
-	return false;
-}
-
-
 bool convoy_sign_t::update(convoihandle_t cnv)
 {
 	if(  !cnv.is_bound()  ||  cnv->get_schedule() == NULL  ||  cnv->get_schedule()->empty()  ) {
@@ -1939,18 +1909,6 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 		tstrncpy( line_number, t, lengthof(line_number) );
 	}
 
-	// its row on the board of the stop it is at or goes to (that trip only)
-	departure = false;
-	delay = -1;
-	time[0] = 0;
-	halthandle_t at = mover->get_leaving_halt();
-	for(  uint8 k = 0;  k < n  &&  !at.is_bound();  k++  ) {
-		at = entry_halt( schedule, (cur + k) % n, owner );
-	}
-	if(  destination[0]  ) {
-		departure = gui_departure_board_view_t::find_convoy_departure( cnv, at, dest_halt, time, lengthof(time), delay );
-	}
-
 	cache[next_slot].cnv = cnv;
 	cache[next_slot].stamp = stamp;
 	cache[next_slot].sign = *this;
@@ -1982,25 +1940,18 @@ scr_coord_val convoy_sign_t::draw_row(scr_coord_val x, scr_coord_val y, bool dra
 	const PIXVAL border = rgb( train_style ? TRAIN_HEAD_BG : OTHER_HEAD_BG );
 	const PIXVAL text_col = rgb( train_style ? TRAIN_TEXT : OTHER_TEXT );
 	const PIXVAL dim_col = rgb( train_style ? TRAIN_VIA : OTHER_VIA );
-	const PIXVAL delay_col = rgb( train_style ? TRAIN_DELAY : OTHER_DELAY );
 	const char *dest = destination[0] ? destination : translator::translate("Not in service");
-	cbuffer_t late;
-	if(  departure  &&  delay > 0  ) {
-		late.printf( translator::translate(train_style ? "+%d min" : "+%d"), (int)delay );
-	}
 
-	// measure: trains [time] [train] [line] destination [delay], others [line] destination [time] [delay]
+	// measure: [train] [line] destination
 	const scr_coord_val badge_w = draw_line_badge( 0, 0, line_number, train_style, waytype, false );
-	const scr_coord_val time_w = departure ? proportional_string_width( time ) : 0;
 	const scr_coord_val train_w = train[0] ? proportional_string_width( train ) : 0;
 	const scr_coord_val dest_w = proportional_string_width( dest );
-	const scr_coord_val late_w = late.len() ? proportional_string_width( late ) : 0;
-	scr_coord_val w = pad;
-	const scr_coord_val parts[5] = { time_w, train_w, badge_w, dest_w, late_w };
-	for(  int i = 0;  i < 5;  i++  ) {
-		if(  parts[i] > 0  ) {
-			w += parts[i] + pad;
-		}
+	scr_coord_val w = pad + dest_w + pad;
+	if(  train_w  ) {
+		w += train_w + pad;
+	}
+	if(  badge_w  ) {
+		w += badge_w + pad;
 	}
 	if(  !draw  ) {
 		return w;
@@ -2011,37 +1962,15 @@ scr_coord_val convoy_sign_t::draw_row(scr_coord_val x, scr_coord_val y, bool dra
 	display_fillbox_wh_clip_rgb( x + 1, y + 1, w - 2, h - 2, bg, true );
 	scr_coord_val cx = x + pad;
 	const scr_coord_val ty = y + 2;
-	if(  train_style  ) {
-		if(  time_w  ) {
-			display_proportional_clip_rgb( cx, ty, time, ALIGN_LEFT, text_col, true );
-			cx += time_w + pad;
-		}
-		if(  train_w  ) {
-			display_proportional_clip_rgb( cx, ty, train, ALIGN_LEFT, text_col, true );
-			cx += train_w + pad;
-		}
-		if(  badge_w  ) {
-			draw_line_badge( cx, ty, line_number, true, waytype, true );
-			cx += badge_w + pad;
-		}
-		display_proportional_clip_rgb( cx, ty, dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
-		cx += dest_w + pad;
+	if(  train_w  ) {
+		display_proportional_clip_rgb( cx, ty, train, ALIGN_LEFT, text_col, true );
+		cx += train_w + pad;
 	}
-	else {
-		if(  badge_w  ) {
-			draw_line_badge( cx, ty, line_number, false, waytype, true );
-			cx += badge_w + pad;
-		}
-		display_proportional_clip_rgb( cx, ty, dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
-		cx += dest_w + pad;
-		if(  time_w  ) {
-			display_proportional_clip_rgb( cx, ty, time, ALIGN_LEFT, text_col, true );
-			cx += time_w + pad;
-		}
+	if(  badge_w  ) {
+		draw_line_badge( cx, ty, line_number, train_style, waytype, true );
+		cx += badge_w + pad;
 	}
-	if(  late_w  ) {
-		display_proportional_clip_rgb( cx, ty, late, ALIGN_LEFT, delay_col, true );
-	}
+	display_proportional_clip_rgb( cx, ty, dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
 	return w;
 }
 
