@@ -974,7 +974,8 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
   train for 3 s in turn ("1/2", "2/2").
 - Destination sign (`convoy_sign_t`, cached a game minute per convoy): line badge and where the convoy's trip
   goes (the board's rules, from the stop it boards at or last boarded at; "Not in service" on a run to a
-  siding). The convoy window shows it in one line under the vehicle picture, as wide as the picture
+  siding, and from leaving an All off stop until it loads again, e.g. R56 Brno hl.n. All off, then the siding
+  odstavné nádraží Jih All off, then Brno hl.n. Regular). The convoy window shows it in one line under the vehicle picture, as wide as the picture
   (`gui_convoy_sign_t`); with "line name mouseover tooltips" the vehicle under the mouse shows the sign in a
   frame (`draw_row`: train number for trains, line badge, destination; no time or delay, the window and the state
   labels have those) with any state text below, instead of "line - convoy name".

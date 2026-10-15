@@ -1877,14 +1877,24 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 		buf.clear();
 	}
 
-	// the trip: from the stop it boards at now, else from the last one it boarded at
+	// the trip: from the stop it boards at now, else from the last one it boarded at; once it left an All off
+	// stop after that it is empty until it loads again (e.g. arrival All off, a siding, then the departure stop)
 	const uint8 cur = schedule->get_current_stop();
 	uint8 e = cur;
+	bool emptied = false;
 	if(  !(mover->get_state() == convoi_t::LOADING  &&  schedule->entries[cur].loads()  &&  entry_halt( schedule, cur, owner ).is_bound())  ) {
 		for(  uint8 k = 1;  k <= n;  k++  ) {
 			const uint8 i = (cur + n - k) % n;
-			if(  schedule->entries[i].loads()  &&  entry_halt( schedule, i, owner ).is_bound()  ) {
+			if(  !entry_halt( schedule, i, owner ).is_bound()  ) {
+				continue;
+			}
+			if(  schedule->entries[i].loads()  ) {
 				e = i;
+				break;
+			}
+			if(  schedule->entries[i].stop_type == schedule_entry_t::all_off  ) {
+				e = i;
+				emptied = true;
 				break;
 			}
 		}
@@ -1894,7 +1904,7 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 	const halthandle_t start = entry_halt( schedule, e, owner );
 	halthandle_t dest;
 	vector_tpl<halthandle_t> on_the_way;
-	if(  start.is_bound()  &&  find_destination( schedule, e, owner, start, train_style, dest, on_the_way )  ) {
+	if(  !emptied  &&  start.is_bound()  &&  find_destination( schedule, e, owner, start, train_style, dest, on_the_way )  ) {
 		cbuffer_t town;
 		board_names_t::get_stop_town( town, start->get_name(), train_style );
 		board_names_t::get_stop_name( buf, dest->get_name(), train_style, town );
