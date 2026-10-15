@@ -941,7 +941,9 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
 - Departures: one stream per schedule entry at the stop that loads, not followed by another entry of
   the same stop (arrival track, then departure track: the last one counts) and with a destination.
   Destination: the next Terminal or All off entry; an All off stop reached from a stop T that leads
-  back to T is a siding (destination T; T = this stop right away: a run to the siding, no row).
+  back to T, loading there again (`loads_at_stop_from`), is a siding (destination T; T = this stop right
+  away: a run to the siding, no row). Back to T without loading (R23: Ústí západ, Ústí hl.n. All off,
+  Ústí západ All off to turn, Ústí hl.n.) it is the terminus.
   Without such entries (buses mostly): the last stop before the schedule comes back to a stop with
   the same board name. Vias: up to 3 (others 2) stops on the way served by the most lines of the kind.
 - Rows: a timetabled entry lists every slot (`simline_t::get_first/next_departure_slot`) not used yet

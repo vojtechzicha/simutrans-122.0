@@ -674,10 +674,40 @@ static uint32 stop_key(halthandle_t h, bool train)
 
 
 /**
+ * Does the train load at the stop of entry j again (j or the entries of the same stop right after it, e.g.
+ * an arrival track and then the departure track)?
+ */
+static bool loads_at_stop_from(const schedule_t *schedule, uint8 j, const player_t *owner, bool train)
+{
+	const uint8 n = schedule->get_count();
+	const halthandle_t first = entry_halt( schedule, j, owner );
+	if(  !first.is_bound()  ) {
+		return false;
+	}
+	const uint32 key = stop_key( first, train );
+	for(  uint8 k = 0;  k < n;  k++  ) {
+		const uint8 i = (j + k) % n;
+		const halthandle_t h = entry_halt( schedule, i, owner );
+		if(  !h.is_bound()  ) {
+			continue;
+		}
+		if(  h != first  &&  stop_key( h, train ) != key  ) {
+			return false;
+		}
+		if(  schedule->entries[i].loads()  ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+
+/**
  * Where a departure from entry e of the schedule goes, and the stops on the way.
  * With Terminal or All off entries in the schedule: the next one. An All off stop the train runs to
- * from a stop T and then comes back to T from is a siding: the trip ends at T. Is T this stop, the
- * departure is only the run to the siding and nobody can ride it (false).
+ * from a stop T and then comes back to T from, loading there again, is a siding: the trip ends at T. Is
+ * T this stop, the departure is only the run to the siding and nobody can ride it (false). Coming back to
+ * T without loading (T is All off too) it is the terminus, T only the place where the train turns.
  * Without (or when that is this stop again): the last stop before the schedule comes back to a stop
  * it passed already (the train turned there) or to this one (a ring).
  */
@@ -704,8 +734,9 @@ static bool find_destination(const schedule_t *schedule, uint8 e, const player_t
 			}
 			if(  en.unloads_all()  ) {
 				if(  en.stop_type == schedule_entry_t::all_off  ) {
-					const halthandle_t back = entry_halt( schedule, next_stop( schedule, i, owner ), owner );
-					if(  back.is_bound()  &&  (back == last  ||  stop_key( back, train ) == stop_key( last, train ))  ) {
+					const uint8 back_entry = next_stop( schedule, i, owner );
+					const halthandle_t back = entry_halt( schedule, back_entry, owner );
+					if(  back.is_bound()  &&  (back == last  ||  stop_key( back, train ) == stop_key( last, train ))  &&  loads_at_stop_from( schedule, back_entry, owner, train )  ) {
 						// a siding: the passengers' trip ends at the stop before it
 						if(  last == here  ||  stop_key( last, train ) == here_key  ) {
 							if(  !moved  ) {
