@@ -3699,7 +3699,9 @@ skip_choose:
 						if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 							planned_onward = get_onward_length( cnv->get_route()->back(), next_stop );
 						}
-						const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
+						// no way on from the planned platform: the next stop cannot be reached from this station,
+						// none leads on; choose as without a next stop (see find_station_track)
+						const uint8 onward = next_stop==koord3d::invalid  ||  planned_onward==0 ? (uint8)ONWARD_OK : leads_on_like_planned( target_rt.back(), next_stop, planned_onward, target_halt );
 						if(  onward==ONWARD_OK  ||  (onward==ONWARD_CROSSING  &&  !avoid_crossing)  ) {
 							best_rt.clear();
 							best_rt.append( &target_rt );
@@ -4248,7 +4250,13 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 	if(  planned_ok  &&  halt.is_bound()  &&  next_stop!=koord3d::invalid  ) {
 		// it must lead on to the next stop, like any other track
 		planned_onward = get_onward_length( route->back(), next_stop );
-		planned_ok = planned_onward>0;
+		if(  planned_onward==0  ) {
+			// no way on from there at all (the search may turn back): the next stop cannot be reached from
+			// this station, so no track leads on. Choose as without a next stop; the stock no route handling
+			// stops the train there and tells the player. Asking every track cost a search of the whole
+			// network each, every time the train asked its signal.
+			next_stop = koord3d::invalid;
+		}
 	}
 	// fork: not a track whose way out runs over a train whose way out runs over that track
 	if(  planned_ok  ) {
@@ -4368,6 +4376,10 @@ bool rail_vehicle_t::find_station_track(const route_t *route, uint32 start, halt
 							if(  !turns_round_through( candidate, 0, halt )  ) {
 								if(  next_stop!=koord3d::invalid  &&  planned_onward==0xFFFFFFFFul  ) {
 									planned_onward = get_onward_length( route->back(), next_stop );
+									if(  planned_onward==0  ) {
+										// as for the planned track above: none leads on, choose as without a next stop
+										next_stop = koord3d::invalid;
+									}
 								}
 								const uint8 onward = next_stop==koord3d::invalid ? (uint8)ONWARD_OK : leads_on_like_planned( candidate.back(), next_stop, planned_onward, halt );
 								crosses = onward==ONWARD_CROSSING;

@@ -575,6 +575,11 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   the planned one only if its way on to the next stop is at most 1.5x + 8 tiles of the planned
   one's (`leads_on_like_planned`): `P` leaves tracks two-way, so without it a train could take the
   other side's platform of a station with a crossover in one throat only and have to go back.
+  When the planned stop position has no way on at all (the next stop is not connected, e.g. track
+  missing), no track counts as leading on and the choice is made as without a next stop: the train
+  goes there and stops with the stock no route message. Before, it stayed red at the `P` or choose
+  signal for good, and every try searched the whole network once per track (2026-10-15: Os 19614 at
+  Roudnice for Bříza obec, about 0.4 s each second, the owner's game fell from 25 to 12 fps).
   A platform whose way on turns off at a switch and then runs over another platform of the same
   stop (`runs_over_other_platform`, `ONWARD_CROSSING`; a far-side track whose line on leaves only
   from the others, e.g. Olomouc hl.n. 5172 for trains turning back to Bystrovany) is taken only
