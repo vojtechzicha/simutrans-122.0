@@ -162,14 +162,17 @@ public:
 	 * Departure board (fork): the line number and the destination that departure boards and destination
 	 * signs show for departures from this stop on, until a later stop of the schedule sets its own. An
 	 * empty text keeps what the stops before set; a bit in board_auto goes back to what the board works
-	 * out by itself. Saved (122.14).
+	 * out by itself, a bit (1 << (BOARD_NONE_SHIFT + ...)) shows nothing (no line number). Saved (122.14,
+	 * the none bits in the same byte).
 	 */
-	enum { BOARD_LINE = 0, BOARD_DESTINATION, MAX_BOARD_TEXTS };
+	enum { BOARD_LINE = 0, BOARD_DESTINATION, MAX_BOARD_TEXTS, BOARD_NONE_SHIFT = 4 };
 	plainstring board_text[MAX_BOARD_TEXTS];
-	uint8 board_auto;   ///< bit (1 << BOARD_...)
+	uint8 board_auto;   ///< bit (1 << BOARD_...), bit (1 << (BOARD_NONE_SHIFT + BOARD_...))
 
 	bool has_board_text(uint8 what) const { return board_text[what].c_str()  &&  board_text[what].c_str()[0]; }
-	bool sets_board_text(uint8 what) const { return has_board_text( what )  ||  (board_auto & (1 << what)); }
+	bool is_board_auto(uint8 what) const { return (board_auto & (1 << what)) != 0; }
+	bool is_board_none(uint8 what) const { return (board_auto & (1 << (BOARD_NONE_SHIFT + what))) != 0; }
+	bool sets_board_text(uint8 what) const { return has_board_text( what )  ||  is_board_auto( what )  ||  is_board_none( what ); }
 
 	/// the same stop with the same settings, the board texts aside (they change no driving)
 	bool same_except_board(const schedule_entry_t &b) const

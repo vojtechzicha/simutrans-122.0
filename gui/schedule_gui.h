@@ -107,6 +107,7 @@ class schedule_gui_t : public gui_frame_t, public action_listener_t
 	gui_textinput_t input_board[schedule_entry_t::MAX_BOARD_TEXTS];
 	char board_buf[schedule_entry_t::MAX_BOARD_TEXTS][128];
 	button_t bt_board_auto[schedule_entry_t::MAX_BOARD_TEXTS];
+	button_t bt_board_none; // no line number from this stop on
 	gui_label_minw_t lb_board_from[schedule_entry_t::MAX_BOARD_TEXTS];
 	sint16 board_shown_entry;          // the entry the inputs show (-1: none yet)
 	void show_board_texts(bool force); // force: also an input being edited

@@ -580,7 +580,7 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 	}
 
 	// departure board (fork): the line number and destination shown from this stop on
-	cont_board.set_table_layout(4,2);
+	cont_board.set_table_layout(5,2);
 	cont_board.set_margin( page_margin_tl, page_margin_br );
 	{
 		static const char *board_labels[schedule_entry_t::MAX_BOARD_TEXTS] = { "Line number", "Board destination" };
@@ -596,6 +596,15 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 			bt_board_auto[k].set_tooltip( "From this stop on, what the board works out by itself" );
 			bt_board_auto[k].add_listener( this );
 			cont_board.add_component( &bt_board_auto[k] );
+			if(  k == schedule_entry_t::BOARD_LINE  ) {
+				bt_board_none.init( button_t::roundbox_state, "None" );
+				bt_board_none.set_tooltip( "From this stop on, no line number" );
+				bt_board_none.add_listener( this );
+				cont_board.add_component( &bt_board_none );
+			}
+			else {
+				cont_board.new_component<gui_empty_t>();
+			}
 			lb_board_from[k].set_min_width( proportional_string_width( translator::translate("automatic from here") ) + proportional_string_width( "MMMM" ) );
 			cont_board.add_component( &lb_board_from[k] );
 		}
@@ -911,6 +920,12 @@ void schedule_gui_t::show_board_texts(bool force)
 			lb_board[k].set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 		}
 	}
+	if(  any  ) {
+		bt_board_none.enable();
+	}
+	else {
+		bt_board_none.disable();
+	}
 	if(  !any  ) {
 		return;
 	}
@@ -920,14 +935,18 @@ void schedule_gui_t::show_board_texts(bool force)
 	gui_departure_board_view_t::get_auto_texts( schedule, cur, player, get_schedule_line(), auto_text[schedule_entry_t::BOARD_LINE], auto_text[schedule_entry_t::BOARD_DESTINATION] );
 
 	for(  uint8 k = 0;  k < schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
-		const bool own_auto = (entry.board_auto & (1 << k)) != 0;
+		const bool own_auto = entry.is_board_auto( k );
+		const bool own_none = entry.is_board_none( k );
 		const char *own = entry.has_board_text( k ) ? entry.board_text[k].c_str() : NULL;
 		uint8 from = 255;
 		const char *inherited = schedule->get_board_text( cur, k, &from, true );
-		const char *shown = own_auto ? (const char *)auto_text[k] : own ? own : inherited ? inherited : (const char *)auto_text[k];
+		const char *shown = own_none ? "" : own_auto ? (const char *)auto_text[k] : own ? own : inherited ? inherited : (const char *)auto_text[k];
 
 		lb_board_from[k].buf().clear();
-		if(  own_auto  ) {
+		if(  own_none  ) {
+			lb_board_from[k].buf().append( translator::translate("none from here") );
+		}
+		else if(  own_auto  ) {
 			lb_board_from[k].buf().append( translator::translate("automatic from here") );
 		}
 		else if(  own  ) {
@@ -941,6 +960,9 @@ void schedule_gui_t::show_board_texts(bool force)
 		}
 		lb_board_from[k].update();
 		bt_board_auto[k].pressed = own_auto;
+		if(  k == schedule_entry_t::BOARD_LINE  ) {
+			bt_board_none.pressed = own_none;
+		}
 		input_board[k].set_color( own ? SYSCOL_EDIT_TEXT : SYSCOL_EDIT_TEXT_DISABLED );
 
 		// an input keeps what the player types while the entry stays the same
@@ -956,7 +978,7 @@ void schedule_gui_t::show_board_texts(bool force)
 
 
 // fork, departure board: the typed text becomes the current entry's own, unless it is empty (back to what
-// the stops before set) or what would show there anyway
+// the stops before set, or None kept when that is set here) or what would show there anyway
 void schedule_gui_t::read_board_text(uint8 what)
 {
 	if(  schedule->empty()  ) {
@@ -978,10 +1000,13 @@ void schedule_gui_t::read_board_text(uint8 what)
 	cbuffer_t auto_text[schedule_entry_t::MAX_BOARD_TEXTS];
 	gui_departure_board_view_t::get_auto_texts( schedule, cur, player, get_schedule_line(), auto_text[schedule_entry_t::BOARD_LINE], auto_text[schedule_entry_t::BOARD_DESTINATION] );
 	const char *inherited = schedule->get_board_text( cur, what, NULL, true );
-	const bool own_auto = (entry.board_auto & (1 << what)) != 0;
+	const bool own_auto = entry.is_board_auto( what );
 	const char *base = own_auto  ||  !inherited ? (const char *)auto_text[what] : inherited;
 
-	if(  text.len() == 0  ) {
+	if(  entry.is_board_none( what )  &&  text.len() == 0  ) {
+		// nothing shows here, as set
+	}
+	else if(  text.len() == 0  ) {
 		// nothing set here: what the stops before set
 		entry.board_text[what] = NULL;
 		entry.board_auto &= ~(1 << what);
@@ -992,7 +1017,7 @@ void schedule_gui_t::read_board_text(uint8 what)
 	}
 	else {
 		entry.board_text[what] = (const char *)text;
-		entry.board_auto &= ~(1 << what);
+		entry.board_auto &= ~((1 << what) | (1 << (schedule_entry_t::BOARD_NONE_SHIFT + what)));
 	}
 	show_board_texts( true );
 }
@@ -1104,7 +1129,24 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 			}
 			else {
 				entry.board_auto |= (1 << what);
+				entry.board_auto &= ~(1 << (schedule_entry_t::BOARD_NONE_SHIFT + what));
 				entry.board_text[what] = NULL;
+			}
+			show_board_texts( true );
+		}
+	}
+	else if(  comp == &bt_board_none  ) {
+		// no line number from this stop on, or (again) what the stops before set
+		if(  !schedule->empty()  ) {
+			const uint8 none_bit = 1 << (schedule_entry_t::BOARD_NONE_SHIFT + schedule_entry_t::BOARD_LINE);
+			schedule_entry_t &entry = schedule->entries[schedule->get_current_stop()];
+			if(  entry.board_auto & none_bit  ) {
+				entry.board_auto &= ~none_bit;
+			}
+			else {
+				entry.board_auto |= none_bit;
+				entry.board_auto &= ~(1 << schedule_entry_t::BOARD_LINE);
+				entry.board_text[schedule_entry_t::BOARD_LINE] = NULL;
 			}
 			show_board_texts( true );
 		}

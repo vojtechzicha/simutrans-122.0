@@ -978,8 +978,9 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
   the schedule, `schedule_t::get_board_text`); Auto at a stop goes back to the board's own from there. Train
   numbers stay automatic (one line schedule serves many trains). Schedule dialog tab Board: the inputs show what
   applies there (greyed unless set at this stop; the label says set here / from stop N / automatic / automatic
-  from here); Enter sets it, empty or the value shown anyway clears it, Auto toggles. The entry list shows
-  `{line S22, to Brno hl.n.}`. They are part of the schedule string (escaped `%2C`, `%7C`, `%25`; an empty last
+  from here / none from here); Enter sets it, empty or the value shown anyway clears it, Auto toggles, None (line
+  number only, a bit in `board_auto`, no save change: `get_board_text` gives "") shows no line number from there,
+  empty Enter keeps it. The entry list shows `{line S22, to Brno hl.n.}` / `{no line number}`. They are part of the schedule string (escaped `%2C`, `%7C`, `%25`; an empty last
   field counts) and of `operator==`, not of `same_except_board` (a text edit resets no delay, anchor or learned
   running time). Used by the boards (`fill_stream_texts`), the sign and the hover row (`convoy_sign_t`).
 - Drawn by hand: a blue train board (time, train, line badge, destination with vias below, delay) and a

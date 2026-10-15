@@ -207,7 +207,8 @@ public:
 	/**
 	 * Fork, departure board: the text (schedule_entry_t::BOARD_...) shown for departures from entry: the one
 	 * set at the nearest entry at or before it that sets one (from, if not NULL, is that entry), going round
-	 * the schedule; NULL if none, or if that entry goes back to the board's own (from 255 if none at all).
+	 * the schedule; NULL if none, or if that entry goes back to the board's own (from 255 if none at all);
+	 * "" if that entry shows nothing there.
 	 * skip_self starts at the entry before.
 	 */
 	const char *get_board_text(uint8 entry, uint8 what, uint8 *from = NULL, bool skip_self = false) const;

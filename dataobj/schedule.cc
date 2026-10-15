@@ -850,7 +850,10 @@ const char *schedule_t::get_board_text(uint8 entry, uint8 what, uint8 *from, boo
 			if(  from  ) {
 				*from = i;
 			}
-			return entries[i].has_board_text( what )  &&  !(entries[i].board_auto & (1 << what)) ? entries[i].board_text[what].c_str() : NULL;
+			if(  entries[i].is_board_none( what )  ) {
+				return "";
+			}
+			return entries[i].has_board_text( what )  &&  !entries[i].is_board_auto( what ) ? entries[i].board_text[what].c_str() : NULL;
 		}
 	}
 	return NULL;
@@ -860,7 +863,10 @@ const char *schedule_t::get_board_text(uint8 entry, uint8 what, uint8 *from, boo
 void schedule_t::append_board_texts( cbuffer_t &buf, schedule_entry_t const& entry )
 {
 	cbuffer_t parts;
-	if(  entry.board_auto & (1 << schedule_entry_t::BOARD_LINE)  ) {
+	if(  entry.is_board_none( schedule_entry_t::BOARD_LINE )  ) {
+		parts.append( translator::translate("no line number") );
+	}
+	else if(  entry.board_auto & (1 << schedule_entry_t::BOARD_LINE)  ) {
 		parts.append( translator::translate("line automatic") );
 	}
 	else if(  entry.has_board_text( schedule_entry_t::BOARD_LINE )  ) {
