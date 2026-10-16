@@ -9,6 +9,8 @@
 #   tools/windows/steam-fork.sh build              make the fork (STATIC = 1, no DLLs needed)
 #   tools/windows/steam-fork.sh install            back up the Steam exe, copy the fork in, add the
 #                                                  fork's English texts (text/en.tab) and help pages
+#                                                  and copy both to OneDrive/Games/Simutrans, from
+#                                                  where other PCs install them (its install.ps1)
 #   tools/windows/steam-fork.sh update             build + install
 #   tools/windows/steam-fork.sh restore            put the Steam exe back
 #   tools/windows/steam-fork.sh status             which exe is installed right now
@@ -30,13 +32,15 @@
 #                                                  platform signal and station boundary, see
 #                                                  tools/fork-signals) into the pakset folder; SIZE 128
 #
-# Override the locations with STEAM_DIR, SIM_USER_DIR and PAKSET in the environment.
+# Override the locations with STEAM_DIR, SIM_USER_DIR, PAKSET and ONEDRIVE_GAME_DIR in the environment.
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STEAM_DIR="${STEAM_DIR:-/d/SteamLibrary/steamapps/common/Simutrans}"
 SIM_USER_DIR="${SIM_USER_DIR:-/d/OneDrive/Documents/Simutrans}"
+# the game folder in OneDrive that other PCs install from (its install.ps1 copies exe and texts)
+ONEDRIVE_GAME_DIR="${ONEDRIVE_GAME_DIR:-/d/OneDrive/Games/Simutrans}"
 PAKSET="${PAKSET:-pak128.cs}"
 MSYS_BASH="${MSYS_BASH:-/c/msys64/usr/bin/bash.exe}"
 JOBS="${JOBS:-20}"
@@ -117,6 +121,24 @@ do_install() {
 	[ -f "$BUILT_COMMIT" ] && cp -f "$BUILT_COMMIT" "$FORK_COMMIT"
 	echo "installed fork as $STEAM_EXE"
 	install_texts
+	publish_onedrive
+}
+
+# Other PCs play from the same OneDrive: copy the exe and the merged texts to the game folder
+# there, whose install.ps1 (run by the Games sync task) puts them into their Steam folder.
+publish_onedrive() {
+	[ -d "$ONEDRIVE_GAME_DIR" ] || { echo "no $ONEDRIVE_GAME_DIR, other PCs not updated"; return; }
+	# rm first: an exe hardlinked into a Steam folder by an older install.ps1 is not written through
+	rm -f "$ONEDRIVE_GAME_DIR/simutrans.exe"
+	cp -p "$STEAM_EXE" "$ONEDRIVE_GAME_DIR/simutrans.exe"
+	[ -f "$FORK_COMMIT" ] && cp -f "$FORK_COMMIT" "$ONEDRIVE_GAME_DIR/simutrans-fork.commit"
+	mkdir -p "$ONEDRIVE_GAME_DIR/text/en"
+	cp -f "$STEAM_EN_TAB" "$ONEDRIVE_GAME_DIR/text/en.tab"
+	local f
+	for f in $(git -C "$REPO" diff --name-only 122.0 -- simutrans/text/en/); do
+		cp -f "$REPO/$f" "$ONEDRIVE_GAME_DIR/text/en/$(basename "$f")"
+	done
+	echo "published fork exe and texts to $ONEDRIVE_GAME_DIR for other PCs"
 }
 
 # The Steam text/en.tab is newer than 122.0, so keep it and append the pairs of the fork's
@@ -297,5 +319,5 @@ case "${1:-}" in
 	rename)    shift; do_rename 0 "$@" ;;
 	rename-dry) shift; do_rename 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
-	*)         sed -n '2,32p' "$0"; exit 1 ;;
+	*)         sed -n '2,34p' "$0"; exit 1 ;;
 esac
