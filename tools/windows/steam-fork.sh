@@ -139,6 +139,12 @@ publish_onedrive() {
 		cp -f "$REPO/$f" "$ONEDRIVE_GAME_DIR/text/en/$(basename "$f")"
 	done
 	echo "published fork exe and texts to $ONEDRIVE_GAME_DIR for other PCs"
+	# Macs build the fork themselves (tools/mac/mac-fork.sh update) from origin
+	local commit; commit="$(cat "$FORK_COMMIT" 2>/dev/null || true)"
+	git -C "$REPO" fetch -q origin 2>/dev/null || true
+	if [ -n "$commit" ] && ! git -C "$REPO" merge-base --is-ancestor "$commit" origin/main 2>/dev/null; then
+		echo "warning: the installed build $(git -C "$REPO" log -1 --format=%h "$commit") is not on origin/main: push it, or a Mac cannot build the same fork" >&2
+	fi
 }
 
 # The Steam text/en.tab is newer than 122.0, so keep it and append the pairs of the fork's

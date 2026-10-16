@@ -55,10 +55,27 @@ cd simutrans && ./simutrans -use_workdir -objects pak
   schedule window that comes back with the save may hold an unsaved edited copy of the schedule.
 - `-load NAME` looks in `<user dir>/save/`, which on macOS is `~/Library/Simutrans/save/` unless you
   pass `-singleuser` (then it is `simutrans/save/`). A save must match its pakset: the owner's
-  pak128.cs saves need the Windows Steam pakset plus add-ons, so they do not load with the
-  pak128.cs copies in OneDrive (the loader segfaults on missing objects, that is stock behaviour).
+  pak128.cs saves need the pakset the Steam game uses, `Games/Simutrans/pak128.cs` in OneDrive (the
+  add-ons are inside it); other pak128.cs copies lack them and the loader segfaults on missing
+  objects (stock behaviour).
+- On a Mac that also plays the owner's game (see below), `~/Library/Simutrans` is a link to OneDrive's
+  `Documents/Simutrans`: always pass `-singleuser` to test runs there, or they load and write the
+  owner's saves and settings.
 - `./cleanup_code.sh` also rewrites include guards and trailing whitespace in files upstream never
   cleaned. Run it, then `git checkout --` every file you did not touch, so commits stay focused.
+
+## Playing on a Mac
+
+`tools/mac/mac-fork.sh` (`deps`, `build`, `install`, `update`, `status`, `run`, `uninstall`) builds a
+release with its own `config.mac-release` into `build/mac-release` (the dev `config.default` stays as it
+is) and installs `~/Applications/Simutrans Fork.app`: the binary, the tracked `simutrans/` data of the
+built commit (`git archive`), `pak128.cs` linked to OneDrive's `Games/Simutrans/pak128.cs`, and
+`~/Library/Simutrans` linked to OneDrive's `Documents/Simutrans` (a local one is moved aside), so the Mac
+plays the same pakset and saves as the Windows PCs. The launcher warns (notification) when OneDrive's
+`simutrans-fork.commit`, the Windows build, is not in the installed build; `update` pulls `main`
+fast-forward and builds it. The Mac builds from origin, so the commit installed on Windows must be
+pushed (`steam-fork.sh install` warns when it is not). Written on Windows; the first run on a Mac is its
+test, fix what it finds there.
 
 ## Save export and web viewer
 
@@ -1021,6 +1038,9 @@ back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`.
   reaches every PC; never install paks into a Steam folder directly.
 - The user dir `D:\OneDrive\Documents\Simutrans` (saves, `simuconf.tab`) is the same OneDrive folder on
   every PC (Documents redirected).
+- Push `main` before (or right after) `update`: a Mac builds the fork from origin with
+  `tools/mac/mac-fork.sh update` (see "Playing on a Mac"), and `install` warns when the installed build
+  is not on `origin/main`.
 - On the other PCs, `D:\OneDrive\Games\Simutrans\install.ps1` (run by `Games\runas-<pc>.ps1`, on the Yoga
   every 15 minutes by the "Sync Games to OneDrive" task) junctions `pak128.cs` and copies the exe and texts
   into that PC's Steam folder when they changed (Steam's exe kept as `simutrans-stock.exe`). It is not in this
