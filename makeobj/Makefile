@@ -44,6 +44,8 @@ endif
 ifeq ($(OSTYPE),mac)
   CFLAGS   += -DUSE_HW -DUSE_C  -Os -fast
   CXXFLAGS   += -DUSE_HW -DUSE_C
+  # ../utils/searchfolder.cc composes file names to sort them like Windows does
+  STD_LIBS += -framework CoreFoundation
 endif
 
 ifeq ($(OSTYPE),freebsd)
@@ -140,6 +142,7 @@ SHARED_SOURCES += ../simdebug.cc
 SHARED_SOURCES += ../simmem.cc
 SHARED_SOURCES += ../utils/simstring.cc
 SHARED_SOURCES += ../utils/searchfolder.cc
+SHARED_SOURCES += ../unicode.cc
 VARIANT_SOURCES += ../dataobj/tabfile.cc
 VARIANT_SOURCES += ../utils/log.cc
 

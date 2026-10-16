@@ -49,6 +49,9 @@ else ifeq ($(OSTYPE),freebsd)
 else ifeq ($(OSTYPE),haiku)
   # Haiku (needs to activate the GCC 4x)
   LIBS += -lnetwork -lbe
+else ifeq ($(OSTYPE),mac)
+  # utils/searchfolder.cc composes file names to sort them like Windows does
+  LIBS += -framework CoreFoundation
 else ifeq ($(OSTYPE),mingw)
   CFLAGS    += -DPNG_STATIC -DZLIB_STATIC
   ifeq ($(shell expr $(STATIC) \>= 1), 1)

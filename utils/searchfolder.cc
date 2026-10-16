@@ -9,6 +9,11 @@
 
 #ifndef _WIN32
 #	include <dirent.h>
+#	include <algorithm>
+#	include <vector>
+#	ifdef __APPLE__
+#		include <CoreFoundation/CoreFoundation.h>
+#	endif
 #else
 #	ifndef NOMINMAX
 #		define NOMINMAX
@@ -21,7 +26,79 @@
 #include "../simmem.h"
 #include "../simtypes.h"
 #include "simstring.h"
+#include "../unicode.h"
 #include "searchfolder.h"
+
+
+#ifndef _WIN32
+/*
+ * Fork: Windows lists a folder in NTFS order (names compared by UTF-16 code unit after upper-casing
+ * them), readdir() in no order at all (APFS: hash order, names decomposed). Paks are read in the
+ * order of the list, and in a pakset with doubled objects the copy read last wins, so a Mac loaded
+ * other objects than Windows and the owner's saves from Windows crashed while loading. Sort the
+ * entries as NTFS does: the name composed (NFC, as Windows stores it), then upper-cased.
+ */
+static uint16 ntfs_upcase(uint16 c)
+{
+	if(  c >= 'a'  &&  c <= 'z'  ) {
+		return c - 32;
+	}
+	if(  c >= 0xE0  &&  c <= 0xFE  &&  c != 0xF7  ) {
+		return c - 32;
+	}
+	if(  c == 0xFF  ) {
+		return 0x178;
+	}
+	// Latin Extended-A: pairs of capital and small letter
+	if(  (c >= 0x100  &&  c <= 0x137)  ||  (c >= 0x14A  &&  c <= 0x177)  ) {
+		return c & ~1;
+	}
+	if(  (c >= 0x139  &&  c <= 0x148)  ||  (c >= 0x179  &&  c <= 0x17E)  ) {
+		return (c & 1) ? c : c - 1;
+	}
+	return c;
+}
+
+
+static std::u16string ntfs_sort_key(const char *name)
+{
+	std::u16string key;
+#ifdef __APPLE__
+	if(  CFStringRef str = CFStringCreateWithCString( kCFAllocatorDefault, name, kCFStringEncodingUTF8 )  ) {
+		CFMutableStringRef nfc = CFStringCreateMutableCopy( kCFAllocatorDefault, 0, str );
+		CFRelease( str );
+		CFStringNormalize( nfc, kCFStringNormalizationFormC );
+		const CFIndex len = CFStringGetLength( nfc );
+		std::vector<UniChar> buf( len );
+		CFStringGetCharacters( nfc, CFRangeMake( 0, len ), buf.data() );
+		CFRelease( nfc );
+		for(  CFIndex i = 0;  i < len;  i++  ) {
+			key += (char16_t)ntfs_upcase( buf[i] );
+		}
+		return key;
+	}
+#endif
+	utf8_decoder_t decoder( (utf8 const *)name );
+	while(  decoder.has_next()  ) {
+		utf32 c = decoder.next();
+		if(  c >= 0x10000  ) {
+			c -= 0x10000;
+			key += (char16_t)(0xD800 + (c >> 10));
+			key += (char16_t)(0xDC00 + (c & 0x3FF));
+		}
+		else {
+			key += (char16_t)ntfs_upcase( (uint16)c );
+		}
+	}
+	return key;
+}
+
+
+static bool ntfs_order( const std::pair<std::u16string, char *> &a, const std::pair<std::u16string, char *> &b )
+{
+	return a.first < b.first;
+}
+#endif
 
 /*
  *
@@ -151,15 +228,22 @@ int searchfolder_t::search_path(const std::string &filepath, const std::string &
 	if (DIR* const dir = opendir(lookfor.c_str())) {
 		lookfor = (name == "*") ? ext : name + ext;
 
+		std::vector< std::pair<std::u16string, char *> > found;
 		while (dirent const* const entry = readdir(dir)) {
 			if(entry->d_name[0]!='.' || (entry->d_name[1]!='.' && entry->d_name[1]!=0)) {
 				int entry_len = strlen(entry->d_name);
 				if (strcasecmp(entry->d_name + entry_len - lookfor.size(), lookfor.c_str()) == 0) {
-					add_entry(path,entry->d_name,prepend_path);
+					found.push_back( std::make_pair( ntfs_sort_key( entry->d_name ), strdup( entry->d_name ) ) );
 				}
 			}
 		}
 		closedir(dir);
+
+		std::sort( found.begin(), found.end(), ntfs_order );
+		for(  size_t i = 0;  i < found.size();  i++  ) {
+			add_entry( path, found[i].second, prepend_path );
+			free( found[i].second );
+		}
 	}
 	(void) only_directories;
 #endif

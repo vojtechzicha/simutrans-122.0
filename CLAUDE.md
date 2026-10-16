@@ -74,8 +74,12 @@ built commit (`git archive`), `pak128.cs` linked to OneDrive's `Games/Simutrans/
 plays the same pakset and saves as the Windows PCs. The launcher warns (notification) when OneDrive's
 `simutrans-fork.commit`, the Windows build, is not in the installed build; `update` pulls `main`
 fast-forward and builds it. The Mac builds from origin, so the commit installed on Windows must be
-pushed (`steam-fork.sh install` warns when it is not). Written on Windows; the first run on a Mac is its
-test, fix what it finds there.
+pushed (`steam-fork.sh install` warns when it is not). First run on a Mac (2026-10-16, MacBook Pro M2 Pro):
+deps, update and the app work; the owner's saves crashed on load until `searchfolder_t` sorted folder
+listings like NTFS (NFC names, upper-cased, by UTF-16 unit). pak128.cs has ~1100 doubled objects and the
+copy read last wins, so `readdir` order (APFS: hash order, NFD names) loaded other objects than Windows.
+At start the game renames `autosave-pak128.cs.sve` to `temp-load.sve` and loads that (stock), so a crash
+there leaves the autosave under that name in OneDrive; rename it back.
 
 ## Save export and web viewer
 
