@@ -1009,6 +1009,10 @@ Steam's `text/en.tab` lacks (Steam's file kept as `en.tab-stock`) and copies the
 fork changed (`text/en/*`, originals as `*-stock`); `restore` puts both back. Commands: `build`, `install`, `update` (both), `restore` (stock exe
 back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`. After every feature, run
 `tools/windows/steam-fork.sh update`.
+`install` also copies the exe and the merged texts to `D:\OneDrive\Games\Simutrans` (`ONEDRIVE_GAME_DIR`),
+from where other PCs install them: that folder's `install.ps1` (run by `Games\runas-<pc>.ps1`, on one
+laptop every 15 minutes by the "Sync Games to OneDrive" task) junctions `pak128.cs` and copies the exe
+and texts into their Steam folder. The pakset and the user dir are the same OneDrive folders everywhere.
 
 The build is `STATIC = 1`, so the exe needs no MinGW DLLs and runs from Steam. `config.default`
 for it (the script writes this if the file is missing):
