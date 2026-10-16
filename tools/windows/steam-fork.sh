@@ -207,6 +207,13 @@ do_status() {
 	else
 		echo "Steam runs an exe this script did not install"
 	fi
+	if [ -f "$ONEDRIVE_GAME_DIR/simutrans.exe" ]; then
+		if [ "$cur" = "$(sha "$ONEDRIVE_GAME_DIR/simutrans.exe")" ] && cmp -s "$STEAM_EN_TAB" "$ONEDRIVE_GAME_DIR/text/en.tab"; then
+			echo "OneDrive:     same exe and texts in $ONEDRIVE_GAME_DIR (other PCs)"
+		else
+			echo "OneDrive:     OUT OF DATE in $ONEDRIVE_GAME_DIR, run '$0 install'"
+		fi
+	fi
 	[ -f "$STOCK_EXE" ] && echo "stock backup: $STOCK_EXE ($(date -r "$STOCK_EXE" '+%Y-%m-%d'))"
 	[ -f "$BUILT" ] && echo "last build:   $BUILT ($(date -r "$BUILT" '+%Y-%m-%d %H:%M'))"
 }

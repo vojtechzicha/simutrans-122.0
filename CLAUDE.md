@@ -1007,12 +1007,25 @@ with MSYS2 MinGW64 and installs the result as `simutrans.exe` in the Steam game 
 again on the next install. `install` also appends the fork's `simutrans/text/en.tab` pairs that
 Steam's `text/en.tab` lacks (Steam's file kept as `en.tab-stock`) and copies the help pages the
 fork changed (`text/en/*`, originals as `*-stock`); `restore` puts both back. Commands: `build`, `install`, `update` (both), `restore` (stock exe
-back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`. After every feature, run
-`tools/windows/steam-fork.sh update`.
-`install` also copies the exe and the merged texts to `D:\OneDrive\Games\Simutrans` (`ONEDRIVE_GAME_DIR`),
-from where other PCs install them: that folder's `install.ps1` (run by `Games\runas-<pc>.ps1`, on one
-laptop every 15 minutes by the "Sync Games to OneDrive" task) junctions `pak128.cs` and copies the exe
-and texts into their Steam folder. The pakset and the user dir are the same OneDrive folders everywhere.
+back), `status`, `downgrade NAME [OUT.sve]`, `export NAME OUT.json`.
+
+**Every install goes to this PC and to OneDrive, so the owner's other PCs never fall behind.**
+- After every fork change that is merged to `main`, run `tools/windows/steam-fork.sh update`. Its `install`
+  puts the exe and texts into the local Steam folder *and* into `D:\OneDrive\Games\Simutrans`
+  (`ONEDRIVE_GAME_DIR`), the folder the other PCs install from. Never copy `build/default/sim.exe` into the
+  Steam folder by hand: that skips OneDrive, and a save written here then does not load on the other PC.
+- `steam-fork.sh status` says whether the OneDrive copy matches the installed exe; fix a mismatch with
+  `install`.
+- Pakset changes go into `D:\OneDrive\Games\Simutrans\pak128.cs` (the pakset repo's `PAK_TARGET_DIR`).
+  Steam's `pak128.cs` here and on every other PC is a junction to that folder, so a pak installed there
+  reaches every PC; never install paks into a Steam folder directly.
+- The user dir `D:\OneDrive\Documents\Simutrans` (saves, `simuconf.tab`) is the same OneDrive folder on
+  every PC (Documents redirected).
+- On the other PCs, `D:\OneDrive\Games\Simutrans\install.ps1` (run by `Games\runas-<pc>.ps1`, on the Yoga
+  every 15 minutes by the "Sync Games to OneDrive" task) junctions `pak128.cs` and copies the exe and texts
+  into that PC's Steam folder when they changed (Steam's exe kept as `simutrans-stock.exe`). It is not in this
+  repo; it skips everything when the OneDrive folder has no exe. The owner's how-to is the Obsidian note
+  `D:\Notes\VZ Notes\Simutrans fork on another PC.md`.
 
 The build is `STATIC = 1`, so the exe needs no MinGW DLLs and runs from Steam. `config.default`
 for it (the script writes this if the file is missing):
