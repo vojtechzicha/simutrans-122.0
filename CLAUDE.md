@@ -909,7 +909,10 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
 - Each tile has two bays; owners are in `convoi_t::layover_bays` (keyed by position, rebuilt after
   loading and rotation by `restore_layover_bays`), each bus holds a record (`layover_pos`, `_bay`,
   `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile and that is one tile
-  long uses bays; longer ones stand in the lane as at any stop. Ordinary stop reservations and choose
+  long uses bays; longer ones stand in the lane as at any stop. An articulated bus of one tile (pak128.cs:
+  two sections of 7 or 8) is drawn as a whole, centred in the bay: every section moves by the same steps
+  (`road_vehicle_t::get_screen_offset`), and `is_off_lane` holds for all of its vehicles while the front
+  is in the bay. Before (2026-10-18) each section was moved to the middle on its own, so they overlapped. Ordinary stop reservations and choose
   signs never use layover tiles (`haltestelle_t::is_reservable` etc., `road_vehicle_t::choose_route`).
 - Choice (`plan_layover`, after `drive_to`): the scheduled tile if a bay is free, else the nearest
   layover tile of the waiting area with a free bay and a way on to the next stop (route replaced;

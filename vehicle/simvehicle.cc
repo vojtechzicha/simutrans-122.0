@@ -2221,7 +2221,7 @@ void road_vehicle_t::get_screen_offset( int &xoff, int &yoff, const sint16 raste
 	// fork: parked in a layover bay: from the lane drawn in the image to the bay
 	if(  is_off_lane()  ) {
 		sint16 bx, by;
-		if(  convoi_t::get_bay_offset( welt->lookup( get_pos() ), cnv->get_layover_bay(), bx, by )  ) {
+		if(  convoi_t::get_bay_offset( welt->lookup( cnv->get_layover_pos() ), cnv->get_layover_bay(), bx, by )  ) {
 			// where the image draws it: 0.135 tile right of the direction (left when driving on the left),
 			// and the pak128 images sit 0.045 tile further north-west (measured on the native buses)
 			sint16 rx = 0, ry = 0;
@@ -2246,9 +2246,17 @@ void road_vehicle_t::get_screen_offset( int &xoff, int &yoff, const sint16 raste
 			// one tile along x is (+w/2, +w/4) on the screen, along y (-w/2, +w/4)
 			xoff += (raster_width * (bdx - bdy)) / 2000;
 			yoff += (raster_width * (bdx + bdy)) / 4000;
-			// it stopped at the end of the tile: draw it in the middle, where the bay is
+			// it stopped at the end of the tile: draw it in the middle, where the bay is. All sections of
+			// an articulated bus move by the same steps, so they stay behind each other; the middle is that
+			// of the whole bus (each image centred on its position, the next one a length behind)
+			const vehicle_t *first = cnv->front();
+			const vehicle_t *last = cnv->back();
+			const sint32 first_pos = first->get_steps();
+			const sint32 front_end = first_pos + first->get_desc()->get_length_in_steps()/2;
+			const sint32 rear_end = first_pos - (sint32)(cnv->get_length_in_steps() - last->get_desc()->get_length_in_steps()) - (sint32)last->get_desc()->get_length_in_steps()/2;
+			const sint32 shift = VEHICLE_STEPS_PER_TILE/2 - (front_end + rear_end)/2;
 			const sint32 drawn = ((sint32)steps * raster_width) & 0xFFFFFC00;
-			const sint32 middle = ((sint32)(VEHICLE_STEPS_PER_TILE/2) * raster_width) & 0xFFFFFC00;
+			const sint32 middle = (((sint32)steps + shift) * raster_width) & 0xFFFFFC00;
 			xoff += ((middle - drawn) * dx) >> 10;
 			yoff += ((middle - drawn) * dy) >> 10;
 		}
@@ -2397,7 +2405,9 @@ bool road_vehicle_t::take_reservation_from_behind()
 
 bool road_vehicle_t::is_off_lane() const
 {
-	return cnv  &&  cnv->is_parked_in_bay()  &&  get_pos()==cnv->get_layover_pos()  &&  convoi_t::get_layover_kind( welt->lookup( get_pos() ) );
+	// the whole bus: the rear section of an articulated one that came in heading north or west stops at
+	// the very start of the tile (the front stops halfway, see hop), so it could be on the tile before
+	return cnv  &&  cnv->is_parked_in_bay()  &&  cnv->front()->get_pos()==cnv->get_layover_pos()  &&  convoi_t::get_layover_kind( welt->lookup( cnv->get_layover_pos() ) );
 }
 
 
