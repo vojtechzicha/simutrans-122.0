@@ -171,6 +171,10 @@ public:
 	/// 0 = sent to another platform than scheduled, 1 = its way takes a switch to the side
 	static uint8 yellow_aspect_rule;
 
+	/// fork: station_far_reach as set in simuconf.tab, -1 if no simuconf.tab sets it; it wins over the value
+	/// saved with a game when loading one (not in network games), so the far reach can be changed later
+	static sint16 station_far_reach_override;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 

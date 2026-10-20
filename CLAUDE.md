@@ -1033,7 +1033,10 @@ counts only for the classes a registered line or lineless convoy carries there (
 set at the end of `rebuild_connections`), and a stop in the Reach without such a line does not keep the house
 from its far stop. Within the Reach nothing changes (all stops serve, parking tiles included), so the owner's
 `parking_(catchemnt_area_ext)*` road stops keep working and act as manual overrides; they were not removed
-(the removal tool in the plan is not built). The owner's game: Reach 2, far reach 8.
+(the removal tool in the plan is not built). A `station_far_reach` set in a simuconf.tab also wins over the value
+saved with a game when it is loaded (`env_t::station_far_reach_override`, not in network games), so it can be
+changed for an existing game by editing simuconf.tab and loading the save again. The owner's game: Reach 2,
+far reach 13 (8 at first; 13 reaches every house of Vratimov, the first town built without parking).
 - Data: far entries at the end of `planquadrat_t::halt_list`, on customer tiles only (city buildings,
   attractions, a factory's `pos` tile measured from the bounding box of its tiles, `get_factory_box`: `pos`
   is no corner after rotating); `far_count`, 3 class bits per entry in `far_classes` and `potential_count`

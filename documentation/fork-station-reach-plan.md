@@ -136,8 +136,9 @@ Recommended `R` = 8: 97% of today's parking-only weight is within it, and with a
 
 - `station_far_reach` in simuconf.tab, saved with the game (savegame 122.15), 0 = off (stock).
   Values up to the Reach do nothing. Routing tab of the settings dialog, next to
-  `station_coverage` (`gui/settings_stats.cc`). An older save takes the value from simuconf.tab on
-  its first load (`settings = env_t::default_settings` before `rdwr`), then keeps its own.
+  `station_coverage` (`gui/settings_stats.cc`). A value set in a simuconf.tab wins over the saved one
+  whenever a game is loaded (not in network games: all clients must load the server's value), so it can
+  be changed for an existing game; otherwise a save keeps its own (an older save takes the default).
 - `settings_t`: default 0, `parse_simuconf`, `rdwr` after the 122.10 block. JSON export:
   `station_far_reach` next to `station_coverage` (`dataobj/savegame_export.cc`).
 - en.tab: the setting label and "(nearest stop)".

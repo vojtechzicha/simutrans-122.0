@@ -1379,6 +1379,10 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	numbered_stations = contents.get_int( "numbered_stations", numbered_stations );
 	station_coverage_size = contents.get_int( "station_coverage", station_coverage_size );
 	station_far_reach = contents.get_int( "station_far_reach", station_far_reach );
+	if(  *contents.get( "station_far_reach" )  ) {
+		// fork: also for saved games, see karte_t::load
+		env_t::station_far_reach_override = station_far_reach;
+	}
 
 	// time stuff
 	bits_per_month = contents.get_int( "bits_per_month", bits_per_month );

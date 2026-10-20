@@ -439,6 +439,7 @@ public:
 
 	uint16 get_station_coverage() const {return station_coverage_size;}
 	uint16 get_station_far_reach() const { return station_far_reach; }
+	void set_station_far_reach( uint16 r ) { station_far_reach = r; }
 
 	uint8 get_max_rail_convoi_length() const {return max_rail_convoi_length;}
 	uint8 get_max_road_convoi_length() const {return max_road_convoi_length;}

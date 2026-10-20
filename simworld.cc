@@ -5479,6 +5479,10 @@ void karte_t::load(loadsave_t *file)
 	settings = env_t::default_settings;
 	settings.rdwr(file);
 	loaded_rotation = settings.get_rotation();
+	if(  !env_t::networkmode  &&  env_t::station_far_reach_override >= 0  ) {
+		// fork: the far reach set in simuconf.tab wins over the saved one, so a running game can change it
+		settings.set_station_far_reach( env_t::station_far_reach_override );
+	}
 
 	// some functions (finish_rd) need to know what version was loaded
 	load_version = file->get_version_int();
