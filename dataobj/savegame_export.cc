@@ -321,6 +321,7 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 	w.kv_bool( "no_standing", schedule->is_no_standing() );
 	w.kv_bool( "no_overcrowding", !schedule->allows_overcrowding() );
 	w.array_key( "entries" );
+	uint8 entry_nr = 0;
 	FOR( minivec_tpl<schedule_entry_t>, const &entry, schedule->entries ) {
 		w.start_object();
 		w.kv_koord3d( "pos", entry.pos );
@@ -364,7 +365,31 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 			w.kv_null( "couple_line_id" );
 		}
 		w.kv_int( "couple_max_wait", entry.couple_max_wait );
+		// fork: departure board texts, what this stop sets and what departures from it show
+		static const char *const board_keys[schedule_entry_t::MAX_BOARD_TEXTS] = { "line", "destination" };
+		w.object_key( "board" );
+		for(  uint8 k = 0;  k < schedule_entry_t::MAX_BOARD_TEXTS;  k++  ) {
+			char key[32];
+			sprintf( key, "%s_mode", board_keys[k] );
+			w.kv_string( key, entry.is_board_none( k ) ? "none" : entry.is_board_auto( k ) ? "auto" : entry.has_board_text( k ) ? "text" : "inherit" );
+			if(  entry.has_board_text( k )  ) {
+				w.kv_string( board_keys[k], entry.board_text[k].c_str() );
+			}
+			else {
+				w.kv_null( board_keys[k] );
+			}
+			sprintf( key, "%s_shown", board_keys[k] );
+			const char *shown = schedule->get_board_text( entry_nr, k );
+			if(  shown  ) {
+				w.kv_string( key, shown );
+			}
+			else {
+				w.kv_null( key );
+			}
+		}
 		w.end_object();
+		w.end_object();
+		entry_nr++;
 	}
 	w.end_array();
 	w.end_object();

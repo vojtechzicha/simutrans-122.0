@@ -64,7 +64,11 @@ while it rides along and right after it was uncoupled. `max_speed`, `sum_power`,
 stop with a timetable (0 = on time, null: none since its schedule or line last changed).
 Schedule entries have `couple_line_id` (the line whose train this schedule's train joins there, or
 null) and `couple_max_wait` in calendar minutes, and `departure_window`: how many minutes after a
-timetable slot a train may still leave in it (null: half the gap to the next slot). Schedules have `no_standing` and `no_overcrowding`
+timetable slot a train may still leave in it (null: half the gap to the next slot). `board` holds the
+departure board texts of the entry: `line_mode` and `destination_mode` say what the stop sets (`inherit`:
+nothing, the stops before decide; `text`; `auto`: the board's own from here; `none`: no line number),
+`line` and `destination` the text set here (or null), `line_shown` and `destination_shown` what
+departures from this stop show (null: worked out by the board, `""`: no line number). Schedules have `no_standing` and `no_overcrowding`
 (passenger vehicles take no standing or no overcrowded passengers; no standing implies no overcrowding).
 
 What the convoy window shows under the destination is in `waiting_for` (null, or an object with
