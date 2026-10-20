@@ -39,6 +39,7 @@
 #include "dataobj/loadsave.h"
 #include "dataobj/translator.h"
 #include "dataobj/environment.h"
+#include "dataobj/station_reach.h"
 
 #include "obj/gebaeude.h"
 #include "obj/label.h"
@@ -413,6 +414,7 @@ haltestelle_t::haltestelle_t(loadsave_t* file)
 	reconnect_counter = welt->get_schedule_counter()-1;
 
 	enables = NOT_ENABLED;
+	reach_served = 0;
 
 	sortierung = freight_list_sorter_t::by_name;
 	resort_freight_info = true;
@@ -439,6 +441,7 @@ haltestelle_t::haltestelle_t(koord k, player_t* player)
 	owner = player;
 
 	enables = NOT_ENABLED;
+	reach_served = 0;
 	// force total re-routing
 	reconnect_counter = welt->get_schedule_counter()-1;
 	last_catg_index = 255;
@@ -485,6 +488,7 @@ haltestelle_t::~haltestelle_t()
 	}
 
 	// remove from all haltlists
+	const koord tiles_ul = ul, tiles_lr = lr;
 	uint16 const cov = welt->get_settings().get_station_coverage();
 	ul.x = max(0, ul.x - cov);
 	ul.y = max(0, ul.y - cov);
@@ -498,6 +502,8 @@ haltestelle_t::~haltestelle_t()
 			}
 		}
 	}
+	// fork: no far entry may keep this handle, and the houses it reached need another stop
+	station_reach_t::halt_removed( self, tiles_ul, tiles_lr );
 
 	destroy_win( magic_halt_info + self.get_id() );
 
@@ -1045,7 +1051,7 @@ bool haltestelle_t::reroute_goods(sint16 &units_remaining)
 				}
 
 				// since also the factory halt list is added to the ground, we can use just this ...
-				if(  welt->access(ware.get_zielpos())->is_connected(self)  ) {
+				if(  welt->access(ware.get_zielpos())->is_connected(self, last_catg_index)  ) {
 					// we are already there!
 					if(  ware.to_factory  ) {
 						liefere_an_fabrik(ware);
@@ -1184,6 +1190,8 @@ sint32 haltestelle_t::rebuild_connections()
 	const player_t *owner;
 	schedule_t *schedule;
 	const minivec_tpl<uint8> *goods_catg_index;
+	// fork, station far reach: what lines and lineless convoys carry here
+	uint8 served = 0;
 
 	minivec_tpl<uint8> supported_catg_index(32);
 
@@ -1242,6 +1250,9 @@ sint32 haltestelle_t::rebuild_connections()
 		if(  supported_catg_index.empty()  ) {
 			// this halt does not support the goods categories handled by the line/lineless convoy
 			continue;
+		}
+		FOR(minivec_tpl<uint8>, const catg_index, supported_catg_index) {
+			served |= planquadrat_t::get_far_class( catg_index );
 		}
 
 		INT_CHECK("simhalt.cc 612");
@@ -1319,6 +1330,11 @@ sint32 haltestelle_t::rebuild_connections()
 				all_links[i].is_transfer = true;
 			}
 		}
+	}
+	if(  served != reach_served  ) {
+		// fork: houses beyond the Reach count only stops with a line
+		reach_served = served;
+		station_reach_t::update_halt( self );
 	}
 	return connections_searched;
 }
@@ -1530,7 +1546,7 @@ int haltestelle_t::search_route( const halthandle_t *const start_halts, const ui
 
 	for( uint32 h=0;  h<plan->get_haltlist_count();  ++h ) {
 		halthandle_t halt = halt_list[h];
-		if(  halt.is_bound()  &&  halt->is_enabled(ware_catg_idx)  ) {
+		if(  plan->is_serving( h, ware_catg_idx )  ) {
 			// check if this is present in the list of start halts
 			for(  uint16 s=0;  s<start_halt_count;  ++s  ) {
 				if(  halt==start_halts[s]  ) {
@@ -1810,7 +1826,7 @@ void haltestelle_t::search_route_resumable(  ware_t &ware   )
 
 	// check halt list for presence of current halt
 	for( uint8 h = 0;  h<plan->get_haltlist_count(); ++h  ) {
-		if (halt_list[h] == self) {
+		if (halt_list[h] == self  &&  (!plan->is_far_entry( h )  ||  plan->is_serving( h, ware_catg_idx ))) {
 			// a destination halt is the same as the current halt -> no route searching is necessary
 			ware.set_ziel( self );
 			return;
@@ -1821,7 +1837,7 @@ void haltestelle_t::search_route_resumable(  ware_t &ware   )
 	if (resume_search) {
 		for( uint8 h=0;  h<plan->get_haltlist_count();  ++h  ) {
 			const halthandle_t halt = halt_list[h];
-			if (markers[ halt.get_id() ]==current_marker  &&  halt_data[ halt.get_id() ].best_weight < best_destination_weight  &&  halt.is_bound()) {
+			if (markers[ halt.get_id() ]==current_marker  &&  halt_data[ halt.get_id() ].best_weight < best_destination_weight  &&  plan->is_serving( h, ware_catg_idx )) {
 				best_destination_weight = halt_data[ halt.get_id() ].best_weight;
 				ware.set_ziel( halt );
 				ware.set_zwischenziel( halt_data[ halt.get_id() ].transfer );
@@ -1843,7 +1859,7 @@ void haltestelle_t::search_route_resumable(  ware_t &ware   )
 	// find suitable destination halt(s), if any
 	for( uint8 h=0;  h<plan->get_haltlist_count();  ++h  ) {
 		const halthandle_t halt = halt_list[h];
-		if(  halt.is_bound()  &&  halt->is_enabled(ware_catg_idx)  ) {
+		if(  plan->is_serving( h, ware_catg_idx )  ) {
 
 			// test for connected component
 			uint16 const dest_comp = halt->all_links[ ware_catg_idx ].catg_connected_component;
@@ -2340,7 +2356,7 @@ dbg->warning("haltestelle_t::liefere_an()","%d %s delivered to %s have no longer
 	}
 
 	// did we arrived?
-	if(  welt->access(ware.get_zielpos())->is_connected(self)  ) {
+	if(  welt->access(ware.get_zielpos())->is_connected(self, ware.get_desc()->get_catg_index())  ) {
 		if(  ware.to_factory  ) {
 			// muss an factory geliefert werden
 			liefere_an_fabrik(ware);
@@ -2730,6 +2746,7 @@ void haltestelle_t::add_to_station_type( grund_t *gr )
  */
 void haltestelle_t::recalc_station_type()
 {
+	const uint8 old_enables = enables;
 	capacity[0] = 0;
 	capacity[1] = 0;
 	capacity[2] = 0;
@@ -2746,6 +2763,11 @@ void haltestelle_t::recalc_station_type()
 		i.grund->set_halt( self );
 	}
 	recalc_status();
+
+	if(  enables != old_enables  ) {
+		// fork: the houses it serves beyond the Reach depend on what it handles
+		station_reach_t::update_halt( self );
+	}
 }
 
 
@@ -3215,6 +3237,7 @@ bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 	}
 
 	koord pos = gr->get_pos().get_2d();
+	const uint8 old_enables = tiles.empty() ? 0 : enables;
 	add_to_station_type( gr );
 	gr->set_halt( self );
 	tiles.append( gr );
@@ -3302,6 +3325,14 @@ bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 	init_pos = tiles.front().grund->get_pos().get_2d();
 	welt->set_schedule_counter();
 
+	// fork: houses beyond the Reach may get this stop as their nearest one
+	if(  enables != old_enables  ) {
+		station_reach_t::update_halt( self );
+	}
+	else {
+		station_reach_t::update_area( pos );
+	}
+
 	return true;
 }
 
@@ -3381,6 +3412,9 @@ bool haltestelle_t::rem_grund(grund_t *gr)
 	// needs to be done, if this was a dock
 	recalc_station_type();
 
+	// fork: the houses around it may need another nearest stop
+	station_reach_t::update_area( gr->get_pos().get_2d() );
+
 	// remove lines eventually
 	for(  size_t j = registered_lines.get_count();  j-- != 0;  ) {
 		bool ok = false;
@@ -3434,6 +3468,8 @@ void haltestelle_t::mark_unmark_coverage(const bool mark) const
 	FOR(slist_tpl<tile_t>, const& i, tiles) {
 		welt->mark_area(i.grund->get_pos() - size / 2, size, mark);
 	}
+	// fork: and the houses it serves (or would serve, without a line yet) beyond the Reach
+	station_reach_t::mark_halt( self, mark );
 }
 
 

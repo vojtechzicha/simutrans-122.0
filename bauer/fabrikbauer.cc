@@ -32,6 +32,7 @@
 #include "../descriptor/objversion.h"
 
 #include "../gui/minimap.h" // to update map after construction of new industry
+#include "../dataobj/station_reach.h"
 
 
 karte_ptr_t factory_builder_t::welt;
@@ -538,6 +539,10 @@ fabrik_t* factory_builder_t::build_factory(koord3d* parent, const factory_desc_t
 				const halthandle_t *halt_list = plan->get_haltlist();
 
 				for(  unsigned h=0;  h<plan->get_haltlist_count();  h++  ) {
+					if(  plan->is_far_entry( h )  ) {
+						// fork: a far entry of a house that stood here is no stop in the Reach
+						continue;
+					}
 					if (halt_list[h]->connect_factory(fab)) {
 						if (x != pos.x  ||  y != pos.y) {
 							// factory halt list is already correct at pos
@@ -568,6 +573,10 @@ fabrik_t* factory_builder_t::build_factory(koord3d* parent, const factory_desc_t
 				fab->add_target_city(i);
 			}
 		}
+	}
+	// fork: workers and mail beyond the Reach go to the nearest stop
+	if(  !station_reach_t::is_suspended()  ) {
+		station_reach_t::update_tile( fab->get_pos().get_2d() );
 	}
 	return fab;
 }

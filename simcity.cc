@@ -49,6 +49,7 @@
 #include "utils/cbuffer_t.h"
 #include "utils/simrandom.h"
 #include "utils/simstring.h"
+#include "dataobj/station_reach.h"
 
 
 #define PACKET_SIZE (7)
@@ -599,6 +600,10 @@ void stadt_t::add_gebaeude_to_stadt(const gebaeude_t* gb, bool ordered)
 						if (add_gb->get_tile()->get_desc()->is_townhall()) {
 							has_townhall = true;
 						}
+						// fork: the nearest stop beyond the Reach (not while loading)
+						if(  !station_reach_t::is_suspended()  ) {
+							station_reach_t::update_tile( pos + k );
+						}
 					}
 					else {
 						// found tile of another building, ignore it
@@ -625,6 +630,10 @@ void stadt_t::remove_gebaeude_from_stadt(gebaeude_t* gb)
 	buildings.remove(gb);
 	gb->set_stadt(NULL);
 	recalc_city_size();
+	// fork: no stop serves an empty tile beyond the Reach
+	if(  !gb->get_tile()  ||  !gb->get_tile()->get_desc()  ||  !gb->get_tile()->get_desc()->is_attraction()  ) {
+		station_reach_t::clear_tile( gb->get_pos().get_2d() );
+	}
 }
 
 
@@ -685,7 +694,7 @@ bool stadt_t::is_within_players_network(const player_t* player) const
 			if(  plan->get_haltlist_count() > 0   ) {
 				const halthandle_t *const halt_list = plan->get_haltlist();
 				for(  int h = 0;  h < plan->get_haltlist_count();  h++  ) {
-					if(  halt_list[h].is_bound()  &&  (halt_list[h]->get_pax_enabled()  || halt_list[h]->get_mail_enabled() )  &&  halt_list[h]->has_available_network(player)  ) {
+					if(  (plan->is_serving( h, goods_manager_t::INDEX_PAS )  ||  plan->is_serving( h, goods_manager_t::INDEX_MAIL ))  &&  halt_list[h]->has_available_network(player)  ) {
 						return true;
 					}
 				}
@@ -1871,7 +1880,8 @@ void stadt_t::step_passagiere()
 	start_halts.clear();
 	for (uint h = 0; h < plan->get_haltlist_count(); h++) {
 		halthandle_t halt = halt_list[h];
-		if(  halt.is_bound()  &&  halt->is_enabled(wtyp)  &&  !halt->is_overcrowded(wtyp->get_index())  ) {
+		// fork: far entries serve only their classes (station far reach)
+		if(  plan->is_serving( h, wtyp->get_catg_index() )  &&  !halt->is_overcrowded(wtyp->get_index())  ) {
 			start_halts.append(halt);
 		}
 	}
@@ -2052,7 +2062,7 @@ void stadt_t::step_passagiere()
 						const halthandle_t *const dest_halt_list = dest_plan->get_haltlist();
 						for (uint h = 0; h < dest_plan->get_haltlist_count(); h++) {
 							halthandle_t halt = dest_halt_list[h];
-							if (halt->is_enabled(wtyp)) {
+							if (dest_plan->is_serving(h, wtyp->get_catg_index())) {
 								halt->add_pax_unhappy(pax_return);
 								break;
 							}
@@ -2065,7 +2075,7 @@ void stadt_t::step_passagiere()
 					const halthandle_t *const dest_halt_list = dest_plan->get_haltlist();
 					for (uint h = 0; h < dest_plan->get_haltlist_count(); h++) {
 						halthandle_t halt = dest_halt_list[h];
-						if (halt->is_enabled(wtyp)) {
+						if (dest_plan->is_serving(h, wtyp->get_catg_index())) {
 							halt->add_pax_no_route(pax_return);
 							break;
 						}
@@ -2082,7 +2092,7 @@ void stadt_t::step_passagiere()
 		// the unhappy passengers will be added to the first stop if any
 		for(  uint h=0;  h<plan->get_haltlist_count(); h++  ) {
 			halthandle_t halt = plan->get_haltlist()[h];
-			if(  halt->is_enabled(wtyp)  ) {
+			if(  plan->is_serving( h, wtyp->get_catg_index() )  ) {
 				halt->add_pax_unhappy(num_pax);
 				is_there_any_stop = true; // only overcrowded
 				break;
@@ -2133,7 +2143,7 @@ void stadt_t::step_passagiere()
 			const halthandle_t *const dest_halt_list = dest_plan->get_haltlist();
 			for (uint h = 0; h < dest_plan->get_haltlist_count(); h++) {
 				halthandle_t halt = dest_halt_list[h];
-				if (  halt->is_enabled(wtyp)  ) {
+				if (  dest_plan->is_serving(h, wtyp->get_catg_index())  ) {
 					if(  is_there_any_stop  ) {
 						// "just" overcrowded
 						halt->add_pax_unhappy(pax_return);

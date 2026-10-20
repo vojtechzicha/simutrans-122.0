@@ -1022,6 +1022,51 @@ a body); `scrolly_departure` still wraps the passenger board, so `halt_info_t::r
 Tested on a copy of the owner's game (Brno hl.n., Praha hl.n., Staré Město, Ostrava-Svinov, Zábřeh,
 Brno Mendlovo nám.) with a throwaway hook that opens the windows and dumps the rows.
 
+## Station far reach (fork feature, savegame 122.15)
+
+Plan and measurements: `documentation/fork-station-reach-plan.md`. `station_far_reach` (simuconf.tab, saved
+with the game, Routing tab next to `station_coverage`, 0 = off; it does nothing unless it is above the Reach):
+a house, attraction or factory (workers and mail) that no stop serves within the Reach is served by its
+nearest stop with a tile within that many tiles (a square, like the Reach), nearest by straight-line distance
+to the stop's nearest tile, exact ties all serve. Passengers and mail only; goods keep the stock Reach. A stop
+counts only for the classes a registered line or lineless convoy carries there (`haltestelle_t::reach_served`,
+set at the end of `rebuild_connections`), and a stop in the Reach without such a line does not keep the house
+from its far stop. Within the Reach nothing changes (all stops serve, parking tiles included), so the owner's
+`parking_(catchemnt_area_ext)*` road stops keep working and act as manual overrides; they were not removed
+(the removal tool in the plan is not built). The owner's game: Reach 2, far reach 8.
+- Data: far entries at the end of `planquadrat_t::halt_list`, on customer tiles only (city buildings,
+  attractions, a factory's `pos` tile measured from the bounding box of its tiles, `get_factory_box`: `pos`
+  is no corner after rotating); `far_count`, 3 class bits per entry in `far_classes` and `potential_count`
+  sit in the padding of `planquadrat_t` (a `static_assert` keeps it 24 bytes). The last `potential_count`
+  entries are display only: the nearest passenger stop as if every stop had a line, where no passenger stop
+  is in the Reach. `get_haltlist_count()` leaves them out, so stock code never sees them. Gameplay asks
+  `is_serving( i, catg )` (stock entry: the halt handles it; far entry: its class) and
+  `is_connected( halt, catg )`: start halts (`simcity.cc`), end halts of `search_route` and
+  `search_route_resumable`, arrival in `liefere_an`/`reroute_goods`, goods from factories (`verteile_waren`
+  skips far entries). `add_to_haltlist`/`sort_haltlist` keep the far entries last.
+- Updates (`dataobj/station_reach.cc`): `update_tile` (ring search up to the far reach), `update_area` around a
+  stop tile added or removed (`add_grund`/`rem_grund`, plus the `pos` tile of every factory within reach),
+  `update_halt` when a stop's handled cargo (`recalc_station_type`, `add_grund`) or served classes change,
+  `halt_removed` from the halt destructor (no handle of a deleted stop stays behind), `clear_tile` when a house,
+  attraction or factory goes, `update_tile` when one is built. Nothing runs between `suspend()` and `resume()`:
+  the whole of `karte_t::load` (lines register their stops only in the players' `finish_rd`, then the reconnect
+  loop sets the served classes; the outermost `resume()` runs `update_all`, 343 ms on the owner's map) and
+  `enlarge_map`. `rotate90` runs `update_all( true )`. Not saved: rebuilt on every load.
+- Display with station coverage shown: stops in the Reach as stock (tint, or filled boxes), far stops as a box
+  with a dark border and light centre right of the Reach boxes, potential far stops (no line yet) as only the
+  dark corners of that box, in the owner's colour. Hovering a stop marks its Reach squares and the houses it
+  serves or would serve through the far reach (`mark_unmark_coverage` -> `station_reach_t::mark_halt`). The
+  build-stop cursor of a passenger stop (`tool_t::cursor_far_preview`, `zeiger_t::set_far_preview`) marks beyond
+  its Reach square the houses for which it would become the nearest stop (`mark_preview`). Minimap
+  passenger/mail coverage, the attraction list and "in network" statistics count far stops; the factory's
+  "Connected stops" marks them "(nearest stop)".
+- JSON export: `station_far_reach` in the settings.
+Tested headless on a copy of the owner's game with a throwaway hook (`reach_test.cc`, not committed; results in the plan, section 8)
+that recomputes every customer tile by brute force after each step: load, a 60-minute run, a stop losing and
+regaining its lines, removing a stop, building one by an unreached house, hover and build-preview marks,
+rotation, save and load; and the three displays in the GDI window. 120 game minutes: +5.3% transported
+passengers, -6.9% no route.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

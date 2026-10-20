@@ -34,6 +34,7 @@
 #include "../tpl/weighted_vector_tpl.h"
 #include "../tpl/vector_tpl.h"
 #include "hausbauer.h"
+#include "../dataobj/station_reach.h"
 
 karte_ptr_t hausbauer_t::welt;
 
@@ -351,6 +352,8 @@ void hausbauer_t::remove( player_t *player, gebaeude_t *gb )
 						// there may be buildings with holes, so we only remove our building!
 						if(gb_part->get_tile()  ==  bdsc->get_tile(layout, k.x, k.y)) {
 							gb_part->set_fab( NULL );
+							// fork: no far entries on a tile without a factory
+							station_reach_t::clear_tile( k+pos.get_2d() );
 							planquadrat_t *plan = welt->access( k+pos.get_2d() );
 							for (size_t i = plan->get_haltlist_count(); i-- != 0;) {
 								halthandle_t halt = plan->get_haltlist()[i];

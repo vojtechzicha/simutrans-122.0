@@ -13,6 +13,7 @@
 #include "../boden/grund.h"
 #include "../dataobj/environment.h"
 #include "zeiger.h"
+#include "../dataobj/station_reach.h"
 
 zeiger_t::zeiger_t(loadsave_t *file) : obj_no_info_t()
 {
@@ -20,6 +21,7 @@ zeiger_t::zeiger_t(loadsave_t *file) : obj_no_info_t()
 	foreground_image = IMG_EMPTY;
 	area = koord(0,0);
 	offset = koord(0,0);
+	far_preview = false;
 	rdwr(file);
 }
 
@@ -32,6 +34,7 @@ zeiger_t::zeiger_t(koord3d pos, player_t *player) :
 	foreground_image = IMG_EMPTY;
 	area = koord(0,0);
 	offset = koord(0,0);
+	far_preview = false;
 }
 
 
@@ -55,6 +58,9 @@ void zeiger_t::change_pos(koord3d k )
 			}
 			welt->mark_area( get_pos()- offset, area, false );
 		}
+		if(  far_preview  ) {
+			station_reach_t::mark_preview( koord::invalid, false );
+		}
 		if(  get_pos().x >= welt->get_size().x-1  ||  get_pos().y >= welt->get_size().y-1  ) {
 			// the raise and lower tool actually can go to size!
 			welt->set_background_dirty();
@@ -75,8 +81,26 @@ void zeiger_t::change_pos(koord3d k )
 					gr->get_halt()->mark_unmark_coverage( true );
 				}
 				welt->mark_area( k-offset, area, true );
+				if(  far_preview  ) {
+					station_reach_t::mark_preview( k.get_2d(), true );
+				}
 			}
 		}
+	}
+}
+
+
+void zeiger_t::set_far_preview( bool on )
+{
+	if(  on == far_preview  ) {
+		return;
+	}
+	far_preview = on;
+	if(  on  ) {
+		station_reach_t::mark_preview( get_pos().get_2d(), true );
+	}
+	else {
+		station_reach_t::mark_preview( koord::invalid, false );
 	}
 }
 

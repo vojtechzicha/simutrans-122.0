@@ -1791,3 +1791,7 @@ line %s
 line %s
 to %s
 to %s
+station_far_reach
+Far reach: houses no stop reaches go to their nearest stop up to (tiles, 0 = off)
+(nearest stop)
+(nearest stop)

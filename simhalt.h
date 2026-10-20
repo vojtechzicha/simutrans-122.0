@@ -314,6 +314,10 @@ private:
 	/* station flags (most what enabled) */
 	uint8 enables;
 
+	// fork, station far reach: classes (planquadrat_t::FAR_*) a registered line or lineless convoy
+	// carries here, set by rebuild_connections()
+	uint8 reach_served;
+
 	/**
 	 * versucht die ware mit beriets wartender ware zusammenzufassen
 	 */
@@ -509,6 +513,9 @@ public:
 	bool get_pax_enabled()  const { return enables & PAX;  }
 	bool get_mail_enabled() const { return enables & POST; }
 	bool get_ware_enabled() const { return enables & WARE; }
+
+	/// fork, station far reach: classes carried here by a line or lineless convoy (planquadrat_t::FAR_*)
+	uint8 get_reach_served() const { return reach_served; }
 
 	// check, if we accepts this good
 	// often called, thus inline ...

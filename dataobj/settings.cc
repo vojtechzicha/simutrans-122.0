@@ -46,6 +46,7 @@ settings_t::settings_t() :
 	mean_citizen_count = 1600;
 
 	station_coverage_size = 2;
+	station_far_reach = 0;
 
 	traffic_level = 5;
 
@@ -909,6 +910,10 @@ void settings_t::rdwr(loadsave_t *file)
 			// fork: block posts on single-track lines
 			file->rdwr_short(block_yield_minutes);
 		}
+		if(  file->is_version_atleast(122, 15)  ) {
+			// fork: houses beyond the Reach go to their nearest stop
+			file->rdwr_short(station_far_reach);
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1373,6 +1378,7 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 
 	numbered_stations = contents.get_int( "numbered_stations", numbered_stations );
 	station_coverage_size = contents.get_int( "station_coverage", station_coverage_size );
+	station_far_reach = contents.get_int( "station_far_reach", station_far_reach );
 
 	// time stuff
 	bits_per_month = contents.get_int( "bits_per_month", bits_per_month );

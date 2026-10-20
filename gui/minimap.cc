@@ -838,7 +838,7 @@ void minimap_t::calc_map_pixel(const koord k)
 		case MAP_PASSENGER:
 			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
 				halthandle_t halt = plan->get_haltlist()[i];
-				if (halt->get_pax_enabled() && !halt->get_pax_connections().empty()) {
+				if (plan->is_serving(i, goods_manager_t::INDEX_PAS) && !halt->get_pax_connections().empty()) {
 					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
 					break;
 				}
@@ -850,7 +850,7 @@ void minimap_t::calc_map_pixel(const koord k)
 		case MAP_MAIL:
 			for( int i = 0; i < plan->get_haltlist_count(); i++  ) {
 				halthandle_t halt = plan->get_haltlist()[i];
-				if (halt->get_mail_enabled() && !halt->get_mail_connections().empty()) {
+				if (plan->is_serving(i, goods_manager_t::INDEX_MAIL) && !halt->get_mail_connections().empty()) {
 					set_map_color( k, color_idx_to_rgb(halt->get_owner()->get_player_color1() + 3) );
 					break;
 				}

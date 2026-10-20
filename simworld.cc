@@ -130,6 +130,7 @@ stringhashtable_tpl<karte_t::missing_level_t>missing_pak_names;
 #ifdef MULTI_THREAD
 #include "utils/simthread.h"
 #include <semaphore.h>
+#include "dataobj/station_reach.h"
 
 bool spawned_world_threads=false; // global job indicator array
 static simthread_barrier_t world_barrier_start;
@@ -1869,6 +1870,9 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		grund_t::enlarge_map( new_size_x, new_size_y );
 	}
 
+	// fork: the station far reach is rebuilt once the map is done
+	station_reach_t::suspend();
+
 	planquadrat_t *new_plan = new planquadrat_t[new_size_x*new_size_y];
 	sint8 *new_grid_hgts = new sint8[(new_size_x + 1) * (new_size_y + 1)];
 	sint8 *new_water_hgts = new sint8[new_size_x * new_size_y];
@@ -2175,6 +2179,7 @@ void karte_t::enlarge_map(settings_t const* sets, sint8 const* const h_field)
 		set_dirty();
 		reset_timer();
 	}
+	station_reach_t::resume();
 	// update main menu
 	tool_t::update_toolbars();
 }
@@ -3530,6 +3535,9 @@ DBG_MESSAGE( "karte_t::rotate90()", "called" );
 	// finally recalculate schedules for goods in transit ...
 	set_schedule_counter();
 
+	// fork: a factory's pos corner moved, so its far entries sit elsewhere now
+	station_reach_t::update_all( true );
+
 	set_dirty();
 }
 // -------- Verwaltung von Fabriken -----------------------------
@@ -3561,11 +3569,13 @@ bool karte_t::rem_fab(fabrik_t *fab)
 	if(plan) {
 
 		// we need a copy, since the verbinde fabriken is modifying the list
-		halthandle_t list[16];
-		const uint8 count = plan->get_haltlist_count();
-		assert(count<16);
-		memcpy( list, plan->get_haltlist(), count*sizeof(halthandle_t) );
-		for( uint8 i=0;  i<count;  i++  ) {
+		// (fork: far entries are no links of the factory, and the list may be longer than 16)
+		station_reach_t::clear_tile( k );
+		vector_tpl<halthandle_t> list( plan->get_haltlist_count() );
+		for(  uint8 i=0;  i<plan->get_haltlist_count();  i++  ) {
+			list.append( plan->get_haltlist()[i] );
+		}
+		for( uint32 i=0;  i<list.get_count();  i++  ) {
 			// first remove all the tiles that do not connect
 			plan->remove_from_haltlist( list[i] );
 			// then reconnect
@@ -3604,6 +3614,10 @@ void karte_t::add_attraction(gebaeude_t *gb)
 	FOR(weighted_vector_tpl<stadt_t*>, const c, stadt) {
 		c->add_target_attraction(gb);
 	}
+	// fork: the nearest stop beyond the Reach (not while loading)
+	if(  !station_reach_t::is_suspended()  ) {
+		station_reach_t::update_tile( gb->get_pos().get_2d() );
+	}
 }
 
 
@@ -3616,6 +3630,7 @@ void karte_t::remove_attraction(gebaeude_t *gb)
 	FOR(weighted_vector_tpl<stadt_t*>, const c, stadt) {
 		c->remove_target_attraction(gb);
 	}
+	station_reach_t::clear_tile( gb->get_pos().get_2d() );
 }
 
 
@@ -5442,6 +5457,8 @@ void karte_t::load(loadsave_t *file)
 
 	clear_random_mode(~LOAD_RANDOM);
 	set_random_mode(LOAD_RANDOM);
+	// fork: nothing of the station far reach is updated until everything is loaded
+	station_reach_t::suspend();
 	destroy();
 
 	loadingscreen_t ls(translator::translate("Loading map ..."), 1, true, true );
@@ -5926,6 +5943,9 @@ DBG_MESSAGE("karte_t::load()", "%d factories loaded", fab_list.get_count());
 #ifdef DEBUG
 	dbg->message("rebuild_destinations()","for all haltstellen_t took %ld ms", dr_time()-dt );
 #endif
+
+	// fork: lines are registered and the connections tell which stops have a line, so now the far entries
+	station_reach_t::resume();
 
 #if 0
 	// reroute goods for benchmarking

@@ -201,6 +201,9 @@ public:
 	/// cursor offset within marked area (only effective if cursor_centered != false)
 	koord cursor_offset;
 
+	/// fork: cursor also marks the houses a new passenger stop here would take beyond the Reach
+	bool cursor_far_preview;
+
 	/// z-offset of cursor, possible values: Z_PLAN and Z_GRID
 	sint8 offset;
 
@@ -252,6 +255,7 @@ public:
 		default_param = NULL;
 		command_key = 0;
 		cursor_centered = false;
+		cursor_far_preview = false;
 		flags = 0;
 		callback_id = 0;
 	}

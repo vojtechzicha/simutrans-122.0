@@ -95,6 +95,12 @@ private:
 
 	uint16 station_coverage_size;
 
+	/**
+	 * Fork, station far reach: a house no stop reaches is served by its nearest stop with a tile
+	 * within this many tiles (0 or not above station_coverage_size = off, stock)
+	 */
+	uint16 station_far_reach;
+
 	// the maximum length of each convoi
 	uint8 max_rail_convoi_length;
 	uint8 max_road_convoi_length;
@@ -432,6 +438,7 @@ public:
 	double get_map_roughness() const {return map_roughness;}
 
 	uint16 get_station_coverage() const {return station_coverage_size;}
+	uint16 get_station_far_reach() const { return station_far_reach; }
 
 	uint8 get_max_rail_convoi_length() const {return max_rail_convoi_length;}
 	uint8 get_max_road_convoi_length() const {return max_road_convoi_length;}

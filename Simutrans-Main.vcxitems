@@ -86,6 +86,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\scenario.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\schedule.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\settings.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\station_reach.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\tabfile.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\translator.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)descriptor\bridge_desc.cc" />
@@ -415,6 +416,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule_entry.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\settings.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\station_reach.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\tabfile.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\translator.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)descriptor\bridge_desc.h" />

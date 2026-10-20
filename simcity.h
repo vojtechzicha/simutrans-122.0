@@ -439,6 +439,8 @@ public:
 	sint32 get_einwohner() const {return (buildings.get_sum_weight()*6)+((2*bev-arb-won)>>1);}
 
 	uint32 get_buildings()  const { return buildings.get_count(); }
+	/// fork: every tile of every building of the city
+	const weighted_vector_tpl<gebaeude_t *> &get_city_buildings() const { return buildings; }
 	sint32 get_unemployed() const { return bev - arb; }
 	sint32 get_homeless()   const { return bev - won; }
 

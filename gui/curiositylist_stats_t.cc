@@ -141,7 +141,7 @@ void curiositylist_stats_t::draw(scr_coord offset)
 		const halthandle_t *halt_list = plan->get_haltlist();
 		for(  unsigned h=0;  (mail&pax)==0  &&  h<plan->get_haltlist_count();  h++ ) {
 			halthandle_t halt = halt_list[h];
-			if (halt->get_pax_enabled()) {
+			if (plan->is_serving(h, goods_manager_t::INDEX_PAS)) {
 				pax = true;
 				if (halt->get_pax_unhappy() > 40) {
 					some_crowded |= true;
@@ -150,7 +150,7 @@ void curiositylist_stats_t::draw(scr_coord offset)
 					all_crowded = false;
 				}
 			}
-			if (halt->get_mail_enabled()) {
+			if (plan->is_serving(h, goods_manager_t::INDEX_MAIL)) {
 				mail = true;
 				if (halt->get_pax_unhappy() > 40) {
 					some_crowded |= true;

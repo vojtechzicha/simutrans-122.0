@@ -35,6 +35,15 @@ private:
 	// stores climate related settings
 	uint8 climate_data;
 
+	// fork, station far reach (dataobj/station_reach.cc): the last far_count entries of halt_list are
+	// the nearest stops of a house no stop reaches; far_classes has 3 bits (FAR_PAX, FAR_MAIL, FAR_GOODS)
+	// for each of them. The last potential_count of those are display only (the nearest stop if every
+	// stop had a line) and are hidden from get_haltlist_count(). All three live in padding before data,
+	// so they cost no memory per tile.
+	uint8 far_count;
+	uint16 far_classes;
+	uint8 potential_count;
+
 	union DATA {
 		grund_t ** some;    // valid if capacity > 1
 		grund_t * one;      // valid if capacity == 1
@@ -44,7 +53,7 @@ public:
 	/**
 	 * Constructs a planquadrat (tile) with initial capacity of one ground
 	 */
-	planquadrat_t() { ground_size = 0; climate_data = 0; data.one = NULL; halt_list_count = 0;  halt_list = NULL; }
+	planquadrat_t() { ground_size = 0; climate_data = 0; data.one = NULL; halt_list_count = 0;  halt_list = NULL; far_count = 0; far_classes = 0; potential_count = 0; }
 
 	~planquadrat_t();
 
@@ -203,7 +212,36 @@ public:
 	* returns the internal array of halts
 	*/
 	const halthandle_t *get_haltlist() const { return halt_list; }
-	uint8 get_haltlist_count() const { return halt_list_count; }
+	/// fork: without the display-only potential entries
+	uint8 get_haltlist_count() const { return halt_list_count - potential_count; }
+
+	/// fork, station far reach: cargo classes of a far entry
+	enum { FAR_PAX = 1, FAR_MAIL = 2, FAR_GOODS = 4, MAX_FAR_ENTRIES = 4 };
+	static uint8 get_far_class( uint8 catg_index );
+
+	/// number of far entries at the end of the halt list (stops serving a house beyond the Reach),
+	/// potential ones included
+	uint8 get_far_count() const { return far_count; }
+	uint8 get_potential_count() const { return potential_count; }
+	/// all entries, potential ones included (display)
+	uint8 get_haltlist_count_with_potential() const { return halt_list_count; }
+	bool is_far_entry( uint8 i ) const { return i >= halt_list_count - far_count; }
+	bool is_potential_entry( uint8 i ) const { return i >= halt_list_count - potential_count; }
+	/// classes served by entry i, which must be a far entry
+	uint8 get_far_classes( uint8 i ) const { return (far_classes >> (3 * (i - (halt_list_count - far_count)))) & 7; }
+
+	/// true if entry i of the halt list serves this tile for this goods category: stock entries for
+	/// everything the halt handles, far entries for their classes only
+	bool is_serving( uint8 i, uint8 catg_index ) const;
+
+	/// arrival check: halt serves this tile for this goods category (see is_serving)
+	bool is_connected( halthandle_t halt, uint8 catg_index ) const;
+
+	/// removes all far entries (station_reach_t only)
+	void clear_far_entries();
+	/// appends a far entry (station_reach_t only), the serving ones before the potential ones;
+	/// ignored beyond MAX_FAR_ENTRIES
+	void add_far_entry( halthandle_t halt, uint8 classes, bool potential );
 
 	void rdwr(loadsave_t *file, koord pos );
 

@@ -602,7 +602,7 @@ bool gebaeude_t::is_within_players_network(const player_t* player) const
 				if(  plan->get_haltlist_count() > 0   ) {
 					const halthandle_t *const halt_list = plan->get_haltlist();
 					for(  int h = 0;  h < plan->get_haltlist_count();  h++  ) {
-						if(  halt_list[h].is_bound()  &&  (halt_list[h]->get_pax_enabled()  || halt_list[h]->get_mail_enabled() )  &&  halt_list[h]->has_available_network(player)  ) {
+						if(  (plan->is_serving( h, goods_manager_t::INDEX_PAS )  ||  plan->is_serving( h, goods_manager_t::INDEX_MAIL ))  &&  halt_list[h]->has_available_network(player)  ) {
 							return true;
 						}
 					}

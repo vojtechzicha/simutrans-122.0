@@ -25,6 +25,8 @@
 
 #include "obj/gebaeude.h"
 
+#include "bauer/goods_manager.h"
+
 #include "dataobj/loadsave.h"
 #include "dataobj/environment.h"
 
@@ -41,7 +43,13 @@ void swap(planquadrat_t& a, planquadrat_t& b)
 	sim::swap(a.halt_list_count, b.halt_list_count);
 	sim::swap(a.data, b.data);
 	sim::swap(a.climate_data, b.climate_data);
+	sim::swap(a.far_count, b.far_count);
+	sim::swap(a.far_classes, b.far_classes);
+	sim::swap(a.potential_count, b.potential_count);
 }
+
+// fork: the far entries must stay in the padding (one planquadrat_t per map tile)
+static_assert( sizeof(void *) != 8  ||  sizeof(planquadrat_t) == 24, "planquadrat_t grew" );
 
 // deletes also all grounds in this array!
 planquadrat_t::~planquadrat_t()
@@ -588,7 +596,8 @@ void planquadrat_t::display_overlay(const sint16 xpos, const sint16 ypos) const
 			// only transparent outline
 			image_id img = overlay_img(gr);
 
-			for(int halt_count = 0; halt_count < halt_list_count; halt_count++) {
+			// fork: far entries are not tinted, they get the hollow box below
+			for(int halt_count = 0; halt_count < halt_list_count-far_count; halt_count++) {
 				const FLAGGED_PIXVAL transparent = PLAYER_FLAG | OUTLINE_FLAG | color_idx_to_rgb(halt_list[halt_count]->get_owner()->get_player_color1() + 4);
 				display_img_blend( img, xpos, ypos, transparent | TRANSPARENT25_FLAG, 0, 0);
 			}
@@ -616,8 +625,48 @@ void planquadrat_t::display_overlay(const sint16 xpos, const sint16 ypos) const
 			const bool kartenboden_dirty = gr->get_flag(grund_t::dirty);
 			const sint16 off = (raster_tile_width>>5);
 			// suitable start search
-			for (size_t h = halt_list_count; h-- != 0;) {
+			for (size_t h = halt_list_count-far_count; h-- != 0;) {
 				display_fillbox_wh_clip_rgb(x - h * off, y + h * off, r, r, PLAYER_FLAG | color_idx_to_rgb(halt_list[h]->get_owner()->get_player_color1() + 4), kartenboden_dirty);
+			}
+		}
+
+		// fork, station far reach: a box for each stop serving this house as its nearest stop beyond the Reach,
+		// dark border and light centre; a stop that would serve it once it has a line: only dark corners.
+		// In the box mode they sit right of the boxes of the stops in the Reach.
+		if(  far_count > 0  ) {
+			const sint16 raster_tile_width = get_tile_raster_width();
+			const sint16 r = max( raster_tile_width/8, 5 );
+			const sint16 off = max( raster_tile_width>>5, 2 );
+			const uint8 stock_count = halt_list_count-far_count;
+			const sint16 shift = (!env_t::use_transparency_station_coverage  &&  stock_count > 0) ? r + off : 0;
+			const sint16 x = xpos+raster_tile_width/2-r + shift;
+			const sint16 y = ypos+(raster_tile_width*3)/4-r - (gr->get_grund_hang()? tile_raster_scale_y(8,raster_tile_width): 0);
+			const bool kartenboden_dirty = gr->get_flag(grund_t::dirty);
+			const sint16 w = max( r/4, 1 );
+			const sint16 c = max( (r+2)/3, w+1 );
+			for(  uint8 f = far_count;  f-- != 0;  ) {
+				const uint8 i = stock_count+f;
+				const halthandle_t h = halt_list[i];
+				if(  !h.is_bound()  ) {
+					continue;
+				}
+				const uint8 base = h->get_owner()->get_player_color1();
+				const PIXVAL dark = PLAYER_FLAG | color_idx_to_rgb(base + 1);
+				const sint16 bx = x + f * (r + off), by = y;
+				if(  !is_potential_entry( i )  ) {
+					display_fillbox_wh_clip_rgb( bx, by, r, r, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx + w, by + w, r - 2 * w, r - 2 * w, PLAYER_FLAG | color_idx_to_rgb(base + 6), kartenboden_dirty );
+				}
+				else {
+					display_fillbox_wh_clip_rgb( bx, by, c, w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx + r - c, by, c, w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx, by + r - w, c, w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx + r - c, by + r - w, c, w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx, by + w, w, c - w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx + r - w, by + w, w, c - w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx, by + r - c, w, c - w, dark, kartenboden_dirty );
+					display_fillbox_wh_clip_rgb( bx + r - w, by + r - c, w, c - w, dark, kartenboden_dirty );
+				}
 			}
 		}
 	}
@@ -656,6 +705,16 @@ void planquadrat_t::halt_list_remove( halthandle_t halt )
 {
 	for( uint8 i=0;  i<halt_list_count;  i++ ) {
 		if(halt_list[i]==halt) {
+			if(  is_far_entry( i )  ) {
+				// fork: drop its classes, the later far entries move down
+				const uint8 shift = 3 * (i - (halt_list_count - far_count));
+				const uint16 below = far_classes & ((1u << shift) - 1);
+				far_classes = below | ((far_classes >> (shift + 3)) << shift);
+				if(  is_potential_entry( i )  ) {
+					potential_count--;
+				}
+				far_count--;
+			}
 			for( uint8 j=i+1;  j<halt_list_count;  j++  ) {
 				halt_list[j-1] = halt_list[j];
 			}
@@ -704,7 +763,8 @@ void planquadrat_t::add_to_haltlist(halthandle_t halt, bool unsorted)
 				// since only the first one gets all, we want the closest halt one to be first
 				halt_list_remove(halt);
 				uint32 dist = koord_distance(halt->get_next_pos(pos), pos);
-				for(unsigned insert_pos=0;  insert_pos<halt_list_count;  insert_pos++) {
+				// fork: stock entries stay in front of the far entries
+				for(unsigned insert_pos=0;  insert_pos<(unsigned)(halt_list_count-far_count);  insert_pos++) {
 
 					if(  koord_distance(halt_list[insert_pos]->get_next_pos(pos), pos) > dist  ) {
 						halt_list_insert_at( halt, insert_pos );
@@ -714,16 +774,21 @@ void planquadrat_t::add_to_haltlist(halthandle_t halt, bool unsorted)
 				// not found
 			}
 			// first just or just append to the end ...
-			halt_list_insert_at( halt, halt_list_count );
+			halt_list_insert_at( halt, halt_list_count-far_count );
 		}
 		else {
 			// insert only if not already present
 			for(uint8 i = 0; i<halt_list_count; i++) {
 				if (halt_list[i] == halt) {
-					return; // already inserted
+					if(  !is_far_entry( i )  ) {
+						return; // already inserted
+					}
+					// fork: a far entry becomes a stock one
+					halt_list_remove( halt );
+					break;
 				}
 			}
-			halt_list_insert_at( halt, halt_list_count );
+			halt_list_insert_at( halt, halt_list_count-far_count );
 		}
 	}
 }
@@ -749,16 +814,18 @@ struct halt_dist_node {
 
 void planquadrat_t::sort_haltlist()
 {
-	vector_tpl<halt_dist_node> halts(halt_list_count);
+	// fork: only the stock entries, the far entries stay at the end
+	const uint8 stock_count = halt_list_count - far_count;
+	vector_tpl<halt_dist_node> halts(stock_count);
 	// sort with respect to distance to pos
 	const koord pos = get_kartenboden()->get_pos().get_2d();
-	for(uint8 i = 0; i<halt_list_count; i++) {
+	for(uint8 i = 0; i<stock_count; i++) {
 		uint32 dist = koord_distance(halt_list[i]->get_next_pos(pos), pos);
 		halt_dist_node n(halt_list[i], dist);
 		halts.insert_unique_ordered(n, halt_dist_node::comp);
 	}
 	// put back into halt_list
-	for(uint8 i = 0; i<halt_list_count; i++) {
+	for(uint8 i = 0; i<stock_count; i++) {
 		halt_list[i] = halts[i].halt;
 	}
 }
@@ -799,12 +866,65 @@ void planquadrat_t::remove_from_haltlist(halthandle_t halt)
  */
 bool planquadrat_t::is_connected(halthandle_t halt) const
 {
-	for( uint8 i=0;  i<halt_list_count;  i++  ) {
+	for( uint8 i=0;  i<get_haltlist_count();  i++  ) {
 		if(halt_list[i]==halt) {
 			return true;
 		}
 	}
 	return false;
+}
+
+
+uint8 planquadrat_t::get_far_class( uint8 catg_index )
+{
+	return catg_index == goods_manager_t::INDEX_PAS ? FAR_PAX : (catg_index == goods_manager_t::INDEX_MAIL ? FAR_MAIL : FAR_GOODS);
+}
+
+
+bool planquadrat_t::is_serving( uint8 i, uint8 catg_index ) const
+{
+	if(  !halt_list[i].is_bound()  ||  is_potential_entry( i )  ) {
+		return false;
+	}
+	if(  is_far_entry( i )  ) {
+		return (get_far_classes( i ) & get_far_class( catg_index )) != 0;
+	}
+	return halt_list[i]->is_enabled( catg_index );
+}
+
+
+bool planquadrat_t::is_connected( halthandle_t halt, uint8 catg_index ) const
+{
+	for(  uint8 i=0;  i<get_haltlist_count();  i++  ) {
+		if(  halt_list[i]==halt  ) {
+			// a stock entry counts for everything, as in stock
+			return !is_far_entry( i )  ||  (get_far_classes( i ) & get_far_class( catg_index )) != 0;
+		}
+	}
+	return false;
+}
+
+
+void planquadrat_t::clear_far_entries()
+{
+	halt_list_count -= far_count;
+	far_count = 0;
+	far_classes = 0;
+	potential_count = 0;
+}
+
+
+void planquadrat_t::add_far_entry( halthandle_t halt, uint8 classes, bool potential )
+{
+	if(  far_count >= MAX_FAR_ENTRIES  ||  !halt.is_bound()  ||  classes == 0  ||  (!potential  &&  potential_count > 0)  ) {
+		return;
+	}
+	halt_list_insert_at( halt, halt_list_count );
+	far_classes |= (uint16)(classes & 7) << (3 * far_count);
+	far_count++;
+	if(  potential  ) {
+		potential_count++;
+	}
 }
 
 void planquadrat_t::update_underground() const

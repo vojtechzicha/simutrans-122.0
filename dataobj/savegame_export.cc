@@ -467,6 +467,7 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_bool( "avoid_overcrowding", s.is_avoid_overcrowding() );
 	w.kv_bool( "no_routing_over_overcrowding", s.is_no_routing_over_overcrowding() );
 	w.kv_int( "station_coverage", s.get_station_coverage() );
+	w.kv_int( "station_far_reach", s.get_station_far_reach() );
 	w.kv_bool( "allow_buying_obsolete_vehicles", s.get_allow_buying_obsolete_vehicles() );
 	w.kv_int( "just_in_time", s.get_just_in_time() );
 	w.kv_int( "industry_increase_every", s.get_industry_increase_every() );

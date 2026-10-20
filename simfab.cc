@@ -705,7 +705,7 @@ bool fabrik_t::is_within_players_network( const player_t* player ) const
 			const halthandle_t *const halt_list = plan->get_haltlist();
 			for( int h = 0; h < plan->get_haltlist_count(); h++ ) {
 				halthandle_t halt = halt_list[h];
-				if(  halt.is_bound()  &&  halt->is_enabled(haltestelle_t::WARE)  &&  halt->has_available_network(player)  ) {
+				if(  halt.is_bound()  &&  !plan->is_far_entry( h )  &&  halt->is_enabled(haltestelle_t::WARE)  &&  halt->has_available_network(player)  ) {
 					return true;
 				}
 			}
@@ -2508,9 +2508,11 @@ void fabrik_t::verteile_waren(const uint32 product)
 	// ok, first generate list of possible destinations
 	const halthandle_t *haltlist = plan->get_haltlist();
 	for(  unsigned i=0;  i<plan->get_haltlist_count();  i++  ) {
-		halthandle_t halt = haltlist[(i + output[product].index_offset) % plan->get_haltlist_count()];
+		const uint8 h_idx = (i + output[product].index_offset) % plan->get_haltlist_count();
+		halthandle_t halt = haltlist[h_idx];
 
-		if(  !halt->get_ware_enabled()  ) {
+		// fork: far entries serve passengers and mail only
+		if(  !plan->is_serving( h_idx, output[product].get_typ()->get_catg_index() )  ) {
 			continue;
 		}
 
@@ -2720,7 +2722,9 @@ void fabrik_t::recalc_factory_status()
 	char status_ein;
 	char status_aus;
 
-	int haltcount=welt->access(pos.get_2d())->get_haltlist_count();
+	// fork: the stops in the Reach, not the ones serving workers beyond it
+	const planquadrat_t *const status_plan = welt->access(pos.get_2d());
+	int haltcount = status_plan->get_haltlist_count_with_potential() - status_plan->get_far_count();
 
 	// set bits for input
 	warenlager = 0;
@@ -2957,6 +2961,9 @@ void fabrik_t::info_conn(cbuffer_t& buf) const
 
 		for(  uint i=0;  i<plan->get_haltlist_count();  i++  ) {
 			buf.printf("\n - %s", plan->get_haltlist()[i]->get_name() );
+			if(  plan->is_far_entry( i )  ) {
+				buf.printf( " %s", translator::translate( "(nearest stop)" ) );
+			}
 		}
 	}
 }

@@ -282,6 +282,7 @@ SOURCES += dataobj/savegame_rename.cc
 SOURCES += dataobj/scenario.cc
 SOURCES += dataobj/schedule.cc
 SOURCES += dataobj/settings.cc
+SOURCES += dataobj/station_reach.cc
 SOURCES += dataobj/tabfile.cc
 SOURCES += dataobj/translator.cc
 SOURCES += descriptor/bridge_desc.cc

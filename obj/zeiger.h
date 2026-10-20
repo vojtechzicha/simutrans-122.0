@@ -23,6 +23,8 @@ private:
 	koord area, offset;
 	/// images
 	image_id image, foreground_image;
+	/// fork: also mark the houses a new passenger stop here would take beyond the Reach
+	bool far_preview;
 
 public:
 	zeiger_t(loadsave_t *file);
@@ -40,6 +42,9 @@ public:
 	 * @param offset if center==false then cursor is at position @p offset
 	 */
 	void set_area( koord area, bool center, koord offset = koord(0,0) );
+
+	/// fork: see far_preview
+	void set_far_preview( bool on );
 
 	/// set back image
 	void set_image( image_id b );

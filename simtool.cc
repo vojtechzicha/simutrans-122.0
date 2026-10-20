@@ -4507,6 +4507,8 @@ set_area_cov:
 		cursor_centered = true;
 		cursor_offset = koord(0,0);
 	}
+	// fork: a passenger stop also shows the houses it would take as their nearest stop
+	cursor_far_preview = cursor_centered  &&  (bdsc->get_enabled() & 1) != 0;
 	return true;
 }
 
