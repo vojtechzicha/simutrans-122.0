@@ -1,8 +1,8 @@
 # Station reach: the nearest stop serves houses beyond the Reach (fork)
 
-Status: implemented (savegame 122.15) with the owner's decisions: far reach 8, goods keep the stock
-Reach, stops without a line do not count, no fallback from an overcrowded far stop, parking kept (the
-removal tool of section 6 is not built), several stops in the Reach stay as stock. Added on the owner's
+Status: implemented (savegame 122.15) with the owner's decisions: far reach 8 (13 since), goods keep the stock
+Reach, stops without a line do not count, no fallback from an overcrowded far stop, parking kept at first, then
+removed where the far reach makes it unnecessary with the tool of section 6 (2026-10-20), several stops in the Reach stay as stock. Added on the owner's
 request: the display also shows the potential far reach (5.5). Numbers in sections 1-3 from
 `FORK-CZR-VZ.sve` (2026-10-18), measured with a throwaway headless diagnostic on a copy of the save;
 test results in section 8.
@@ -274,24 +274,121 @@ Three kinds of coverage, so a city can be planned before its lines exist:
 - A stop tile built or removed: at most 289 customer tiles, each a ring search of at most 289 tiles
   (R = 8) where a class is missing; milliseconds even for a large station.
 
-## 6. Removing the parking (phase 2, optional, not built)
+## 6. Removing the parking (phase 2, built 2026-10-20)
 
-A batch command next to `-rename`: `simutrans -load NAME -strip-parking MODE [-saveas OUT.sve]`
-(dry run without `-saveas`), wrapped by `steam-fork.sh strip-parking NAME MODE` that backs up the
-save and writes a new file, never over an existing one, like `rename`. Parking objects are found by
-name (a prefix list in the command, default `parking_(catchemnt_area_ext)`).
+Measured on `FORK-CZR-VZ.sve` of 2026-10-20 07:34 (Reach 2, far reach 13) with a throwaway hook (`REACH_STRIP` in
+`reach_test.cc`, not committed). It models every customer's stops exactly as the game's lists have them (all 143,364
+customers equal at load), takes the tiles out one by one and checks the rule below; for the recommended mode it then
+removes them for real through the game's own code and compares again.
 
-| Mode | Removes (R = 8) | Network after |
-|---|---|---|
-| `unchanged` | 14,074 tiles: every parking tile not within Reach of a house whose stops would change | same stops for every house |
-| `deliberate` | 18,519 tiles: keeps only parking behind houses whose nearest stop is not one of today's, or that would lose their stop | 15% of the weight keeps fewer of today's stops (the overlap goes) |
-| `all` | 26,757 tiles | section 3 table |
+### 6.1 The parking now
 
-Edge cases the command would handle: parking tiles that a schedule entry points at are kept (101
-tiles), stops made only of parking are kept (9), a stop's name on a parking tile moves to another tile
-(`rem_grund` does it), tiles with a vehicle on them or reserved are skipped. It would write a report
-(TSV) with the removed and kept tiles and, after removal, every house whose serving stops changed, so
-the estimate above is checked on the real result.
+- 26,739 tiles of `parking_(catchemnt_area_ext)1/2/3`: road stops that handle nothing. Their capacity (64) counts for
+  nothing, since this game has `separate_halt_capacities = 1` and they enable no class, so removing them changes no
+  stop's capacity. Maintenance 36 a month each; removing one costs 1,000 (`cst_multiply_remove_haus`), as with the
+  remove tool.
+- 9 stops are only parking (12 tiles). They handle nothing, serve no house and no schedule points at them.
+- Chains reach far: of the tiles that are no stop position, 5,823 are more than 6 tiles from their stop's own
+  tiles and 276 more than 15 (the farthest: Jesenice station, 40 tiles away).
+
+### 6.2 A tile a vehicle stops on is never removed
+
+- A schedule entry of a line or convoy points at it: 108 tiles.
+- A convoy longer than one tile stops at a schedule tile next to it and could stand on it (`route_t::calc_route`
+  moves a long convoy forward into the next tiles of the stop): 2 tiles.
+- A bus at a road choose sign could pick it (`road_vehicle_t::choose_route` takes any free tile of the target stop):
+  every parking tile among the first `max_choose_route_steps` (250) road tiles from one of the 23 road choose signs,
+  317 tiles.
+- A convoy stands on it or has it reserved when the tool runs: none now.
+
+Checked by playing two game hours: loading convoys stood on 40 parking tiles, 39 of them schedule entries and 1 in a
+choose sign's search, none on any other parking tile.
+
+### 6.3 The rule for houses
+
+For every house, attraction and factory and every class: B = the stops that serve it now, A = the stops that would
+serve it with the tile gone (Reach and far reach together, as `is_serving` sees them; stops without a line count,
+so the parking of a stop whose line is not built yet stays where it matters).
+
+| Mode | A tile goes when every customer... |
+|---|---|
+| `same` | keeps exactly its stops (A = B) |
+| `near T` | keeps exactly its stops, or keeps at least one and every stop it loses is within T tiles (nearer or farther) of the nearest stop it keeps or gets |
+| `any` | keeps at least one stop |
+
+Distances are straight-line distances to the stop's own tiles (not its parking), so a long chain that gives a house
+a station 10 tiles away over a bus stop 3 tiles away is kept in `near 2`, while a border drawn one tile differently
+between two neighbouring stops is not. The bound works both ways: a house must not end up at a stop much farther than
+the one it had either (that happens when the stop taking over is the nearest only through one of its own kept parking
+tiles). Read as "any stop if the old one is within N tiles" instead, N = 4 removes 16,361 tiles and N = 6 21,002.
+
+- Goods: always `same` (the far reach does not do goods). 1 to 12 tiles, depending on the mode.
+- Mail: not compared by default. No letter was sent this month or last (8 of the 532 stops that handle mail have a
+  line carrying it); once a line carries mail, the far reach gives each house its nearest mail stop. Comparing mail
+  keeps 300 to 660 more tiles.
+
+Order: outermost tiles first (farthest from their own stop's tiles); each is taken out, every customer within the far
+reach of it is checked, and it is put back if one breaks the rule. A second pass retries those kept. The order
+changes the count a little, never the rule.
+
+### 6.4 What each mode removes (mail not compared)
+
+Passenger weight as in section 3: "fewer" = keeps some of its stops and loses one it shared (the overlap), "other" =
+another stop instead.
+
+| Mode | Removed | Kept for houses | Same stops | Fewer | Other | No stop |
+|---|---|---|---|---|---|---|
+| `same` | 15,205 (57%) | 11,106 | 100% | 0 | 0 | 0 |
+| `near 1` | 16,876 (63%) | 9,435 | 98.1% | 0.8% | 1.1% | 0 |
+| `near 2` | 18,996 (71%) | 7,313 | 94.1% | 3.1% | 2.7% | 0 |
+| `near 3` | 21,355 (80%) | 4,951 | 88.2% | 6.7% | 5.1% | 0 |
+| `near 5` | 24,444 (91%) | 1,860 | 79.0% | 12.1% | 9.0% | 0 |
+| `any` | 26,083 (98%) | 217 | 74.1% | 14.0% | 11.9% | 0 |
+
+In every mode 427 more are kept as stop positions (6.2) and a few for goods. Even `same` removes more than half: those
+tiles change no house's stops at all with the far reach on. In `near 2` the kept tiles are, by distance from their
+own stop: up to 2 tiles 202, 3-4 2,931, 5-6 2,425, 7-10 1,342, 11-15 302, farther 114. `any` keeps only the tiles
+without which a house would have no stop at all (more than 13 tiles from any other stop with a line).
+
+`near 2` for real on a copy of the save: 18,996 tiles removed through `haltestelle_t::remove` in 4 s, every
+customer's lists afterwards equal to the model, the brute-force check of section 8 clean (far entries then on 26.5%
+of the passenger weight). No stop changed its name; the 9 stops made only of parking are gone (Praha, Pavlíkova;
+Praha 21 - planina; Praha, Nádraží Čakovice [S]; Brandýs nad Labem - Stará Boleslav, Svátkova; Zdiby, Na Ladech;
+Benešov [BN], Mariánovice; Hlučín land stop; Ostrava John Street stop; D1a odpočívka Speřice). Saved and loaded
+again: 7,743 parking tiles, the same far entries (same hash), the check clean.
+
+Two game hours from the same state against the unchanged game (one deterministic run each): 325,936 transported of
+525,662 generated (62.0%) against 329,771 of 529,688 (62.3%), no route 146,091 against 147,205, unhappy 62,638
+against 62,673, walked 1,369 against 1,388. A first version bounded the distance one way only (the lost stop at
+most 2 tiles farther than the new one, any distance nearer): 20,938 tiles, but houses could end up at a much farther
+stop, and unhappy rose to 65,187 (+4%).
+
+### 6.5 The tool
+
+- `simutrans -load NAME -strip-parking same|near=T|any [-strip-keep FILE] [-strip-mail] [-strip-free]
+  [-strip-report FILE] [-saveas OUT.sve]` next to `-rename` (`dataobj/savegame_strip_parking.*`); `near` alone is
+  `near=2`. Without `-saveas` it is a dry run. Parking is found by its name prefix `parking_(catchemnt_area_ext)`.
+  The keep file names stops (one per line) whose parking stays whole.
+- Report (TSV, default `strip-parking.tsv`): `#` summary lines, one `tile` row per parking tile (position, stop,
+  removed or kept, and why: the stop-position kind, `keep-list`, or the customer with its stops now and without the
+  tile, with distances), `stop-removed` rows, then a `customer` row for every customer whose stops change (before,
+  after).
+- Removal goes through `haltestelle_t::remove`, like the remove tool: a stop's name on a removed tile moves to another
+  of its tiles, a stop made only of parking disappears, Reach and far reach are updated (`rem_grund`, `update_area`).
+  Afterwards every customer's lists are compared with the model; any difference and `-saveas` is refused.
+- `steam-fork.sh strip-parking NAME|latest [MODE] [KEEP.txt] [OUT.sve]` copies the save to `save/backup/` first and
+  writes a new `NAME-noparking-<date>.sve` with the report next to it, never over an existing file;
+  `strip-parking-dry` only writes the report (`save/NAME-noparking-dry.tsv`); more switches in `STRIP_OPTS`.
+- No save format change. But a game stripped of its parking needs the far reach: a stock or older fork exe, or a
+  `downgrade` copy, would leave those houses without a stop, and lowering `station_far_reach` below 13 afterwards
+  does the same (raising it is fine). The kept tiles go on working as overrides; new stops and line changes move
+  houses by the far rule, as they do now.
+
+Decisions (2026-10-20): `near=2`, mail not compared, removal costs as the remove tool (`-strip-free` exists), the
+stops made only of parking go except D1a odpočívka Speřice (keep list). The tool on a copy of the save with that:
+19,002 tiles removed, 7,737 kept (108 schedule, 317 choose sign, 2 keep list, 7,307 passengers, 3 goods), 8 stops
+gone, every customer's stops afterwards as planned, saved and loaded again with the brute-force check clean. Its
+first version took the nearest distance with `min()`, which takes int, and kept 144 tiles too many.
 
 ## 7. Decisions (taken 2026-10-19)
 

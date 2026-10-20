@@ -98,6 +98,24 @@ renames duplicates), is skipped. On Windows `steam-fork.sh rename NAME|latest LI
 copies the save to `save/backup/NAME-<file time>.sve` first and writes a new
 `NAME-renamed-<date>.sve`, never over an existing file; `rename-dry` only reports.
 
+Removing parking: `simutrans -load NAME -strip-parking same|near=T|any [-strip-keep FILE] [-strip-mail]
+[-strip-free] [-strip-report FILE] -saveas OUT.sve` (`dataobj/savegame_strip_parking.*`, design and numbers in
+`documentation/fork-station-reach-plan.md` section 6) removes the `parking_(catchemnt_area_ext)*` tiles that the
+station far reach makes unnecessary. Never a stop position (a schedule entry, the tiles a longer convoy stands on
+around one, a road choose sign's search, a standing convoy or a reservation) or a tile of a stop named in the keep
+file (one name per line); the rest outermost first, while every house, attraction and factory keeps its stops
+(`same`), keeps one and loses only stops within T tiles of the nearest one it keeps or gets (`near=T`, default 2,
+both ways), or keeps one (`any`); passengers, mail only with `-strip-mail`, factory goods always the same stops. It
+plans with a model of every customer's stops (compared with the game's lists before anything goes), removes through
+`haltestelle_t::remove` (costs as the remove tool unless `-strip-free`), compares again and refuses `-saveas` on any
+difference; without `-saveas` it is a dry run. The report (TSV) lists every parking tile (removed, or kept and why:
+the customer with its stops now and without the tile), the stops that disappear (made only of parking) and every
+customer whose stops change. Distances are doubles: `min()` takes int and once kept 144 tiles too many.
+`steam-fork.sh strip-parking NAME|latest [MODE] [KEEP.txt] [OUT.sve]` backs the save up and writes
+`NAME-noparking-<date>.sve` with the report next to it (`.tsv`), `strip-parking-dry` only reports, more switches
+in `STRIP_OPTS`. A stripped game needs the far reach: not for the stock exe or a `downgrade` copy, and never lower
+`station_far_reach` below the value it was stripped with.
+
 ## Windows is the real target
 
 - The owner plays on Windows, through Steam, and Steam runs this fork (see the Windows section
@@ -1032,8 +1050,8 @@ to the stop's nearest tile, exact ties all serve. Passengers and mail only; good
 counts only for the classes a registered line or lineless convoy carries there (`haltestelle_t::reach_served`,
 set at the end of `rebuild_connections`), and a stop in the Reach without such a line does not keep the house
 from its far stop. Within the Reach nothing changes (all stops serve, parking tiles included), so the owner's
-`parking_(catchemnt_area_ext)*` road stops keep working and act as manual overrides; they were not removed
-(the removal tool in the plan is not built). A `station_far_reach` set in a simuconf.tab also wins over the value
+`parking_(catchemnt_area_ext)*` road stops keep working and act as manual overrides; `-strip-parking` (see "Save
+export and web viewer") removes the ones the far reach makes unnecessary. A `station_far_reach` set in a simuconf.tab also wins over the value
 saved with a game when it is loaded (`env_t::station_far_reach_override`, not in network games), so it can be
 changed for an existing game by editing simuconf.tab and loading the save again. The owner's game: Reach 2,
 far reach 13 (8 at first; 13 reaches every house of Vratimov, the first town built without parking).

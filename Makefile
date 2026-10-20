@@ -279,6 +279,7 @@ SOURCES += dataobj/ribi.cc
 SOURCES += dataobj/route.cc
 SOURCES += dataobj/savegame_export.cc
 SOURCES += dataobj/savegame_rename.cc
+SOURCES += dataobj/savegame_strip_parking.cc
 SOURCES += dataobj/scenario.cc
 SOURCES += dataobj/schedule.cc
 SOURCES += dataobj/settings.cc

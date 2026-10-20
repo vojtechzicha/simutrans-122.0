@@ -67,6 +67,7 @@
 #include "dataobj/environment.h"
 #include "dataobj/savegame_export.h"
 #include "dataobj/savegame_rename.h"
+#include "dataobj/savegame_strip_parking.h"
 #include "dataobj/tabfile.h"
 #include "dataobj/settings.h"
 #include "dataobj/translator.h"
@@ -465,6 +466,10 @@ int simu_main(int argc, char** argv)
 			" -saveversion VER    save version for -saveas, e.g. 0.122.0 for the stock game\n"
 			" -rename FILE        renames the objects listed in FILE before -export/-saveas and\n"
 			"                     quits, report in FILE.result.tsv (see dataobj/savegame_rename.h)\n"
+			" -strip-parking MODE removes the parking tiles the far reach makes unnecessary (same,\n"
+			"                     near=T or any; -strip-keep FILE, -strip-mail, -strip-free,\n"
+			"                     -strip-report FILE; see dataobj/savegame_strip_parking.h), only\n"
+			"                     with -saveas, else a dry run\n"
 			" -freeplay           play with endless money\n"
 			" -fullscreen         starts simutrans in fullscreen mode\n"
 			" -fps COUNT          framerate (from 5 to 100)\n"
@@ -518,7 +523,8 @@ int simu_main(int argc, char** argv)
 	const char *export_filename = gimme_arg(argc, argv, "-export", 1);
 	const char *saveas_filename = gimme_arg(argc, argv, "-saveas", 1);
 	const char *rename_filename = gimme_arg(argc, argv, "-rename", 1);
-	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL;
+	const char *strip_parking_mode = gimme_arg(argc, argv, "-strip-parking", 1);
+	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL  ||  strip_parking_mode != NULL;
 
 #ifdef __BEOS__
 	if (1) // since BeOS only supports relative paths ...
@@ -1414,11 +1420,22 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 				report += ".result.tsv";
 				savegame_rename_t::apply( welt, rename_filename, report.c_str() );
 			}
+			bool may_save = true;
+			if(  strip_parking_mode  ) {
+				// without -saveas this is a dry run: the report tells what would be removed
+				const char *report = gimme_arg(argc, argv, "-strip-report", 1);
+				may_save = savegame_strip_parking_t::apply( welt, strip_parking_mode, gimme_arg(argc, argv, "-strip-keep", 1),
+					gimme_arg(argc, argv, "-strip-mail", 0) != NULL, gimme_arg(argc, argv, "-strip-free", 0) != NULL,
+					saveas_filename == NULL, report ? report : "strip-parking.tsv" );
+			}
 			if(  export_filename  ) {
 				const char *save_name = gimme_arg(argc, argv, "-load", 1);
 				savegame_export_t::write_json( welt, save_name ? save_name : loadgame.c_str(), export_filename );
 			}
-			if(  saveas_filename  ) {
+			if(  saveas_filename  &&  !may_save  ) {
+				dbg->error( "simmain()", "not saving '%s': removing the parking did not give the planned result", saveas_filename );
+			}
+			else if(  saveas_filename  ) {
 				// an older version (e.g. 0.122.0) leaves out the fork's fields, so the stock game can load the file
 				const char *version = gimme_arg(argc, argv, "-saveversion", 1);
 				if(  version == NULL  ) {

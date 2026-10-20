@@ -27,6 +27,16 @@
 #                                                  NAME-renamed-DATE.sve; report in LIST.tsv.result.tsv
 #   tools/windows/steam-fork.sh rename-dry NAME|latest LIST.tsv
 #                                                  the same without writing anything but the report
+#   tools/windows/steam-fork.sh strip-parking NAME|latest [MODE] [KEEP.txt] [OUT.sve]
+#                                                  copy the save to save/backup/, remove the parking
+#                                                  tiles the far reach makes unnecessary (MODE same,
+#                                                  near=T or any, default near=2; KEEP.txt: names of
+#                                                  stops to keep whole, one per line; more switches in
+#                                                  STRIP_OPTS, e.g. "-strip-mail -strip-free"; see
+#                                                  dataobj/savegame_strip_parking.h) and write the
+#                                                  result as NAME-noparking-DATE.sve, report next to it
+#   tools/windows/steam-fork.sh strip-parking-dry NAME|latest [MODE] [KEEP.txt]
+#                                                  only the report, save/NAME-noparking-dry.tsv
 #   tools/windows/steam-fork.sh signals FILE.dat [SIZE]
 #                                                  build the fork's makeobj and compile FILE.dat (the
 #                                                  platform signal and station boundary, see
@@ -306,6 +316,56 @@ do_rename() {
 	echo "done: $out ($(du -h "$out" | cut -f1))"
 }
 
+strip_summary() {
+	local report="$1"
+	[ -f "$report" ] || die "no report $report written"
+	echo "report: $report"
+	grep '^#\|^error\|^warning' "$report" || true
+	if grep -q '^stop-removed' "$report"; then
+		echo "stops that disappear (made only of parking):"
+		grep '^stop-removed' "$report" | cut -f2 | sed 's/^/  /'
+	fi
+}
+
+do_strip() {
+	local dry="$1"; shift
+	local name="${1:-}" mode="${2:-near=2}" keep="${3:-}"
+	[ -n "$name" ] || die "usage: $0 strip-parking NAME|latest [MODE] [KEEP.txt] [OUT.sve]"
+	local keep_args=()
+	if [ -n "$keep" ]; then
+		[ -f "$keep" ] || die "no keep list $keep"
+		# run_batch runs in the Steam folder
+		keep_args=(-strip-keep "$(cd "$(dirname "$keep")" && pwd)/$(basename "$keep")")
+	fi
+	name="$(save_name "$name")"
+	local src="$SIM_USER_DIR/save/$name.sve"
+	if tasklist 2>/dev/null | grep -qi '^simutrans'; then
+		echo "warning: Simutrans is running; the copy has the state of $src as saved at $(date -r "$src" '+%Y-%m-%d %H:%M')"
+	fi
+	echo "save: $src ($(date -r "$src" '+%Y-%m-%d %H:%M:%S')), mode $mode"
+	# shellcheck disable=SC2086
+	if [ "$dry" = 1 ]; then
+		local report="$SIM_USER_DIR/save/$name-noparking-dry.tsv"
+		rm -f "$report"
+		run_batch -load "$name" -strip-parking "$mode" ${keep_args[@]+"${keep_args[@]}"} ${STRIP_OPTS:-} -strip-report "$report" | grep -i 'error\|WRONGSAVE' || true
+		strip_summary "$report"
+		return
+	fi
+	local out="${4:-$SIM_USER_DIR/save/$name-noparking-$(date '+%Y%m%d-%H%M%S').sve}"
+	[ ! -e "$out" ] || die "$out exists, not overwriting it"
+	mkdir -p "$SIM_USER_DIR/save/backup"
+	local bak; bak="$SIM_USER_DIR/save/backup/$name-$(date -r "$src" '+%Y%m%d-%H%M%S').sve"
+	[ -f "$bak" ] || cp -p "$src" "$bak"
+	cmp -s "$src" "$bak" || die "backup $bak differs from $src"
+	echo "backup: $bak"
+	local report="${out%.sve}.tsv"
+	run_batch -load "$name" -strip-parking "$mode" ${keep_args[@]+"${keep_args[@]}"} ${STRIP_OPTS:-} -strip-report "$report" -saveas "$out" | grep -i 'saving game\|not saving\|error\|WRONGSAVE' || true
+	strip_summary "$report"
+	[ -f "$out" ] || die "no output file written"
+	cmp -s "$src" "$bak" || die "the save changed while removing, backup kept at $bak"
+	echo "done: $out ($(du -h "$out" | cut -f1))"
+}
+
 # the fork's makeobj knows is_platformsignal and station_boundary; the objects go into the pakset
 # folder as an add-on, the rest of the pakset stays as Steam installed it
 do_signals() {
@@ -331,6 +391,8 @@ case "${1:-}" in
 	export)    shift; do_export "$@" ;;
 	rename)    shift; do_rename 0 "$@" ;;
 	rename-dry) shift; do_rename 1 "$@" ;;
+	strip-parking) shift; do_strip 0 "$@" ;;
+	strip-parking-dry) shift; do_strip 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
-	*)         sed -n '2,34p' "$0"; exit 1 ;;
+	*)         sed -n '2,/^# Override/p' "$0"; exit 1 ;;
 esac
