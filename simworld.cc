@@ -702,7 +702,8 @@ bool karte_t::remove_city(stadt_t *s)
 		DBG_MESSAGE("karte_t::remove_city()", "%s", s->get_name());
 	}
 	// fork: the reassign tool names its town by index, which may now name another town
-	if(  get_tool( get_active_player_nr() ) == tool_t::general_tool[TOOL_REASSIGN_CITY]  ) {
+	// (not while the world goes: at quit the tools are already gone)
+	if(  !destroying  &&  tool_t::general_tool.get_count() > TOOL_REASSIGN_CITY  &&  get_tool( get_active_player_nr() ) == tool_t::general_tool[TOOL_REASSIGN_CITY]  ) {
 		set_tool( tool_t::general_tool[TOOL_QUERY], get_active_player() );
 	}
 	stadt.remove(s);
