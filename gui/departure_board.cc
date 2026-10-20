@@ -1870,26 +1870,31 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 		return false;
 	}
 
-	// a sign is asked for every frame (the window, the vehicle under the mouse): keep it for a minute
+	const schedule_t *schedule = cnv->get_schedule();
+	const uint8 n = schedule->get_count();
+	const player_t *owner = cnv->get_owner();
+	const convoi_t *mover = get_mover( cnv );
+	const uint8 cur = schedule->get_current_stop();
+	const bool loading = mover->get_state() == convoi_t::LOADING;
+
+	// a sign is asked for every frame (the window, the vehicle under the mouse): keep it for a minute, but not
+	// past the next stop or the start of loading (a calendar minute can be many seconds, or a pause)
 	struct cached_t {
 		convoihandle_t cnv;
 		sint64 stamp;
+		uint8 cur;
+		bool loading;
 		convoy_sign_t sign;
 	};
 	static cached_t cache[8];
 	static uint8 next_slot = 0;
 	const sint64 stamp = board_stamp();
 	for(  int i = 0;  i < 8;  i++  ) {
-		if(  cache[i].cnv == cnv  &&  cache[i].stamp == stamp  ) {
+		if(  cache[i].cnv == cnv  &&  cache[i].stamp == stamp  &&  cache[i].cur == cur  &&  cache[i].loading == loading  ) {
 			*this = cache[i].sign;
 			return true;
 		}
 	}
-
-	const schedule_t *schedule = cnv->get_schedule();
-	const uint8 n = schedule->get_count();
-	const player_t *owner = cnv->get_owner();
-	const convoi_t *mover = get_mover( cnv );
 
 	waytype = schedule->get_waytype();
 	train_style = waytype == track_wt  ||  waytype == monorail_wt  ||  waytype == maglev_wt  ||  waytype == narrowgauge_wt;
@@ -1910,10 +1915,9 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 
 	// the trip: from the stop it boards at now, else from the last one it boarded at; once it left an All off
 	// stop after that it is empty until it loads again (e.g. arrival All off, a siding, then the departure stop)
-	const uint8 cur = schedule->get_current_stop();
 	uint8 e = cur;
 	bool emptied = false;
-	if(  !(mover->get_state() == convoi_t::LOADING  &&  schedule->entries[cur].loads()  &&  entry_halt( schedule, cur, owner ).is_bound())  ) {
+	if(  !(loading  &&  schedule->entries[cur].loads()  &&  entry_halt( schedule, cur, owner ).is_bound())  ) {
 		for(  uint8 k = 1;  k <= n;  k++  ) {
 			const uint8 i = (cur + n - k) % n;
 			if(  !entry_halt( schedule, i, owner ).is_bound()  ) {
@@ -1952,6 +1956,8 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 
 	cache[next_slot].cnv = cnv;
 	cache[next_slot].stamp = stamp;
+	cache[next_slot].cur = cur;
+	cache[next_slot].loading = loading;
 	cache[next_slot].sign = *this;
 	next_slot = (next_slot + 1) % 8;
 	return true;
