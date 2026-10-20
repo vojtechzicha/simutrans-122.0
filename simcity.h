@@ -18,6 +18,7 @@
 #include <string>
 
 class building_desc_t;
+class grund_t;
 class karte_ptr_t;
 class player_t;
 class rule_t;
@@ -131,6 +132,10 @@ private:
 
 	// this counter will increment by one for every change => dialogs can question, if they need to update map
 	uint32 pax_destinations_new_change;
+
+	// fork: town whose buildings are framed, and the framed tiles (see show_buildings_of)
+	static stadt_t *shown_city;
+	static vector_tpl<koord> shown_tiles;
 
 	koord pos;             // Gruendungsplanquadrat der City
 	koord townhall_road;   // road in front of townhall
@@ -423,6 +428,21 @@ public:
 
 	// changes the weight; must be called if there is a new definition (tile) for that house
 	void update_gebaeude_from_stadt(gebaeude_t *gb);
+
+	/**
+	 * fork: frames on the tiles of one town's buildings, shown while the reassign tool works for it
+	 * (this client only, nothing in the game depends on it); NULL removes them.
+	 * Kept up to date as buildings join or leave that town, rotated with the map.
+	 */
+	static void show_buildings_of( stadt_t *city );
+	static const stadt_t *get_shown_city() { return shown_city; }
+	/// fork: frame one ground tile or take its frame off (display only)
+	static void set_tile_framed( koord k, bool framed );
+	/// fork: must this tile keep its frame when other marks (cursor, stop coverage) are taken off?
+	static bool keeps_frame( const grund_t *gr );
+
+	/// fork: after moving buildings between towns, refresh the passenger targets of these towns and towards them
+	static void update_targets_after_reassign( const vector_tpl<stadt_t *> &changed );
 
 	/**
 	* Returns the finance history for cities

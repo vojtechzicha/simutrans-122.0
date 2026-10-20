@@ -355,7 +355,7 @@ void station_reach_t::set_marked( const koord3d &pos, bool mark )
 		if(  mark  ) {
 			gr->set_flag( grund_t::marked );
 		}
-		else {
+		else if(  !stadt_t::keeps_frame( gr )  ) {
 			gr->clear_flag( grund_t::marked );
 		}
 		gr->set_flag( grund_t::dirty );

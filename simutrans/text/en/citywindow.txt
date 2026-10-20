@@ -31,6 +31,10 @@ The balance between these counters determines which type of city building (resid
 The <em>Allow city growth</em> button allows you to toggle city growth on and off.
 </p>
 <p>
+<em>Reassign buildings</em> changes which city buildings belong to. While the button is pressed, every building of this city has a frame on the map. Click a building of another city to make it part of this one, or drag an area (or click two corners) to take all buildings in it; while dragging, the frames and a tooltip show what would move and from which cities. Buildings that belong to no city join too. Town halls always stay with their own city. Press the button again, or choose another tool, to stop.<br>
+The city limits are the smallest rectangle around a city's buildings, and a city builds new houses and roads only inside it. A city that takes a distant suburb therefore also gets the land in between to grow into. Population moves with the buildings; the history graphs of both cities keep their old values. Names of stops are not changed. In network games only the public service can use it.
+</p>
+<p>
 <em>Mini-maps</em> of the game world in <strong>City Statistics</strong> show the destinations of passengers and mail generated within the city as coloured dots.<br>
 The right hand mini-map shows values for the current game calendar month, and the left one for the last game calendar month. The colour of each dot indicates if the destination can be reached or not:<br>
 - yellow dot: there is a route and an uncrowded <a href="station.txt">stop</a> to start journey (happy face shown in Stop Information).<br>

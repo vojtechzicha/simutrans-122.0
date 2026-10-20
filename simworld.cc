@@ -701,6 +701,10 @@ bool karte_t::remove_city(stadt_t *s)
 	if(s->get_name()) {
 		DBG_MESSAGE("karte_t::remove_city()", "%s", s->get_name());
 	}
+	// fork: the reassign tool names its town by index, which may now name another town
+	if(  get_tool( get_active_player_nr() ) == tool_t::general_tool[TOOL_REASSIGN_CITY]  ) {
+		set_tool( tool_t::general_tool[TOOL_QUERY], get_active_player() );
+	}
 	stadt.remove(s);
 	DBG_DEBUG4("karte_t::remove_city()", "reduce city to %i", settings.get_city_count() - 1);
 	settings.set_city_count(settings.get_city_count() - 1);
@@ -6653,7 +6657,8 @@ void karte_t::mark_area( const koord3d pos, const koord size, const bool mark ) 
 				if(mark) {
 					gr->set_flag(grund_t::marked);
 				}
-				else {
+				else if(  !stadt_t::keeps_frame( gr )  ) {
+					// fork: the frames of the town the reassign tool works for stay
 					gr->clear_flag(grund_t::marked);
 				}
 				gr->set_flag(grund_t::dirty);

@@ -6,11 +6,14 @@
 #include "../simdebug.h"
 #include "../simcity.h"
 #include "../simmenu.h"
+#include "../simtool.h"
 #include "../simworld.h"
 #include "../simcolor.h"
 #include "../dataobj/translator.h"
 #include "../display/viewport.h"
 #include "../utils/cbuffer_t.h"
+#include "../dataobj/environment.h"
+#include "../player/simplay.h"
 #include "../utils/simstring.h"
 #include "../tpl/array2d_tpl.h"
 
@@ -197,6 +200,12 @@ void city_info_t::init()
 		allow_growth.pressed = city->get_citygrowth();
 		allow_growth.add_listener( this );
 		add_component(&allow_growth);
+
+		// fork: click buildings or drag an area on the map to make them part of this city
+		reassign.init( button_t::roundbox_state | button_t::flexible, "Reassign buildings" );
+		reassign.set_tooltip( translator::translate( "Click buildings or drag an area on the map to move them to this town" ) );
+		reassign.add_listener( this );
+		add_component(&reassign);
 		end_table();
 
 		pax_map = new_component<gui_city_minimap_t>(city);
@@ -377,11 +386,20 @@ void city_info_t::update_labels()
 }
 
 
+void city_info_t::update_reassign_button()
+{
+	reassign.pressed = tool_reassign_city_t::is_working_for( city );
+	// in network games only the public service changes towns
+	reassign.enable( !env_t::networkmode  ||  welt->get_active_player()->is_public_service() );
+}
+
+
 void city_info_t::draw(scr_coord pos, scr_size size)
 {
 	// update chart seed
 	chart.set_seed(welt->get_last_year());
 	update_labels();
+	update_reassign_button();
 	gui_frame_t::draw(pos, size);
 }
 
@@ -393,6 +411,21 @@ bool city_info_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 		sprintf(param,"g%hi,%hi,%hi", city->get_pos().x, city->get_pos().y, (short)(!city->get_citygrowth()) );
 		tool_t::simple_tool[TOOL_CHANGE_CITY]->set_default_param( param );
 		welt->set_tool( tool_t::simple_tool[TOOL_CHANGE_CITY], welt->get_public_player());
+		return true;
+	}
+	if(  comp==&reassign  ) {
+		if(  tool_reassign_city_t::is_working_for( city )  ) {
+			welt->set_tool( tool_t::general_tool[TOOL_QUERY], welt->get_active_player() );
+		}
+		else if(  welt->get_cities().is_contained( city )  ) {
+			// the tool names the city by its index (it keeps the pointer to this text)
+			static char reassign_param[16];
+			sprintf( reassign_param, "%u", welt->get_cities().index_of( city ) );
+			tool_t *tool = tool_t::general_tool[TOOL_REASSIGN_CITY];
+			tool->set_default_param( reassign_param );
+			welt->set_tool( tool, welt->get_active_player() );
+		}
+		update_reassign_button();
 		return true;
 	}
 	if(  comp==&name_input  ) {

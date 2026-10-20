@@ -28,6 +28,7 @@
 class koord3d;
 class koord;
 class way_builder_t;
+class stadt_t;
 class building_desc_t;
 class roadsign_desc_t;
 class way_desc_t;
@@ -229,6 +230,36 @@ private:
 	void mark_tiles(player_t*, koord3d const&, koord3d const&) OVERRIDE;
 	uint8 is_valid_pos(player_t*, koord3d const&, char const*&, koord3d const&) OVERRIDE;
 	bool is_init_network_safe() const OVERRIDE { return true; }
+};
+
+/* fork: make city buildings part of another town, a click on a building or an area dragged;
+ * default_param: index of that town (the city window selects it), town halls stay
+ */
+class tool_reassign_city_t : public two_click_tool_t {
+public:
+	tool_reassign_city_t() : two_click_tool_t(TOOL_REASSIGN_CITY | GENERAL_TOOL) { cursor_area = koord(0,0); }
+	char const* get_tooltip(player_t const*) const OVERRIDE;
+	bool init(player_t*) OVERRIDE;
+	bool exit(player_t*) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return true; }
+
+	/// the town this tool works for, NULL if default_param names none
+	stadt_t *get_target_city() const;
+
+	/// is it the city window's tool working for this town?
+	static bool is_working_for( const stadt_t *city );
+
+private:
+	/// tiles framed as preview while dragging (this client only)
+	vector_tpl<koord> preview_tiles;
+
+	/// the selected instance on this client: only it shows frames
+	bool shows_frames() const;
+	void clear_preview();
+
+	char const* do_work(player_t*, koord3d const&, koord3d const&) OVERRIDE;
+	void mark_tiles(player_t*, koord3d const&, koord3d const&) OVERRIDE;
+	uint8 is_valid_pos(player_t*, koord3d const&, char const*&, koord3d const&) OVERRIDE;
 };
 
 class tool_plant_tree_t : public kartenboden_tool_t {
