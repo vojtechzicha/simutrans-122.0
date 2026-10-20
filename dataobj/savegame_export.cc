@@ -479,6 +479,20 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_int( "factory_worker_radius", s.get_factory_worker_radius() );
 	w.kv_int( "tourist_percentage", s.get_tourist_percentage() );
 	w.kv_int( "passenger_factor", s.get_passenger_factor() );
+	// how strongly passengers prefer near destinations: the factor in use this year and the year table
+	w.kv_int( "locality_factor", koord::locality_factor );
+	w.array_key( "locality_factor_table" );
+	for(  int i = 0;  i < 10;  i++  ) {
+		// as get_locality_factor(): a year 0 after the first entry ends the table
+		if(  i > 0  &&  s.get_locality_factor_year( i ) == 0  ) {
+			break;
+		}
+		w.start_object();
+		w.kv_int( "year", s.get_locality_factor_year( i ) );
+		w.kv_int( "factor", s.get_locality_factor_value( i ) );
+		w.end_object();
+	}
+	w.end_array();
 	w.kv_int( "passenger_multiplier", s.get_passenger_multiplier() );
 	w.kv_int( "mail_multiplier", s.get_mail_multiplier() );
 	w.kv_int( "goods_multiplier", s.get_goods_multiplier() );
@@ -1233,6 +1247,23 @@ static void export_cities( json_writer_t &w, karte_t *welt )
 		w.kv_int( "population", city->get_einwohner() );
 		w.kv_int( "buildings", city->get_buildings() );
 		w.kv_int( "growth", city->get_wachstum() );
+		// city limits (the box its buildings span, where it grows)
+		w.kv_koord( "limits_nw", city->get_linksoben() );
+		w.kv_koord( "limits_se", city->get_rechtsunten() );
+		// passengers and mail of this month and the last one: generated, could start their journey, walked
+		const sint64 *hist = city->get_city_history_month();
+		static const char *const month_key[2] = { "this_month", "last_month" };
+		for(  int m = 0;  m < 2;  m++  ) {
+			const sint64 *h = hist + m * MAX_CITY_HISTORY;
+			w.object_key( month_key[m] );
+			w.kv_int( "pax_generated", h[HIST_PAS_GENERATED] );
+			w.kv_int( "pax_transported", h[HIST_PAS_TRANSPORTED] );
+			w.kv_int( "pax_walked", h[HIST_PAS_WALKED] );
+			w.kv_int( "mail_generated", h[HIST_MAIL_GENERATED] );
+			w.kv_int( "mail_transported", h[HIST_MAIL_TRANSPORTED] );
+			w.kv_int( "mail_walked", h[HIST_MAIL_WALKED] );
+			w.end_object();
+		}
 		w.end_object();
 	}
 	w.end_array();

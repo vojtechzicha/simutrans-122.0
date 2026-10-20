@@ -585,6 +585,9 @@ public:
 	uint16 get_factory_maximum_intransit_percentage() const { return factory_maximum_intransit_percentage; }
 
 	uint32 get_locality_factor(sint16 year) const;
+	/// fork: entry i (0..9) of the locality_factor year table, year 0 after entry 0 = unused (for the JSON export)
+	sint16 get_locality_factor_year(int i) const { return locality_factor_per_year[i].year; }
+	uint32 get_locality_factor_value(int i) const { return locality_factor_per_year[i].factor; }
 
 	// disallow using obsolete vehicles in depot
 	bool get_allow_buying_obsolete_vehicles() const { return allow_buying_obsolete_vehicles; }

@@ -106,6 +106,11 @@ minus buttons to zoom, hover a stop or a line to see its name, click one to open
 in the toolbar turn line types, stops and city labels on and off.
 
 Cities, Factories and Goods are plain sortable tables.
+Each city also has `limits_nw` and `limits_se` (the city limits: the box its buildings span, where
+it grows) and `this_month` / `last_month` with `pax_generated`, `pax_transported`, `pax_walked` and
+the same for mail (the city statistics). The settings carry `locality_factor` (the factor in use this
+year: higher spreads passengers over the map, lower keeps them near home) and `locality_factor_table`
+(the saved year table it comes from).
 
 Every table is filtered and sorted in the browser and rows are added in chunks, so a save with
 thousands of stops still scrolls. Links between lines, stops and convoys go through the URL hash
