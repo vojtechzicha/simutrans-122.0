@@ -35,6 +35,7 @@ private:
 
 	gui_textinput_t name_input;    ///< Input field where the name of the city can be changed
 	button_t allow_growth;         ///< Checkbox to enable/disable city growth
+	button_t reassign;             ///< fork: selects the tool that makes buildings on the map part of this city
 	gui_label_buf_t lb_size, lb_buildings, lb_border, lb_unemployed, lb_homeless;
 
 	gui_tab_panel_t year_month_tabs;
@@ -53,6 +54,9 @@ private:
 	void reset_city_name();
 
 	void update_labels();
+
+	/// fork: pressed while the reassign tool works for this city
+	void update_reassign_button();
 
 	void init();
 public:

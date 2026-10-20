@@ -1914,6 +1914,253 @@ const char *tool_set_climate_t::do_work( player_t *player, const koord3d &start,
 
 
 /**
+ * fork: make city buildings part of another town
+ */
+
+// first tiles of the city buildings in k1..k2 that would join city; town halls of other towns stay
+static void find_buildings_to_reassign( const stadt_t *city, koord k1, koord k2, vector_tpl<gebaeude_t *> &found, bool &townhall )
+{
+	koord k;
+	for(  k.y = k1.y;  k.y <= k2.y;  k.y++  ) {
+		for(  k.x = k1.x;  k.x <= k2.x;  k.x++  ) {
+			const grund_t *gr = world()->lookup_kartenboden( k );
+			gebaeude_t *gb = gr ? gr->find<gebaeude_t>() : NULL;
+			if(  gb == NULL  ||  gb->get_fabrik()  ||  !gb->get_tile()->get_desc()->is_connected_with_town()  ||  gb->get_stadt() == city  ) {
+				continue;
+			}
+			if(  gb->is_townhall()  ) {
+				townhall = true;
+				continue;
+			}
+			found.append_unique( gb->get_first_tile() );
+		}
+	}
+}
+
+
+// every tile of the building gb belongs to (as stadt_t::add_gebaeude_to_stadt finds them)
+static void get_building_tiles( const gebaeude_t *gb, vector_tpl<gebaeude_t *> &tiles )
+{
+	const building_tile_desc_t *tile = gb->get_tile();
+	const koord size = tile->get_desc()->get_size( tile->get_layout() );
+	const koord origin = gb->get_pos().get_2d() - tile->get_offset();
+	koord k;
+	for(  k.y = 0;  k.y < size.y;  k.y++  ) {
+		for(  k.x = 0;  k.x < size.x;  k.x++  ) {
+			if(  const grund_t *gr = world()->lookup_kartenboden( origin + k )  ) {
+				gebaeude_t *t = gr->find<gebaeude_t>();
+				if(  t  &&  gb->is_same_building( t )  ) {
+					tiles.append( t );
+				}
+			}
+		}
+	}
+}
+
+
+stadt_t *tool_reassign_city_t::get_target_city() const
+{
+	if(  default_param == NULL  ||  *default_param < '0'  ||  *default_param > '9'  ) {
+		return NULL;
+	}
+	const uint32 index = atoi( default_param );
+	return index < welt->get_cities().get_count() ? welt->get_cities()[index] : NULL;
+}
+
+
+bool tool_reassign_city_t::is_working_for( const stadt_t *city )
+{
+	const tool_reassign_city_t *tool = static_cast<const tool_reassign_city_t *>( tool_t::general_tool[TOOL_REASSIGN_CITY] );
+	return city  &&  welt->get_tool( welt->get_active_player_nr() ) == tool  &&  tool->get_target_city() == city;
+}
+
+
+bool tool_reassign_city_t::shows_frames() const
+{
+	// tools sent over the network are copies; the one selected here draws
+	return this == tool_t::general_tool[TOOL_REASSIGN_CITY];
+}
+
+
+const char *tool_reassign_city_t::get_tooltip( const player_t * ) const
+{
+	const stadt_t *city = get_target_city();
+	sprintf( toolstr, translator::translate( "Reassign buildings to %s" ), city ? city->get_name() : "-" );
+	return toolstr;
+}
+
+
+void tool_reassign_city_t::clear_preview()
+{
+	// a previewed building that joined the town keeps its frame
+	const stadt_t *shown = stadt_t::get_shown_city();
+	FOR( vector_tpl<koord>, const k, preview_tiles ) {
+		const grund_t *gr = welt->lookup_kartenboden( k );
+		const gebaeude_t *gb = gr ? gr->find<gebaeude_t>() : NULL;
+		if(  shown == NULL  ||  gb == NULL  ||  gb->get_stadt() != shown  ) {
+			stadt_t::set_tile_framed( k, false );
+		}
+	}
+	preview_tiles.clear();
+}
+
+
+bool tool_reassign_city_t::init( player_t *player )
+{
+	two_click_tool_t::init( player );
+	cursor = tool_t::general_tool[TOOL_QUERY]->cursor;
+	stadt_t *city = get_target_city();
+	if(  city == NULL  ||  (env_t::networkmode  &&  (player == NULL  ||  !player->is_public_service()))  ) {
+		return false;
+	}
+	if(  shows_frames()  ) {
+		clear_preview();
+		if(  city != stadt_t::get_shown_city()  ) {
+			stadt_t::show_buildings_of( city );
+		}
+	}
+	return true;
+}
+
+
+bool tool_reassign_city_t::exit( player_t *player )
+{
+	// the base cleanup only, our init would frame the town again
+	two_click_tool_t::init( player );
+	if(  shows_frames()  ) {
+		clear_preview();
+		stadt_t::show_buildings_of( NULL );
+	}
+	return true;
+}
+
+
+uint8 tool_reassign_city_t::is_valid_pos( player_t *player, const koord3d &pos, const char *&error, const koord3d &start )
+{
+	error = NULL;
+	const stadt_t *city = get_target_city();
+	if(  city == NULL  ) {
+		error = "";
+		return 0;
+	}
+	if(  env_t::networkmode  &&  (player == NULL  ||  !player->is_public_service())  ) {
+		error = "Only the public service can move buildings to another town.";
+		return 0;
+	}
+	if(  start == koord3d::invalid  ) {
+		// a click on a building that can join moves it at once, anywhere else starts an area
+		vector_tpl<gebaeude_t *> found;
+		bool townhall = false;
+		find_buildings_to_reassign( city, pos.get_2d(), pos.get_2d(), found, townhall );
+		return found.empty() ? 2 : 3;
+	}
+	return 2;
+}
+
+
+void tool_reassign_city_t::mark_tiles( player_t *, const koord3d &start, const koord3d &end )
+{
+	clear_preview();
+	const stadt_t *city = get_target_city();
+	if(  city == NULL  ) {
+		return;
+	}
+	koord k1( min( start.x, end.x ), min( start.y, end.y ) );
+	koord k2( max( start.x, end.x ), max( start.y, end.y ) );
+	vector_tpl<gebaeude_t *> found;
+	bool townhall = false;
+	find_buildings_to_reassign( city, k1, k2, found, townhall );
+
+	// frame what would join, count it per town it leaves
+	vector_tpl<const stadt_t *> towns;
+	vector_tpl<uint32> counts;
+	sint32 citizens = 0;
+	FOR( vector_tpl<gebaeude_t *>, const gb, found ) {
+		const stadt_t *from = gb->get_stadt();
+		uint32 i = 0;
+		while(  i < towns.get_count()  &&  towns[i] != from  ) {
+			i++;
+		}
+		if(  i == towns.get_count()  ) {
+			towns.append( from );
+			counts.append( 0 );
+		}
+		counts[i]++;
+		vector_tpl<gebaeude_t *> tiles;
+		get_building_tiles( gb, tiles );
+		FOR( vector_tpl<gebaeude_t *>, const t, tiles ) {
+			// the town's own weight of a tile, as get_einwohner() counts it
+			citizens += ( t->get_tile()->get_desc()->get_level() + 1 ) * 6;
+			if(  shows_frames()  ) {
+				const koord k = t->get_pos().get_2d();
+				preview_tiles.append( k );
+				stadt_t::set_tile_framed( k, true );
+			}
+		}
+	}
+
+	cbuffer_t buf;
+	if(  found.empty()  ) {
+		buf.append( translator::translate( "No buildings of other towns here" ) );
+	}
+	else {
+		buf.printf( translator::translate( "To %s: %u buildings, about %d citizens" ), city->get_name(), found.get_count(), citizens );
+		buf.append( " (" );
+		for(  uint32 i = 0;  i < towns.get_count();  i++  ) {
+			if(  i == 3  ) {
+				buf.printf( translator::translate( "%u more" ), towns.get_count() - 3 );
+				break;
+			}
+			buf.printf( "%s%s %u", i > 0 ? ", " : "", towns[i] ? towns[i]->get_name() : translator::translate( "no town" ), counts[i] );
+		}
+		buf.append( ")" );
+	}
+	if(  townhall  ) {
+		buf.append( ", " );
+		buf.append( translator::translate( "town halls stay" ) );
+	}
+	tstrncpy( toolstr, buf, sizeof( toolstr ) );
+	win_set_static_tooltip( toolstr );
+}
+
+
+const char *tool_reassign_city_t::do_work( player_t *player, const koord3d &start, const koord3d &end )
+{
+	stadt_t *city = get_target_city();
+	if(  city == NULL  ||  (env_t::networkmode  &&  (player == NULL  ||  !player->is_public_service()))  ) {
+		return "";
+	}
+	const koord3d &last = end == koord3d::invalid ? start : end;
+	koord k1( min( start.x, last.x ), min( start.y, last.y ) );
+	koord k2( max( start.x, last.x ), max( start.y, last.y ) );
+	vector_tpl<gebaeude_t *> found;
+	bool townhall = false;
+	find_buildings_to_reassign( city, k1, k2, found, townhall );
+	if(  found.empty()  ) {
+		return NULL;
+	}
+
+	vector_tpl<stadt_t *> changed;
+	changed.append( city );
+	FOR( vector_tpl<gebaeude_t *>, const gb, found ) {
+		if(  stadt_t *from = gb->get_stadt()  ) {
+			changed.append_unique( from );
+			// every tile is a member of its own
+			vector_tpl<gebaeude_t *> tiles;
+			get_building_tiles( gb, tiles );
+			FOR( vector_tpl<gebaeude_t *>, const t, tiles ) {
+				from->remove_gebaeude_from_stadt( t );
+			}
+		}
+		city->add_gebaeude_to_stadt( gb );
+	}
+	stadt_t::update_targets_after_reassign( changed );
+	DBG_MESSAGE( "tool_reassign_city_t::do_work()", "%u buildings to %s", found.get_count(), city->get_name() );
+	return NULL;
+}
+
+
+/**
  * change water height
  */
 bool tool_change_water_height_t::init( player_t *player )

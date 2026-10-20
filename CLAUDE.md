@@ -897,6 +897,31 @@ over the westbound track at 4566), a layout lock the stock game has too. Tested 
 (one warning), a full bus ring with a dwelling stop just before the depot junction (one warning, 16
 buses), and a month of the owner's game without a jam (none).
 
+## Reassigning buildings to another town (fork feature, no save change)
+
+A town has no stored boundary: its limits (`lo`/`ur`) are the bounding box of its buildings (+2 when
+sparse, `recalc_city_size`), rebuilt on load, and that box is also where it grows (`stadt_t::build`)
+and what `find_nearest_city` checks. Which town a building belongs to is saved per building
+(`gebaeude_t` city index), so changing the membership changes the limits for good without a format
+change. The city window's "Reassign buildings" button (pressed while active) selects
+`tool_reassign_city_t` (general tool `TOOL_REASSIGN_CITY`, two-click, `default_param` = the town's
+index; no menuconf entry) for the active player: a click on a building of another town (or of none)
+moves it, a drag or two clicks moves every such building in the rectangle (a multi-tile building
+counts when any tile is inside), town halls stay. Each tile leaves its old town
+(`remove_gebaeude_from_stadt`), the first tile joins (`add_gebaeude_to_stadt`), then
+`stadt_t::update_targets_after_reassign` refreshes both towns' target lists and theirs in every other
+town (centres moved). Population moves as the building weight; `bev`/`arb`/`won` and the history stay.
+Display (this client only): while active, every tile of the town has the ground `marked` frame
+(`stadt_t::show_buildings_of`, `shown_tiles`, kept up to date in add/remove, rotated in `rotate90`,
+dropped in the destructor); while dragging, the buildings that would join get the frame too and a
+static tooltip says "To X: N buildings, about M citizens (Y 4, Z 2), town halls stay". The tool's
+cursor area is 0 and `karte_t::mark_area`/`station_reach_t::set_marked` keep the frame on the town's
+tiles (`stadt_t::keeps_frame`): leaving a stop tile clears the marks of its whole coverage square,
+even with the coverage display off. Network games: public service only (button disabled for others).
+`remove_city` deselects the tool (indices shift). Tested headless with a throwaway harness (click,
+town hall, drag, frames, rotation, 3 months, save/load, city removal) and the window and button
+under Xvfb with SDL2; a live drag could not be driven there (no pointer motion while a button is held).
+
 ## Convoy names (fork feature, no save change)
 
 A convoy's name gets its id in front ("(4486) R12") only while another convoy of the same owner has

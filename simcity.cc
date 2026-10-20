@@ -597,6 +597,10 @@ void stadt_t::add_gebaeude_to_stadt(const gebaeude_t* gb, bool ordered)
 						}
 
 						add_gb->set_stadt(this);
+						if(  this == shown_city  ) {
+							shown_tiles.append( pos + k );
+							set_tile_framed( pos + k, true );
+						}
 						if (add_gb->get_tile()->get_desc()->is_townhall()) {
 							has_townhall = true;
 						}
@@ -629,6 +633,9 @@ void stadt_t::remove_gebaeude_from_stadt(gebaeude_t* gb)
 {
 	buildings.remove(gb);
 	gb->set_stadt(NULL);
+	if(  this == shown_city  &&  shown_tiles.remove( gb->get_pos().get_2d() )  ) {
+		set_tile_framed( gb->get_pos().get_2d(), false );
+	}
 	recalc_city_size();
 	// fork: no stop serves an empty tile beyond the Reach
 	if(  !gb->get_tile()  ||  !gb->get_tile()->get_desc()  ||  !gb->get_tile()->get_desc()->is_attraction()  ) {
@@ -642,6 +649,71 @@ void stadt_t::update_gebaeude_from_stadt(gebaeude_t* gb)
 {
 	buildings.remove(gb);
 	buildings.append(gb, gb->get_tile()->get_desc()->get_level() + 1);
+}
+
+
+stadt_t *stadt_t::shown_city = NULL;
+vector_tpl<koord> stadt_t::shown_tiles;
+
+
+void stadt_t::set_tile_framed( koord k, bool framed )
+{
+	if(  grund_t *gr = welt->lookup_kartenboden( k )  ) {
+		if(  framed  ) {
+			gr->set_flag( grund_t::marked );
+		}
+		else {
+			gr->clear_flag( grund_t::marked );
+		}
+		gr->set_flag( grund_t::dirty );
+	}
+}
+
+
+bool stadt_t::keeps_frame( const grund_t *gr )
+{
+	if(  shown_city == NULL  ||  !gr->ist_karten_boden()  ) {
+		return false;
+	}
+	const gebaeude_t *gb = gr->find<gebaeude_t>();
+	return gb  &&  gb->get_stadt() == shown_city;
+}
+
+
+void stadt_t::show_buildings_of( stadt_t *city )
+{
+	FOR( vector_tpl<koord>, const k, shown_tiles ) {
+		set_tile_framed( k, false );
+	}
+	shown_tiles.clear();
+	shown_city = city;
+	if(  city  ) {
+		// every tile of a building is in the list
+		FOR( weighted_vector_tpl<gebaeude_t *>, const gb, city->buildings ) {
+			const koord k = gb->get_pos().get_2d();
+			shown_tiles.append( k );
+			set_tile_framed( k, true );
+		}
+	}
+}
+
+
+void stadt_t::update_targets_after_reassign( const vector_tpl<stadt_t *> &changed )
+{
+	// both ends of a move have a new size and centre
+	FOR( vector_tpl<stadt_t *>, const c, changed ) {
+		c->recalc_target_cities();
+		c->recalc_target_attractions();
+	}
+	FOR( weighted_vector_tpl<stadt_t *>, const other, welt->get_cities() ) {
+		if(  changed.is_contained( other )  ) {
+			continue;
+		}
+		FOR( vector_tpl<stadt_t *>, const c, changed ) {
+			other->remove_target_city( c );
+			other->add_target_city( c );
+		}
+	}
 }
 
 
@@ -965,6 +1037,16 @@ void stadt_t::factory_set_t::resolve_factories()
 
 stadt_t::~stadt_t()
 {
+	if(  shown_city == this  ) {
+		if(  welt->is_destroying()  ) {
+			shown_tiles.clear();
+			shown_city = NULL;
+		}
+		else {
+			show_buildings_of( NULL );
+		}
+	}
+
 	// close info win
 	destroy_win((ptrdiff_t)this);
 
@@ -1383,6 +1465,11 @@ void stadt_t::rotate90( const sint16 y_size )
 	// rotate town origin
 	pos.rotate90( y_size );
 	townhall_road.rotate90( y_size );
+	if(  this == shown_city  ) {
+		FOR( vector_tpl<koord>, &k, shown_tiles ) {
+			k.rotate90( y_size );
+		}
+	}
 	// rotate an rectangle
 	lo.rotate90( y_size );
 	ur.rotate90( y_size );

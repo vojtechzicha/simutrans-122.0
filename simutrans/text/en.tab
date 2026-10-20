@@ -1795,3 +1795,21 @@ station_far_reach
 Far reach: houses no stop reaches go to their nearest stop up to (tiles, 0 = off)
 (nearest stop)
 (nearest stop)
+Reassign buildings
+Reassign buildings
+Click buildings or drag an area on the map to move them to this town
+Click buildings or drag an area on the map to move them to this town
+Reassign buildings to %s
+Reassign buildings to %s
+No buildings of other towns here
+No buildings of other towns here
+To %s: %u buildings, about %d citizens
+To %s: %u buildings, about %d citizens
+%u more
+%u more
+no town
+no town
+town halls stay
+town halls stay
+Only the public service can move buildings to another town.
+Only the public service can move buildings to another town.

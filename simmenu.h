@@ -76,6 +76,7 @@ enum {
 	TOOL_MERGE_STOP,
 	TOOL_EXEC_SCRIPT,
 	TOOL_EXEC_TWO_CLICK_SCRIPT,
+	TOOL_REASSIGN_CITY, // fork: make city buildings part of another town
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
