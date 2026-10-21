@@ -7647,16 +7647,38 @@ bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d star
 	if(  schedule  &&  schedule->get_count()>1  ) {
 		next = schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos;
 	}
+	// also the layover tiles of the same stops beyond the waiting area (rows of bays round a stop with
+	// plain road between them); the queue stays that of our waiting area
+	vector_tpl<koord3d> candidates( group );
+	FOR( vector_tpl<koord3d>, const p, group ) {
+		const halthandle_t halt = haltestelle_t::get_halt( p, owner );
+		if(  !halt.is_bound()  ) {
+			continue;
+		}
+		FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
+			if(  get_layover_kind( t.grund )  ) {
+				candidates.append_unique( t.grund->get_pos() );
+			}
+		}
+	}
 	const koord3d here = fahr[0]->get_pos();
 	const sint32 speed = speed_to_kmh( min_top_speed );
 	uint32 best = 0xFFFFFFFFu;
-	FOR( vector_tpl<koord3d>, const p, group ) {
+	FOR( vector_tpl<koord3d>, const p, candidates ) {
 		const grund_t *gr = welt->lookup( p );
 		if(  p==not_here  ||  get_layover_kind( gr )==0  ) {
 			continue;
 		}
 		if(  get_bay_owner( p, 0 ).is_bound()  &&  get_bay_owner( p, 1 ).is_bound()  ) {
 			continue;
+		}
+		if(  !group.is_contained( p )  ) {
+			// another waiting area: not before the buses that wait in front of it
+			vector_tpl<koord3d> other;
+			get_layover_group( p, owner, other );
+			if(  !is_first_in_layover_queue( other )  ) {
+				continue;
+			}
 		}
 		// (route_t directly: road_vehicle_t::calc_route would drop a choose sign's reservation)
 		route_t r;

@@ -411,8 +411,9 @@ private:
 	static void get_layover_group(koord3d start, const player_t *owner, vector_tpl<koord3d> &group);
 	/// first among the convoys queued in front of that waiting area (by layover_since, then id)
 	bool is_first_in_layover_queue(const vector_tpl<koord3d> &group) const;
-	/// a layover tile of the group other than not_here with a bay for us and the way there from start
-	/// (and on to the next stop of the schedule); false if none
+	/// a layover tile of the group, or of a stop of the group (another waiting area, if no bus waits
+	/// there longer than we do), other than not_here with a bay for us and the shortest way there from
+	/// start (and on to the next stop of the schedule); false if none
 	bool find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, koord3d &pos, route_t &way);
 
 	/**

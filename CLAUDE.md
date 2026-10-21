@@ -961,7 +961,11 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   layover tile of the waiting area with a free bay and a way on to the next stop (route replaced;
   not with waypoints on the way). The waiting area (`get_layover_group`) is every layover tile of the
   owner's stops reached over road tiles that are layover tiles or next to one (the junctions of a
-  cluster), so rows of bays that became separate stops still count as one. No bay: QUEUED, the bus
+  cluster), so rows of bays that became separate stops still count as one. Layover tiles of the same
+  stops beyond the waiting area (rows of bays round a stop with plain road between them) are candidates
+  too (`find_other_layover`), if no bus waits longer in front of their own waiting area; the queue stays
+  per waiting area, so no bus waits behind one it cannot see. Before (2026-10-21, Ostrava, Hrabůvka,
+  Poliklinika: four layover tiles in three areas) a bus queued at its full tile beside free bays. No bay: QUEUED, the bus
   drives on and stops before the first layover tile or junction next to one (`layover_gate` from
   `road_vehicle_t::can_enter_tile`), joining the queue there (`layover_since`, first come first
   served); the first in the queue takes a freed bay, on another tile by changing the route after the
