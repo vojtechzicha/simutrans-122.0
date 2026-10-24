@@ -327,6 +327,9 @@ private:
 	bool platform_hold;
 	bool platform_boarded;
 
+	// fork, rail: when reroute_round_taken last searched a way round (ticks, 0 = not yet); not saved
+	uint32 reroute_tried;
+
 	// fork: at the real start after boarding while held, as at departure in hat_gehalten: a full
 	// passenger train leaves those still waiting for its next stops behind (mark_missed_connection)
 	void mark_missed_after_hold();
@@ -674,6 +677,25 @@ public:
 	// fork, rail: waiting at the stop position until the platform signal ahead is green
 	bool is_platform_held() const { return platform_hold  &&  (state==CAN_START  ||  state==CAN_START_ONE_MONTH  ||  state==CAN_START_TWO_MONTHS); }
 	void set_platform_hold(bool on) { platform_hold = on; }
+
+	/**
+	 * Fork, rail: a train standing at its stop that cannot start because its route runs over another
+	 * track of that stop held by another train takes a way round it from there (reversing if it leads
+	 * the other way), when there is one not much longer. The route search ignores other trains, so a
+	 * train may plan to leave through the throat behind it and come back in over the next platform,
+	 * and would then wait for that platform for good while the way out ahead is free. Tried every two
+	 * calendar minutes; true when it took a new route.
+	 */
+	bool reroute_round_taken();
+
+	/**
+	 * Fork, rail (not trams): a new route from a stop that leaves the station through its throat and comes
+	 * straight back into another platform of it the other way (the route search sees no difference
+	 * between that and turning round at the platform, and takes it when the way out ahead is a little
+	 * slower) is replaced by the way that keeps off the other platforms of the stop, when there is one
+	 * not much longer. Called in drive_to before the train sets off.
+	 */
+	void avoid_throat_turn();
 	// fork: the stop it finished loading at and still stands at (see leaving_halt)
 	halthandle_t get_leaving_halt() const { return leaving_halt; }
 	// fork, rail: may wait at the platform for its exit signal (not leaving a depot, not handing the

@@ -421,6 +421,31 @@ both directions, Dobrovice and MB hl.n. depending on the gap, express 17-34 min 
 freight overtaken at Čachovice; a small loop/station layout where the stopper steps off the main
 platform; save/load mid-hold; the 33 rail regression scenarios byte-identical).
 
+## Leaving a station without turning through its throat (fork feature, no save change)
+
+The route search (`route_t::intern_calc_route`) ignores other trains and lets a train turn round through two
+90 degree curves, so a train leaving a stop could plan to run out through the throat behind it and come straight
+back in over another platform (Praha hl.n.: Os 5843 south to 2509,2076 and back north over the track at x 2513;
+Vysočany: the west throat 2591-2592,1995-1997 into the next platform). It then waited at its exit signal for that
+platform for good, and two such trains wanting each other's platforms locked the station (Vysočany 2026-10-22: Os
+5841 on y 1994 and Os 9528 on y 1997, Os 9105 behind them). Rail only, never trams; nothing is saved.
+- At departure (`convoi_t::avoid_throat_turn`, from `drive_to` before `vorfahren`): a new route that leaves the
+  stop and comes back into it within 40 tiles heading the other way is replaced by the way that keeps off the
+  stop's other tiles (all but the way out and our own track behind us up to a switch; `rail_vehicle_t::avoid_tiles`
+  in `check_next_tile`, `find_route_avoiding` through the waypoints like `calc_route_on`), when there is one at
+  most a quarter longer plus 16 tiles. Otherwise the route stays, so layouts whose only way on is that turn work
+  as before. A departure from a depot, or with a claim (single-track sections), is left alone.
+- Standing at the stop (`convoi_t::reroute_round_taken`, from the CAN_START step when it cannot start, every 2
+  calendar minutes; 1/256 month without the calendar): when the first tile ahead held by another train is a tile
+  of our stop that our way reaches after leaving the stop (a train in front of us on our own platform is waited
+  for as before), it searches the way that keeps off the tiles of the stop other trains hold
+  (`rail_vehicle_t::avoid_taken_halt`, `find_route_round_taken`), within the same length limit, and takes it
+  through `drive_to` like a departure (it turns round at the platform if the way leads back). Not with a claim, a
+  section wait (the single-track rules choose there), or when the holder's line couples with ours.
+Measured on the owner's game (close autosave 2026-10-22, from each line's stop tiles): of 7568 departures, 5 rail
+ones turn through the throat back into their station; the turn rule changes one (R9 at Kolín, 264 tiles instead of
+278), the other four have no other way and keep it. The 39 regression scenarios are byte-identical.
+
 ## Mixed traction (fork feature)
 
 A convoy with electric engines and other engines (diesel, steam, ...) needs no catenary

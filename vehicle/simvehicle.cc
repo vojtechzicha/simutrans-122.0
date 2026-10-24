@@ -2909,6 +2909,7 @@ rail_vehicle_t::rail_vehicle_t(loadsave_t *file, bool is_first, bool is_last) : 
 	detour_any_track = false;
 	track_search = 0;
 	track_search_block = false;
+	avoid_tiles = NULL;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
 	stop_search_start = koord3d::invalid;
@@ -2973,6 +2974,7 @@ rail_vehicle_t::rail_vehicle_t(koord3d pos, const vehicle_desc_t* desc, player_t
 	detour_any_track = false;
 	track_search = 0;
 	track_search_block = false;
+	avoid_tiles = NULL;
 	track_search_start = koord3d::invalid;
 	couple_goal = koord3d::invalid;
 	stop_search_start = koord3d::invalid;
@@ -3157,7 +3159,44 @@ bool rail_vehicle_t::check_next_tile(const grund_t *bd) const
 		return turn_probe  ||  sch->can_reserve(cnv->self);
 	}
 
+	if(  avoid_tiles  &&  avoid_tiles->is_contained( bd->get_pos() )  ) {
+		// fork: a way out that keeps off the other platforms of our stop
+		return false;
+	}
+	if(  avoid_taken_halt.is_bound()  &&  cnv!=NULL  &&  bd->get_halt()==avoid_taken_halt  ) {
+		// fork: a way round the trains at our stop, not over their tracks there
+		const convoihandle_t holder = sch->get_reserved_convoi();
+		if(  holder.is_bound()  &&  holder!=cnv->self  ) {
+			return false;
+		}
+	}
+
 	return true;
+}
+
+
+bool rail_vehicle_t::find_route_round_taken(halthandle_t halt, uint32 from, route_t &alt)
+{
+	// a plain route search (a stop search would only take free tiles everywhere)
+	const halthandle_t old_target = target_halt;
+	target_halt = halthandle_t();
+	avoid_taken_halt = halt;
+	const bool ok = cnv->calc_route_on( get_pos(), *cnv->get_route(), from, vector_tpl<koord3d>(), alt );
+	avoid_taken_halt = halthandle_t();
+	target_halt = old_target;
+	return ok;
+}
+
+
+bool rail_vehicle_t::find_route_avoiding(const vector_tpl<koord3d> &tiles, route_t &alt)
+{
+	const halthandle_t old_target = target_halt;
+	target_halt = halthandle_t();
+	avoid_tiles = &tiles;
+	const bool ok = cnv->calc_route_on( get_pos(), *cnv->get_route(), 0, vector_tpl<koord3d>(), alt );
+	avoid_tiles = NULL;
+	target_halt = old_target;
+	return ok;
 }
 
 

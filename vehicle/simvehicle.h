@@ -727,6 +727,15 @@ private:
 	halthandle_t stop_search_halt;
 	koord3d stop_search_start; // the search may leave this tile (a signal on a platform end)
 
+	/* fork: while bound, the route search keeps off the tiles of this halt that other trains hold
+	 * (convoi_t::reroute_round_taken: a train that cannot leave its stop because its route runs over
+	 * another track of the stop held by another train looks for a way round it)
+	 */
+	halthandle_t avoid_taken_halt;
+
+	// fork: while set, the route search keeps off these tiles (convoi_t::avoid_throat_turn)
+	const vector_tpl<koord3d> *avoid_tiles;
+
 	// the signal on this tile applies to a train leaving it in direction dir (never a block post:
 	// those count only for a train in a single-track section, see is_stop_point)
 	bool signal_applies(const grund_t *gr, ribi_t::ribi dir) const;
@@ -874,6 +883,18 @@ public:
 
 	// since we might need to un-reserve previously used blocks, we must do this before calculation a new route
 	bool calc_route(koord3d start, koord3d ziel, sint32 max_speed, route_t* route) OVERRIDE;
+
+	// fork: the way from here along the convoy's route (from index from on, through its waypoints) to its end
+	// that keeps off the tiles of halt other trains hold (see avoid_taken_halt)
+	bool find_route_round_taken(halthandle_t halt, uint32 from, route_t &alt);
+	// fork: while set, every route search keeps off them (the caller clears it)
+	void set_avoid_taken_halt(halthandle_t halt) { avoid_taken_halt = halt; }
+
+	// fork: the way from here along the convoy's route (through its waypoints) to its end that keeps off
+	// these tiles (a plain route search otherwise)
+	bool find_route_avoiding(const vector_tpl<koord3d> &tiles, route_t &alt);
+	// fork: while set, every route search keeps off these tiles (the caller clears it)
+	void set_avoid_tiles(const vector_tpl<koord3d> *tiles) { avoid_tiles = tiles; }
 
 	// how expensive to go here (for way search)
 	int get_cost(const grund_t *gr, const weg_t *w, const sint32 max_speed, ribi_t::ribi from) const OVERRIDE;

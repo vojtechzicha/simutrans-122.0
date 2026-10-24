@@ -200,6 +200,7 @@ void convoi_t::init(player_t *player)
 	leaving_loadable = 0;
 	platform_hold = false;
 	platform_boarded = false;
+	reroute_tried = 0;
 	running_late = false;
 	late_slot = -1;
 	departure_delay = NO_DEPARTURE_DELAY;
@@ -2232,6 +2233,8 @@ bool convoi_t::drive_to()
 				release_claim( true );
 			}
 			if(  route_ok  ) {
+				// fork, rail: not out through the throat and back into the next platform
+				avoid_throat_turn();
 				// fork, bus layover: a bay at the stop the route ends at (may change the route)
 				plan_layover();
 				// fork, coupling: the train we parted from may stand in our way out of the platform
@@ -2412,6 +2415,9 @@ void convoi_t::step()
 						}
 						leaving_halt = halthandle_t();
 					}
+				}
+				else if(  reroute_round_taken()  ) {
+					// fork: a new way out round a train at our stop (drive_to set the state)
 				}
 				else if(  is_platform_held()  ) {
 					// fork: the exit signal keeps us at the platform, boarding goes on
@@ -6385,6 +6391,118 @@ static bool line_couples_with(linehandle_t l, uint16 id)
 		}
 	}
 	return false;
+}
+
+
+bool convoi_t::reroute_round_taken()
+{
+	rail_vehicle_t *const lok = anz_vehikel>0 ? dynamic_cast<rail_vehicle_t *>(fahr[0]) : NULL;
+	if(  lok==NULL  ||  lok->get_desc()->get_waytype()==tram_wt  ||  route.get_count()<2  ||  has_claim()  ||  section_wait!=SECTION_WAIT_NONE  ||  steps_driven>=0  ) {
+		// single-track sections and their claims choose their tracks themselves; trams queue at their stops
+		return false;
+	}
+	const uint32 now = welt->get_ticks();
+	const uint32 interval = welt->has_calendar() ? (uint32)welt->calendar_minutes_to_ticks( 2 ) : (uint32)(welt->ticks_per_world_month >> 8);
+	if(  reroute_tried!=0  &&  now - reroute_tried < interval  ) {
+		return false;
+	}
+	grund_t const* const gr = welt->lookup( lok->get_pos() );
+	const halthandle_t halt = gr ? gr->get_halt() : halthandle_t();
+	const uint32 from = lok->get_route_index()>0 ? lok->get_route_index()-1 : 0;
+	if(  !halt.is_bound()  ||  from+1>=route.get_count()  ||  route.at(from)!=lok->get_pos()  ) {
+		return false;
+	}
+	// the first tile ahead that another train holds: on a track of our stop, after our way left it? (a train
+	// standing in front of us on our own platform is simply waited for)
+	convoihandle_t holder;
+	bool at_stop = false, left = false;
+	for(  uint32 i=from+1;  i<route.get_count()  &&  i<=from+64  &&  !holder.is_bound();  i++  ) {
+		grund_t const* const g = welt->lookup( route.at(i) );
+		schiene_t const* const sch = g ? obj_cast<schiene_t>( g->get_weg( lok->get_waytype() ) ) : NULL;
+		left |= g!=NULL  &&  g->get_halt()!=halt;
+		if(  sch  &&  sch->get_reserved_convoi().is_bound()  &&  sch->get_reserved_convoi()!=self  ) {
+			holder = sch->get_reserved_convoi();
+			at_stop = left  &&  g->get_halt()==halt;
+		}
+	}
+	if(  !holder.is_bound()  ||  !at_stop  ) {
+		return false;
+	}
+	if(  line.is_bound()  &&  holder->get_line().is_bound()  &&  (line_couples_with( line, holder->get_line().get_id() )  ||  line_couples_with( holder->get_line(), line.get_id() ))  ) {
+		// coupling brings the two together on purpose
+		return false;
+	}
+	reroute_tried = nonzero_ticks( now );
+	route_t alt;
+	const uint32 rest = route.get_count() - from;
+	if(  !lok->find_route_round_taken( halt, from, alt )  ||  alt.get_count() > rest + rest/4 + 16  ) {
+		return false;
+	}
+	// as at the departure: a new route from here, turning round when it leads the other way
+	dbg->message( "convoi_t::reroute_round_taken()", "%s at %s: way out over the track of %s at %s, leaves round it", get_name(), lok->get_pos().get_str(), holder->get_name(), halt->get_name() );
+	lok->set_avoid_taken_halt( halt );
+	const bool ok = drive_to();
+	lok->set_avoid_taken_halt( halthandle_t() );
+	return ok;
+}
+
+
+void convoi_t::avoid_throat_turn()
+{
+	rail_vehicle_t *const lok = anz_vehikel>0 ? dynamic_cast<rail_vehicle_t *>(fahr[0]) : NULL;
+	if(  lok==NULL  ||  lok->get_desc()->get_waytype()==tram_wt  ||  route.get_count()<3  ||  has_claim()  ) {
+		return;
+	}
+	grund_t const* const gr = welt->lookup( route.front() );
+	const halthandle_t halt = gr  &&  !gr->get_depot() ? gr->get_halt() : halthandle_t();
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	// out of the stop at a, back into it at b within 40 tiles, heading the other way
+	uint32 a = 1;
+	while(  a<route.get_count()  &&  haltestelle_t::get_halt( route.at(a), owner )==halt  ) {
+		a++;
+	}
+	uint32 b = a;
+	while(  b<route.get_count()  &&  b<a+40  &&  haltestelle_t::get_halt( route.at(b), owner )!=halt  ) {
+		b++;
+	}
+	if(  b>=route.get_count()  ||  b>=a+40  ||  ribi_type( route.at(b-1), route.at(b) )!=ribi_t::backward( ribi_type( route.at(a-1), route.at(a) ) )  ) {
+		return;
+	}
+	// the tiles of the stop but ours: the way out of it, and our track on behind us up to a switch
+	vector_tpl<koord3d> own;
+	for(  uint32 i=0;  i<a;  i++  ) {
+		own.append( route.at(i) );
+	}
+	koord3d prev = route.at(1), cur = route.front();
+	for(  int n=0;  n<256;  n++  ) {
+		grund_t const* const g = welt->lookup( cur );
+		grund_t *to = NULL;
+		if(  g==NULL  ||  !g->get_neighbour( to, lok->get_waytype(), ribi_type( prev, cur ) )  ||  to->get_halt()!=halt  ) {
+			break;
+		}
+		own.append( to->get_pos() );
+		weg_t const* const w = to->get_weg( lok->get_waytype() );
+		if(  w==NULL  ||  ribi_t::is_threeway( w->get_ribi_unmasked() )  ) {
+			break;
+		}
+		prev = cur;
+		cur = to->get_pos();
+	}
+	vector_tpl<koord3d> others;
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
+		if(  t.grund->get_weg( lok->get_waytype() )  &&  !own.is_contained( t.grund->get_pos() )  ) {
+			others.append( t.grund->get_pos() );
+		}
+	}
+	route_t alt;
+	if(  !lok->find_route_avoiding( others, alt )  ||  alt.get_count() > route.get_count() + route.get_count()/4 + 16  ) {
+		return;
+	}
+	dbg->message( "convoi_t::avoid_throat_turn()", "%s at %s: leaves without turning through the throat into another platform of %s", get_name(), route.front().get_str(), halt->get_name() );
+	route.clear();
+	route.append( &alt );
 }
 
 
