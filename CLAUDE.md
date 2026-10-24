@@ -892,8 +892,13 @@ every 5 calendar minutes (1/64 month without the calendar) and builds a wait-for
 vehicle:
 - Rail and tram convoys waiting at a signal or stop (WAITING_FOR_CLEARANCE*, CAN_START*) point at the
   convoy holding the first tile on their route ahead that they have not reserved (up to the second
-  signal). Section waits count too (since 2026-10-13), except ENTRY, YIELD, HOLD and the passing
-  holds, which time out: waiting for the single-track line (LINE) points at the holder of
+  signal). Section waits count too (since 2026-10-13), except YIELD, HOLD and the passing holds,
+  which time out; ENTRY (at an `LT`, waiting to enter) counts since 2026-10-24 like a plain wait (the
+  first foreign tile ahead; a partner still running in is no node). Vršovice: on a track with a `P`
+  at its east end only, a westbound passing train's claim ran out of the station (`get_claim_start`
+  claimed only past the far throat's last switch), Os 19015 stopped on the unclaimed track and waited
+  for the line EC 115 stood on at the `LT`, R 890 behind EC 115's claim: no warning until then.
+  Waiting for the single-track line (LINE) points at the holder of
   `section_wait_tile`; waiting for a track at a station (TRACK, LAST_TRACK) at the trains on its
   tracks (`rail_vehicle_t::get_station_occupants`), and a circle through such a train counts only
   when every one of them is stuck too (in a circle or behind one). `check_section_lock` misses locks

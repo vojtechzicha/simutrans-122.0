@@ -1221,8 +1221,11 @@ void convoi_t::check_deadlocks()
 	vector_tpl<sint32> next;
 
 	// rail convoys waiting for a reservation, also at the platform signals, station boundaries and
-	// block posts of single-track lines; not for a partner, a train to let through or a passing train,
-	// which time out
+	// block posts of single-track lines; not for a train to let through or a passing train, which time
+	// out. A train at a station boundary waiting to enter (ENTRY) counts: the throat or its claimed track
+	// may be held by a train that waits for it (Vršovice: a passing train's claim ran out of the station
+	// past a track without a P, and a train stopping on that track waited for the line the first one
+	// stood on); one waiting there for its partner running in points at that partner, which is no node
 	inthashtable_tpl<uint16, uint32> rail_node_of;
 	FOR( vector_tpl<convoihandle_t>, const cnv, welt->convoys() ) {
 		const convoi_t *c = cnv.get_rep();
@@ -1234,7 +1237,7 @@ void convoi_t::check_deadlocks()
 			continue;
 		}
 		const uint8 sw = c->section_wait;
-		if(  sw==SECTION_WAIT_ENTRY  ||  sw==SECTION_WAIT_YIELD  ||  sw==SECTION_WAIT_HOLD  ||  c->passing_hold_for.is_bound()  ||  c->section_hold_for.is_bound()  ) {
+		if(  sw==SECTION_WAIT_YIELD  ||  sw==SECTION_WAIT_HOLD  ||  c->passing_hold_for.is_bound()  ||  c->section_hold_for.is_bound()  ) {
 			continue;
 		}
 		rail_node_of.put( cnv.get_id(), nodes.get_count() );
