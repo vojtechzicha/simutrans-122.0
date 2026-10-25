@@ -426,6 +426,13 @@ public:
 	 */
 	sint8 is_connected(halthandle_t halt, uint8 catg_index) const;
 
+	/**
+	 * Fork, stop types: a packet waiting here can leave for its next stop, i.e. that stop is one of
+	 * our connections (built along the stop types, see rebuild_connections), or the packet has no
+	 * next stop yet (fetch_goods searches one then).
+	 */
+	bool can_leave_for(const ware_t &ware) const;
+
 	bool has_available_network( const player_t* player, uint8 catg_index = goods_manager_t::INDEX_NONE ) const;
 
 	const slist_tpl<fabrik_t*>& get_fab_list() const { return fab_list; }

@@ -1174,6 +1174,10 @@ sint32 haltestelle_t::rebuild_connections()
 	MEMZERON(max_consecutive_halts_schedule, goods_manager_t::get_max_catg_index());
 	// previous halt supporting the ware categories of the serving line
 	static halthandle_t previous_halt[256];
+	// fork, stop types: a schedule has a terminal or all-off entry here, so cargo changes here
+	// even when only one line serves the halt (the walk is blocked there, see below)
+	bool changes_here[256];
+	MEMZERON(changes_here, goods_manager_t::get_max_catg_index());
 
 	// first, remove all old entries
 	for(  uint8 i=0;  i<goods_manager_t::get_max_catg_index();  i++  ){
@@ -1280,6 +1284,11 @@ sint32 haltestelle_t::rebuild_connections()
 						previous_halt[catg_index] = self;
 					}
 				}
+				if(  !entry.rides_through()  ) {
+					FOR(minivec_tpl<uint8>, const catg_index, supported_catg_index) {
+						changes_here[catg_index] = true;
+					}
+				}
 				// reset aggregate weight
 				aggregate_weight = WEIGHT_WAIT;
 				blocked = !entry.plans_departure();
@@ -1323,8 +1332,9 @@ sint32 haltestelle_t::rebuild_connections()
 	}
 	for(  uint8 i=0;  i<goods_manager_t::get_max_catg_index();  i++  ){
 		if(  !consecutive_halts[i].empty()  ) {
-			if(  consecutive_halts[i].get_count() == max_consecutive_halts_schedule[i]  ) {
+			if(  consecutive_halts[i].get_count() == max_consecutive_halts_schedule[i]  &&  !changes_here[i]  ) {
 				// one schedule reaches all consecutive halts -> this is not transfer halt
+				// (fork: unless cargo cannot ride through here; the route search goes on only from transfer halts)
 			}
 			else {
 				all_links[i].is_transfer = true;
@@ -1400,6 +1410,28 @@ sint8 haltestelle_t::is_connected(halthandle_t halt, uint8 catg_index) const
 	}
 	// now check whether both halts are in the same component
 	return linka.catg_connected_component == linkb.catg_connected_component ? 1 : 0;
+}
+
+
+bool haltestelle_t::can_leave_for(const ware_t &ware) const
+{
+	const halthandle_t via = ware.get_zwischenziel();
+	if(  !via.is_bound()  ||  ware.get_ziel()==self  ) {
+		return true;
+	}
+	// sorted by halt id (connection_t::compare)
+	const vector_tpl<connection_t> &conns = all_links[ware.get_desc()->get_catg_index()].connections;
+	uint32 lo = 0, hi = conns.get_count();
+	while(  lo<hi  ) {
+		const uint32 mid = (lo+hi)/2;
+		if(  conns[mid].halt.get_id() < via.get_id()  ) {
+			lo = mid+1;
+		}
+		else {
+			hi = mid;
+		}
+	}
+	return lo<conns.get_count()  &&  conns[lo].halt==via;
 }
 
 

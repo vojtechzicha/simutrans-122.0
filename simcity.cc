@@ -2099,22 +2099,47 @@ void stadt_t::step_passagiere()
 					if(  !return_halt->is_overcrowded(wtyp->get_index())  ) {
 						// stop can receive passengers
 
-						// register departed pax/mail at factory
-						if (factory_entry) {
-							factory_entry->factory->book_stat(pax_return, ispass ? FAB_PAX_DEPARTED : FAB_MAIL_DEPARTED);
-						}
-
 						// setup ware packet
 						return_pax.menge = pax_return;
 						return_pax.set_zielpos(origin_pos);
-						return_halt->starte_mit_route(return_pax);
 
-						// log departed at stop
-						return_halt->add_pax_happy(pax_return);
+						// fork, stop types: the return route is the forward one reversed, which the lines need not
+						// offer (a stop served in one direction only, an all-off or only-load entry); then search it
+						// from here, so it keeps to the stop types like every other route
+						int return_result = haltestelle_t::ROUTE_OK;
+						if(  !return_halt->can_leave_for( return_pax )  ) {
+							return_result = haltestelle_t::search_route( &return_halt, 1u, welt->get_settings().is_no_routing_over_overcrowding(), return_pax );
+						}
 
-						// log departed at destination city
-						dest_city->city_history_year[0][history_type + HIST_OFFSET_TRANSPORTED] += pax_return;
-						dest_city->city_history_month[0][history_type + HIST_OFFSET_TRANSPORTED] += pax_return;
+						if(  return_result==haltestelle_t::ROUTE_OK  ) {
+							// register departed pax/mail at factory
+							if (factory_entry) {
+								factory_entry->factory->book_stat(pax_return, ispass ? FAB_PAX_DEPARTED : FAB_MAIL_DEPARTED);
+							}
+
+							return_halt->starte_mit_route(return_pax);
+
+							// log departed at stop
+							return_halt->add_pax_happy(pax_return);
+
+							// log departed at destination city
+							dest_city->city_history_year[0][history_type + HIST_OFFSET_TRANSPORTED] += pax_return;
+							dest_city->city_history_month[0][history_type + HIST_OFFSET_TRANSPORTED] += pax_return;
+						}
+						else if(  return_result==haltestelle_t::ROUTE_WALK  ) {
+							if (factory_entry) {
+								factory_entry->factory->book_stat(pax_return, ispass ? FAB_PAX_DEPARTED : FAB_MAIL_DEPARTED);
+							}
+							return_halt->add_pax_walked(pax_return);
+							dest_city->city_history_year[0][history_type + HIST_OFFSET_WALKED] += pax_return;
+							dest_city->city_history_month[0][history_type + HIST_OFFSET_WALKED] += pax_return;
+						}
+						else if(  return_result==haltestelle_t::ROUTE_OVERCROWDED  ) {
+							return_halt->add_pax_unhappy(pax_return);
+						}
+						else {
+							return_halt->add_pax_no_route(pax_return);
+						}
 					}
 					else {
 						// stop is crowded

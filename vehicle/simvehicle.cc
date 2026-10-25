@@ -950,7 +950,8 @@ void vehicle_t::remove_stale_cargo(const schedule_t *sched)
 			if(  tmp.get_zwischenziel().is_bound()  ) {
 				// the original halt exists, but does we still go there?
 				FOR(minivec_tpl<schedule_entry_t>, const& i, sched->entries) {
-					if(  haltestelle_t::get_halt( i.pos, cnv->get_owner()) == tmp.get_zwischenziel()  ) {
+					// fork, stop types: only an entry where we unload (not only load, not hold)
+					if(  i.unloads()  &&  haltestelle_t::get_halt( i.pos, cnv->get_owner()) == tmp.get_zwischenziel()  ) {
 						found = true;
 						break;
 					}
@@ -962,8 +963,9 @@ void vehicle_t::remove_stale_cargo(const schedule_t *sched)
 				const int max_count = sched->entries.get_count();
 				for(  int i=0;  i<max_count;  i++  ) {
 					// try to unload on next stop
-					halthandle_t halt = haltestelle_t::get_halt( sched->entries[ (i+offset)%max_count ].pos, cnv->get_owner() );
-					if(  halt.is_bound()  ) {
+					const schedule_entry_t &entry = sched->entries[ (i+offset)%max_count ];
+					halthandle_t halt = haltestelle_t::get_halt( entry.pos, cnv->get_owner() );
+					if(  halt.is_bound()  &&  entry.unloads()  ) {
 						if(  halt->is_enabled(tmp.get_index())  ) {
 							// ok, lets change here, since goods are accepted here
 							tmp.access_zwischenziel() = halt;

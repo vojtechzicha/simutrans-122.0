@@ -252,6 +252,17 @@ rides through; a stop only to let passing trains overtake, see below). The rules
 applies them when it walks a schedule: a Terminal or All off entry blocks the walk, so no edges are
 added until the next entry of the home halt, which is what stops the planner from routing anyone
 through a terminus (A-B-C-E, then E-D-B-A: nobody boards at B for D, they change instead).
+Every route must come from those connections. The stock return trip did not: `search_route` gives the
+return packet the forward trip reversed, so a stop served one way only got return passengers for a stop
+it has no connection to, which no vehicle there loads (Ostrava, Vrbina 2026-10-25: line 52 stops there
+northbound only, return passengers "to Křižíkova" waited for good and filled the stop). `simcity.cc` now
+checks it (`haltestelle_t::can_leave_for`: the next stop is one of the stop's connections) and searches the
+return route from the return stop otherwise; vehicles with stale cargo after a schedule change
+(`remove_stale_cargo`) give it a next stop only at an entry that unloads. The route search goes on only
+from transfer halts, and stock calls a halt served by one line none, so no route ever went through a
+terminus only one line serves (Vrbina had no route south via Paseky, line 52's All off terminus): a halt
+with a Terminal or All off entry in a schedule now counts as a transfer halt (`changes_here` in
+`rebuild_connections`).
 `convoi_t::hat_gehalten` applies them when stopping. The schedule dialog shows the type as a
 lettered badge in front of each entry row; left click cycles forward, right click back. A single
 terminus entry with a timetable is Terminal; a bus station with arrival, waiting and departure
