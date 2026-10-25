@@ -110,7 +110,8 @@ Each city also has `limits_nw` and `limits_se` (the city limits: the box its bui
 it grows) and `this_month` / `last_month` with `pax_generated`, `pax_transported`, `pax_walked` and
 the same for mail (the city statistics). The settings carry `locality_factor` (the factor in use this
 year: higher spreads passengers over the map, lower keeps them near home) and `locality_factor_table`
-(the saved year table it comes from).
+(the saved year table it comes from), `passenger_factor` (whole number, as a stock save holds it) and
+`passenger_factor_exact` (the factor the towns use, in steps of 1/16, e.g. 1.5).
 
 Every table is filtered and sorted in the browser and rows are added in chunks, so a save with
 thousands of stops still scrolls. Links between lines, stops and convoys go through the URL hash

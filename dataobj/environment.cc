@@ -82,6 +82,7 @@ bool env_t::warn_doubled_objects = true;
 uint8 env_t::yellow_aspect_rule = 0;
 sint16 env_t::station_far_reach_override = -1;
 sint32 env_t::locality_factor_override = -1;
+sint32 env_t::passenger_factor_override = -1;
 bool env_t::show_delete_buttons = false;
 
 // only used internally => do not touch further

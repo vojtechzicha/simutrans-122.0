@@ -399,7 +399,14 @@ void settings_economy_stats_t::read(settings_t* const sets)
 	READ_BOOL_VALUE( sets->allow_underground_transformers );
 	READ_NUM_VALUE( sets->way_height_clearance );
 
-	READ_NUM_VALUE( sets->passenger_factor );
+	{
+		// fork: a whole number here; a fraction from simuconf.tab stays unless this one is changed
+		sint32 passenger_factor = sets->passenger_factor;
+		READ_NUM_VALUE( passenger_factor );
+		if(  passenger_factor != sets->passenger_factor  ) {
+			sets->set_passenger_factor_16( passenger_factor * 16 );
+		}
+	}
 	READ_NUM_VALUE( sets->minimum_city_distance );
 	READ_NUM_VALUE( sets->special_building_distance );
 	READ_NUM_VALUE( sets->factory_worker_radius );

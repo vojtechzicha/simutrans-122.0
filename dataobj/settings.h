@@ -208,6 +208,9 @@ private:
 	sint16 origin_x, origin_y;
 
 	sint32 passenger_factor;
+	/// fork: the passenger factor in sixteenths (24 = 1.5), the one the towns use; passenger_factor is this
+	/// rounded for stock code and stock saves (savegame 122.16)
+	sint32 passenger_factor_16;
 
 	sint16 min_factory_spacing;
 	sint16 max_factory_spacing;
@@ -549,6 +552,10 @@ public:
 	bool get_with_private_paks() const { return with_private_paks; }
 
 	sint32 get_passenger_factor() const { return passenger_factor; }
+	/// fork: the passenger factor in sixteenths, 16 = 1
+	sint32 get_passenger_factor_16() const { return passenger_factor_16; }
+	/// fork: sets the factor in sixteenths and passenger_factor to the nearest whole number
+	void set_passenger_factor_16(sint32 f16);
 
 	// town growth stuff
 	sint32 get_passenger_multiplier() const { return passenger_multiplier; }

@@ -5,6 +5,7 @@
 
 #include <string>
 #include <math.h>
+#include <stdlib.h>
 
 #include "settings.h"
 #include "environment.h"
@@ -111,6 +112,7 @@ settings_t::settings_t() :
 
 	// passenger manipulation factor (=16 about old value)
 	passenger_factor = 16;
+	passenger_factor_16 = 16 * 16;
 
 	// town growth factors
 	passenger_multiplier = 40;
@@ -546,6 +548,10 @@ void settings_t::rdwr(loadsave_t *file)
 			file->rdwr_short(origin_y );
 
 			file->rdwr_long(passenger_factor );
+			if(  file->is_loading()  ) {
+				// fork: a whole number before 122.16, which also saves the fraction (below)
+				passenger_factor_16 = passenger_factor * 16;
+			}
 
 			// town grow stuff
 			if(file->is_version_atleast(102, 2)) {
@@ -914,6 +920,13 @@ void settings_t::rdwr(loadsave_t *file)
 			// fork: houses beyond the Reach go to their nearest stop
 			file->rdwr_short(station_far_reach);
 		}
+		if(  file->is_version_atleast(122, 16)  ) {
+			// fork: the passenger factor with its fraction
+			file->rdwr_long(passenger_factor_16);
+			if(  file->is_loading()  ) {
+				set_passenger_factor_16( passenger_factor_16 );
+			}
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1221,6 +1234,28 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	minimum_city_distance = contents.get_int( "minimum_city_distance", minimum_city_distance );
 	industry_increase = contents.get_int( "industry_increase_every", industry_increase );
 	passenger_factor = contents.get_int( "passenger_factor", passenger_factor ); /* this can manipulate the passenger generation */
+	passenger_factor_16 = passenger_factor * 16;
+	if(  *contents.get( "passenger_factor_override" )  ) {
+		// fork: a factor with a fraction (steps of 1/16, e.g. 1.5), also for saved games, see karte_t::load;
+		// its own key, since every simuconf.tab already sets passenger_factor = 16
+		std::string text = contents.get( "passenger_factor_override" );
+		for(  size_t i = 0;  i < text.size();  i++  ) {
+			if(  text[i] == ','  ) {
+				text[i] = '.';
+			}
+		}
+		const sint32 f16 = (sint32)( strtod( text.c_str(), NULL ) * 16.0 + 0.5 );
+		if(  f16 <= 0  ) {
+			dbg->error( "Parameter in simuconf.tab wrong!", "passenger_factor_override must be larger than zero!" );
+		}
+		else {
+			env_t::passenger_factor_override = f16;
+		}
+	}
+	if(  env_t::passenger_factor_override > 0  ) {
+		// also when a later simuconf.tab sets passenger_factor
+		set_passenger_factor_16( env_t::passenger_factor_override );
+	}
 	factory_worker_percentage = contents.get_int( "factory_worker_percentage", factory_worker_percentage );
 	factory_worker_radius = contents.get_int( "factory_worker_radius", factory_worker_radius );
 	factory_worker_minimum_towns = contents.get_int( "factory_worker_minimum_towns", factory_worker_minimum_towns );
@@ -1662,6 +1697,14 @@ sint64 settings_t::get_starting_money(sint16 const year) const
 		}
 
 	}
+}
+
+
+void settings_t::set_passenger_factor_16(sint32 const f16)
+{
+	passenger_factor_16 = f16;
+	// stock code and stock saves know whole numbers only: the nearest one, at least 1 while there is a factor
+	passenger_factor = f16 > 0 ? max( 1, (f16 + 8) / 16 ) : 0;
 }
 
 

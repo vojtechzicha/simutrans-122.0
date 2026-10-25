@@ -1206,6 +1206,30 @@ regaining its lines, removing a stop, building one by an unreached house, hover 
 rotation, save and load; and the three displays in the GDI window. 120 game minutes: +5.3% transported
 passengers, -6.9% no route.
 
+## Passenger factor and locality (fork feature, savegame 122.16)
+
+Two simuconf.tab keys set how many passengers the towns send out and how far they go, also for a saved game: set in
+a simuconf.tab, each replaces the value saved with a game when that game is loaded (not in network games, as
+`station_far_reach`), and the next save keeps it, so the line can go once the game was saved.
+- `locality_factor = N` (no index): one factor for every year instead of the `locality_factor[i]=year,factor` table
+  (`settings_t::set_locality_factor`: a single entry with year 0, the stock table and save format, so a stock exe reads
+  it too). Stock takes the factor in use (`koord::locality_factor`) from the table at load and every New Year, so the
+  table is what must change: harness runs that set only `koord::locality_factor` went back to the table at New Year.
+- `passenger_factor_override = 1.5`: the passenger factor in steps of 1/16 (`settings_t::passenger_factor_16`, saved
+  122.16). Its own key, since every simuconf.tab already sets `passenger_factor = 16`. `passenger_factor` is it rounded
+  (at least 1) for stock code, stock saves (`-saveversion 0.122.0` writes 2 for 1.5) and the settings dialog, which
+  keeps a fraction unless its number is changed. It is a rate: `stadt_t::step` runs `step_passagiere` every
+  (1 << 25) / (buildings * f16 + 16) ticks, stock's formula for whole numbers; `gebaeude_t::get_passagier_level` and
+  `get_mail_level` scale by f16 / 256. Export `passenger_factor_exact`.
+The owner's game was started with factor 1 and locality 2500 (the table's value from 2050). Measured on a copy of it
+with the harness (game hours 6-12 and 12-20 against the unchanged save; page "Passenger Mix Options",
+https://claude.ai/artifact/XW9rwNERYTzstqtKGf48pJ): locality alone gave city transport at most
++12% (it moves riders off the trains); factor 2 with locality 1 gave city transport +79%, trains +36%, unhappy x2.1; factor 1.5 with
+locality 1 city transport +39%, trains +2 to +10%, unhappy +38%, steady over 20 game hours. The owner chose 1.5 with
+locality 1 (2026-10-25). Two runs with the same settings differ up to 6% in train riders, about 1% elsewhere.
+Tested headless on that save: keys set (1.5, locality 1), saved and loaded without them (kept), an older save (1, the
+2500 table), the stock-format copy (2).
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

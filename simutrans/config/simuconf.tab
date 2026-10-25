@@ -127,6 +127,10 @@ growthfactor_capitals = 100
 
 # passenger generation (default is 16) Smaller values means less passengers
 passenger_factor=16
+# fork: a passenger factor that may have a fraction (steps of 1/16, e.g. 1.5); set in a
+# simuconf.tab it replaces passenger_factor, also the one saved with a game when that game
+# is loaded, and the next save keeps it
+#passenger_factor_override = 1.5
 
 # amount of passengers that travel from/to factories or attractions
 # the remaining percentage is intercity and intracity travel

@@ -1580,7 +1580,8 @@ void stadt_t::step(uint32 delta_t)
 	next_step += delta_t;
 	next_growth_step += delta_t;
 
-	step_interval = (1 << 21U) / (buildings.get_count() * welt->get_settings().get_passenger_factor() + 1);
+	// fork: the factor in sixteenths (a fraction like 1.5); for whole numbers the same as stock's (1 << 21) / (count * factor + 1)
+	step_interval = (1 << 25U) / (buildings.get_count() * welt->get_settings().get_passenger_factor_16() + 16);
 	if (step_interval < 1) {
 		step_interval = 1;
 	}

@@ -179,6 +179,10 @@ public:
 	/// year table, also of a saved game when loading one (not in network games)
 	static sint32 locality_factor_override;
 
+	/// fork: passenger_factor_override set in simuconf.tab, in sixteenths (24 = 1.5), -1 if none; it replaces
+	/// the passenger factor, also of a saved game when loading one (not in network games)
+	static sint32 passenger_factor_override;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 

@@ -479,6 +479,8 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_int( "factory_worker_radius", s.get_factory_worker_radius() );
 	w.kv_int( "tourist_percentage", s.get_tourist_percentage() );
 	w.kv_int( "passenger_factor", s.get_passenger_factor() );
+	// the factor the towns use, with its fraction (passenger_factor is it rounded, as a stock save holds it)
+	w.kv_double( "passenger_factor_exact", s.get_passenger_factor_16() / 16.0 );
 	// how strongly passengers prefer near destinations: the factor in use this year and the year table
 	w.kv_int( "locality_factor", koord::locality_factor );
 	w.array_key( "locality_factor_table" );
