@@ -6329,6 +6329,189 @@ const char *tool_forest_t::do_work( player_t *player, const koord3d &start, cons
 }
 
 
+/* Fork: landscaping a rectangle at once (bauer/landscaper.h) */
+
+landscaper_t::mode_t tool_landscape_t::get_mode() const
+{
+	switch(  default_param ? default_param[0] : 'L'  ) {
+		case '+': return landscaper_t::RAISE;
+		case '-': return landscaper_t::LOWER;
+		case 'R': return landscaper_t::RAMP;
+		case 'S': return landscaper_t::SMOOTH;
+		default:  return landscaper_t::LEVEL;
+	}
+}
+
+
+sint8 tool_landscape_t::get_tile_height( const koord3d &pos ) const
+{
+	const grund_t *gr = welt->lookup_kartenboden( pos.get_2d() );
+	return gr ? gr->get_hoehe() : welt->get_groundwater();
+}
+
+
+const char *tool_landscape_t::plan_area( landscaper_t &plan, player_t *player, const koord3d &start, const koord3d &end ) const
+{
+	const landscaper_t::mode_t mode = get_mode();
+	sint8 h_start = get_tile_height( start );
+	if(  mode == landscaper_t::LEVEL  &&  picked_level != NO_PICK  ) {
+		h_start = picked_level;
+	}
+	return plan.plan( player, mode, start.get_2d(), end.get_2d(), h_start, get_tile_height( end ) );
+}
+
+
+const char *tool_landscape_t::get_tooltip( const player_t * ) const
+{
+	const sint64 price = welt->get_settings().cst_alter_land;
+	switch(  get_mode()  ) {
+		case landscaper_t::RAISE:  return tooltip_with_price( "Raise an area by one level", price );
+		case landscaper_t::LOWER:  return tooltip_with_price( "Lower an area by one level", price );
+		case landscaper_t::RAMP:   return tooltip_with_price( "Ramp between two tiles", price );
+		case landscaper_t::SMOOTH: return tooltip_with_price( "Smooth an area", price );
+		default: break;
+	}
+	if(  picked_level != NO_PICK  ) {
+		char buf[256];
+		sprintf( buf, translator::translate( "Level an area at height %d (picked, Ctrl+click it again to drop)" ), picked_level );
+		return tooltip_with_price( buf, price );
+	}
+	return tooltip_with_price( "Level an area (Ctrl+click picks the level)", price );
+}
+
+
+const char *tool_landscape_t::work( player_t *player, koord3d pos )
+{
+	if(  is_first_click()  &&  is_ctrl_pressed()  &&  get_mode() == landscaper_t::LEVEL  ) {
+		// pick the level for the next drags, the same height again drops it
+		const sint8 h = get_tile_height( pos );
+		picked_level = picked_level == h ? NO_PICK : h;
+		return NULL;
+	}
+	return two_click_tool_t::work( player, pos );
+}
+
+
+void tool_landscape_t::rdwr_custom_data( memory_rw_t *packet )
+{
+	two_click_tool_t::rdwr_custom_data( packet );
+	packet->rdwr_byte( picked_level );
+}
+
+
+uint8 tool_landscape_t::is_valid_pos( player_t *, const koord3d &pos, const char *&error, const koord3d & )
+{
+	if(  grund_t::underground_mode != grund_t::ugm_none  ) {
+		error = "Terraforming not possible\nhere in underground view";
+		return 0;
+	}
+	if(  welt->lookup_kartenboden( pos.get_2d() ) == NULL  ) {
+		error = "";
+		return 0;
+	}
+	return 2;
+}
+
+
+static void mark_landscape_tile( grund_t *gr, slist_tpl<zeiger_t *> &marked )
+{
+	zeiger_t *marker = new zeiger_t( gr->get_pos(), NULL );
+	const uint8 grund_hang = gr->get_grund_hang();
+	const uint8 back_hang = ( grund_hang % 3 ) + 3 * ( (uint8)( grund_hang / 9 ) ) + 27;
+	marker->set_foreground_image( ground_desc_t::marker->get_image( grund_hang % 27 ) );
+	marker->set_image( ground_desc_t::marker->get_image( back_hang ) );
+	marker->mark_image_dirty( marker->get_image(), 0 );
+	gr->obj_add( marker );
+	marked.insert( marker );
+}
+
+
+void tool_landscape_t::mark_tiles( player_t *player, const koord3d &start, const koord3d &end )
+{
+	landscaper_t plan;
+	const char *err = plan_area( plan, player, start, end );
+
+	// the area, and every tile around it that changes with it
+	const koord k1( min( start.x, end.x ), min( start.y, end.y ) );
+	const koord k2( max( start.x, end.x ), max( start.y, end.y ) );
+	if(  err == NULL  ) {
+		for(  sint16 y = k1.y;  y <= k2.y;  y++  ) {
+			for(  sint16 x = k1.x;  x <= k2.x;  x++  ) {
+				if(  grund_t *gr = welt->lookup_kartenboden( x, y )  ) {
+					mark_landscape_tile( gr, marked );
+				}
+			}
+		}
+		FOR( vector_tpl<koord>, const k, plan.get_changed_tiles() ) {
+			if(  k.x < k1.x  ||  k.x > k2.x  ||  k.y < k1.y  ||  k.y > k2.y  ) {
+				if(  grund_t *gr = welt->lookup_kartenboden( k )  ) {
+					mark_landscape_tile( gr, marked );
+				}
+			}
+		}
+	}
+
+	cbuffer_t buf;
+	const sint8 h_start = get_mode() == landscaper_t::LEVEL  &&  picked_level != NO_PICK ? picked_level : get_tile_height( start );
+	switch(  get_mode()  ) {
+		case landscaper_t::LEVEL:
+			buf.printf( translator::translate( "Level at height %d" ), h_start );
+			break;
+		case landscaper_t::RAISE:
+			buf.append( translator::translate( "Raise by one level" ) );
+			break;
+		case landscaper_t::LOWER:
+			buf.append( translator::translate( "Lower by one level" ) );
+			break;
+		case landscaper_t::RAMP:
+			buf.printf( translator::translate( "Ramp from height %d to %d" ), h_start, get_tile_height( end ) );
+			if(  err == NULL  &&  plan.get_ramp_levels() != 0  ) {
+				buf.printf( translator::translate( ", one level per %.1f tiles" ), (double)plan.get_ramp_tiles() / abs( plan.get_ramp_levels() ) );
+			}
+			break;
+		case landscaper_t::SMOOTH:
+			buf.append( translator::translate( "Smooth the terrain" ) );
+			break;
+	}
+	buf.append( ": " );
+	if(  err  ) {
+		buf.append( translator::translate( err ) );
+	}
+	else if(  plan.get_changed_tiles().empty()  ) {
+		buf.append( translator::translate( plan.get_blocked_tiles() ? "nothing can change here (ways, buildings)" : "nothing to change" ) );
+	}
+	else {
+		buf.printf( translator::translate( "%u tiles change" ), plan.get_changed_tiles().get_count() );
+		char money[64];
+		money_to_string( money, (double)plan.get_cost() / -100.0 );
+		buf.append( ", " );
+		buf.append( money );
+		if(  plan.get_blocked_tiles()  ) {
+			buf.printf( translator::translate( ", %u tiles cannot follow (ways, buildings)" ), plan.get_blocked_tiles() );
+		}
+	}
+	tstrncpy( toolstr, buf, sizeof( toolstr ) );
+	win_set_static_tooltip( toolstr );
+}
+
+
+const char *tool_landscape_t::do_work( player_t *player, const koord3d &start, const koord3d &end )
+{
+	CHECK_FUNDS();
+	landscaper_t plan;
+	if(  const char *err = plan_area( plan, player, start, end == koord3d::invalid ? start : end )  ) {
+		return err;
+	}
+	if(  plan.get_changed_tiles().empty()  ) {
+		return plan.get_blocked_tiles() ? NOTICE_TILE_FULL : "";
+	}
+	if(  !player->can_afford( plan.get_cost() )  ) {
+		return NOTICE_INSUFFICIENT_FUNDS;
+	}
+	return plan.apply( player );
+}
+
+
 image_id tool_stop_mover_t::get_marker_image() const
 {
 	return cursor;

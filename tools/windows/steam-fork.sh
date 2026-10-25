@@ -41,6 +41,10 @@
 #                                                  build the fork's makeobj and compile FILE.dat (the
 #                                                  platform signal and station boundary, see
 #                                                  tools/fork-signals) into the pakset folder; SIZE 128
+#   tools/windows/steam-fork.sh landscape            build the toolbar icons of the landscaping tools
+#                                                  (tools/fork-landscape) into the pakset folder as
+#                                                  fork-landscape-icons.pak; without it the tools stay
+#                                                  out of the toolbar
 #
 # Override the locations with STEAM_DIR, SIM_USER_DIR, PAKSET and ONEDRIVE_GAME_DIR in the environment.
 
@@ -368,17 +372,30 @@ do_strip() {
 
 # the fork's makeobj knows is_platformsignal and station_boundary; the objects go into the pakset
 # folder as an add-on, the rest of the pakset stays as Steam installed it
-do_signals() {
-	local dat="${1:-}" size="${2:-128}"
-	[ -n "$dat" ] && [ -f "$dat" ] || die "usage: $0 signals FILE.dat [SIZE]"
+build_makeobj() {
 	ensure_config
 	[ -x "$MSYS_BASH" ] || die "MSYS2 not found at $MSYS_BASH (winget install MSYS2.MSYS2)"
 	# makeobj/Makefile adds -march=pentium for mingw, which the 64 bit compiler refuses
 	MSYSTEM=MINGW64 "$MSYS_BASH" -lc "cd '$REPO' && make -j$JOBS makeobj OS_OPT='-DPNG_STATIC -DZLIB_STATIC'"
 	[ -f "$MAKEOBJ" ] || die "build produced no $MAKEOBJ"
+}
+
+do_signals() {
+	local dat="${1:-}" size="${2:-128}"
+	[ -n "$dat" ] && [ -f "$dat" ] || die "usage: $0 signals FILE.dat [SIZE]"
+	build_makeobj
 	local dir; dir="$(cd "$(dirname "$dat")" && pwd)"
 	(cd "$dir" && PATH="/c/msys64/mingw64/bin:$PATH" "$MAKEOBJ" "pak$size" "$STEAM_DIR/$PAKSET/" "$(basename "$dat")")
 	echo "done: objects from $dat are in $STEAM_DIR/$PAKSET/"
+}
+
+# the landscaping tools find their icons by name (tool_t::add_landscape_tools), menu icons are 32 pixels
+do_landscape() {
+	build_makeobj
+	local out="$STEAM_DIR/$PAKSET/fork-landscape-icons.pak"
+	(cd "$REPO/tools/fork-landscape" && PATH="/c/msys64/mingw64/bin:$PATH" "$MAKEOBJ" pak32 "$out" landscape_icons.dat)
+	[ -f "$out" ] || die "makeobj wrote no $out"
+	echo "done: $out"
 }
 
 case "${1:-}" in
@@ -394,5 +411,6 @@ case "${1:-}" in
 	strip-parking) shift; do_strip 0 "$@" ;;
 	strip-parking-dry) shift; do_strip 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
+	landscape) do_landscape ;;
 	*)         sed -n '2,/^# Override/p' "$0"; exit 1 ;;
 esac

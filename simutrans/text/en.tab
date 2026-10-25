@@ -1813,3 +1813,41 @@ town halls stay
 town halls stay
 Only the public service can move buildings to another town.
 Only the public service can move buildings to another town.
+Level an area (Ctrl+click picks the level)
+Level an area (Ctrl+click picks the level)
+Level an area at height %d (picked, Ctrl+click it again to drop)
+Level an area at height %d (picked, Ctrl+click it again to drop)
+Raise an area by one level
+Raise an area by one level
+Lower an area by one level
+Lower an area by one level
+Ramp between two tiles
+Ramp between two tiles
+Smooth an area
+Smooth an area
+Level at height %d
+Level at height %d
+Raise by one level
+Raise by one level
+Lower by one level
+Lower by one level
+Ramp from height %d to %d
+Ramp from height %d to %d
+, one level per %.1f tiles
+, one level per %.1f tiles
+Smooth the terrain
+Smooth the terrain
+nothing can change here (ways, buildings)
+nothing can change here (ways, buildings)
+nothing to change
+nothing to change
+%u tiles change
+%u tiles change
+, %u tiles cannot follow (ways, buildings)
+, %u tiles cannot follow (ways, buildings)
+Too steep: this ramp needs at least %d tiles
+Too steep: this ramp needs at least %d tiles
+Area too large (at most %d x %d tiles)
+Area too large (at most %d x %d tiles)
+Terraforming not possible here
+Terraforming not possible here

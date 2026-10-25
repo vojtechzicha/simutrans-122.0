@@ -123,6 +123,7 @@ tool_t *create_general_tool(int toolnr)
 		case TOOL_EXEC_SCRIPT:                 tool = new tool_exec_script_t();         break;
 		case TOOL_EXEC_TWO_CLICK_SCRIPT:       tool = new tool_exec_two_click_script_t(); break;
 		case TOOL_REASSIGN_CITY:               tool = new tool_reassign_city_t();       break;
+		case TOOL_LANDSCAPE:                   tool = new tool_landscape_t();           break;
 		default:
 			dbg->error("create_general_tool()","cannot satisfy request for general_tool[%i]!",toolnr);
 			return NULL;
@@ -421,6 +422,58 @@ static bool compare_tool(tool_t const* const a, tool_t const* const b)
 	uint16 const ac = a->command_key & ~32;
 	uint16 const bc = b->command_key & ~32;
 	return ac != bc ? ac < bc : a->command_key < b->command_key;
+}
+
+
+void tool_t::add_landscape_tools()
+{
+	// one tool per mode, the icon from a menu skin of that name (tools/fork-landscape)
+	static const char *const modes[][2] = {
+		{ "L", "ForkLandLevel" },
+		{ "+", "ForkLandRaise" },
+		{ "-", "ForkLandLower" },
+		{ "R", "ForkLandRamp" },
+		{ "S", "ForkLandSmooth" }
+	};
+	toolbar_t *target = NULL;
+	FOR( vector_tpl<toolbar_t *>, const tb, toolbar_tool ) {
+		FOR( slist_tpl<tool_t *>, const t, tb->get_tools() ) {
+			if(  t->get_id() == ( TOOL_LANDSCAPE | GENERAL_TOOL )  ) {
+				return; // menuconf.tab has them
+			}
+			if(  target == NULL  &&  t->get_id() == ( TOOL_RAISE_LAND | GENERAL_TOOL )  ) {
+				target = tb;
+			}
+		}
+	}
+	if(  target == NULL  ) {
+		return;
+	}
+	const tool_t *slope_tool = general_tool[TOOL_SETSLOPE];
+	bool separated = false;
+	for(  uint i = 0;  i < lengthof( modes );  i++  ) {
+		const skin_desc_t *skin = skinverwaltung_t::get_extra( modes[i][1], strlen( modes[i][1] ) );
+		if(  skin == NULL  ) {
+			dbg->message( "tool_t::add_landscape_tools()", "no icon %s, landscaping tool %s not in the toolbar", modes[i][1], modes[i][0] );
+			continue;
+		}
+		if(  !separated  ) {
+			// a separator, as menuconf.tab makes one from "-"
+			tool_t *separator = new tool_dummy_t();
+			separator->default_param = "-";
+			separator->command_key = 1;
+			target->append( separator );
+			separated = true;
+		}
+		tool_t *tool = create_general_tool( TOOL_LANDSCAPE );
+		*tool = *general_tool[TOOL_LANDSCAPE];
+		tool->icon = skin->get_image_id( 0 );
+		tool->cursor = slope_tool->cursor;
+		tool->ok_sound = slope_tool->ok_sound;
+		tool->default_param = modes[i][0];
+		general_tool.append( tool );
+		target->append( tool );
+	}
 }
 
 
@@ -738,6 +791,7 @@ void tool_t::read_menu(const std::string &objfilename)
 			}
 		}
 	}
+	add_landscape_tools();
 	toolbar_tool.append( toolbar_last_used_t::last_used_tools );
 
 	// sort characters

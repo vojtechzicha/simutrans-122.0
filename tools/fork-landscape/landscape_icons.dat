@@ -1,0 +1,22 @@
+# Toolbar icons of the fork's landscaping tools (simmenu.cc, tool_t::add_landscape_tools).
+# The names are what the game looks for; build with: steam-fork.sh landscape
+
+Obj=menu
+Name=ForkLandLevel
+Image[0]=landscape_icons.0.0
+-
+Obj=menu
+Name=ForkLandRaise
+Image[0]=landscape_icons.0.1
+-
+Obj=menu
+Name=ForkLandLower
+Image[0]=landscape_icons.0.2
+-
+Obj=menu
+Name=ForkLandRamp
+Image[0]=landscape_icons.0.3
+-
+Obj=menu
+Name=ForkLandSmooth
+Image[0]=landscape_icons.0.4

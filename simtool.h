@@ -23,6 +23,8 @@
 
 #include "player/simplay.h"
 
+#include "bauer/landscaper.h"
+
 #include "tpl/slist_tpl.h"
 
 class koord3d;
@@ -613,6 +615,37 @@ private:
 	void mark_tiles(player_t*, koord3d const&, koord3d const&) OVERRIDE;
 	uint8 is_valid_pos(player_t*, koord3d const&, char const*&, koord3d const&) OVERRIDE;
 	bool is_init_network_safe() const OVERRIDE { return true; }
+};
+
+/**
+ * Fork: shapes a dragged rectangle of tiles at once (bauer/landscaper.h). default_param is the mode:
+ * L level at the height of the first tile (or the one picked with ctrl+click), + raise or - lower
+ * by one level, R ramp from the first tile's height to the last one's, S smooth.
+ */
+class tool_landscape_t : public two_click_tool_t {
+public:
+	tool_landscape_t() : two_click_tool_t(TOOL_LANDSCAPE | GENERAL_TOOL), picked_level(NO_PICK) {}
+	image_id get_icon(player_t*) const OVERRIDE { return grund_t::underground_mode==grund_t::ugm_all ? IMG_EMPTY : icon; }
+	char const* get_tooltip(player_t const*) const OVERRIDE;
+	bool exit(player_t *player) OVERRIDE { picked_level = NO_PICK; return two_click_tool_t::exit(player); }
+	char const* work(player_t*, koord3d) OVERRIDE;
+	void rdwr_custom_data(memory_rw_t*) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return true; }
+
+private:
+	static const sint8 NO_PICK = -128;
+	/// level picked with ctrl+click for the next level drags
+	sint8 picked_level;
+
+	landscaper_t::mode_t get_mode() const;
+	/// the height a tile gives the level or a ramp end: its lowest corner
+	sint8 get_tile_height(koord3d const &pos) const;
+	/// plans the area, NULL or an error
+	const char *plan_area(landscaper_t &plan, player_t *player, koord3d const &start, koord3d const &end) const;
+
+	char const* do_work(player_t*, koord3d const&, koord3d const&) OVERRIDE;
+	void mark_tiles(player_t*, koord3d const&, koord3d const&) OVERRIDE;
+	uint8 is_valid_pos(player_t*, koord3d const&, char const*&, koord3d const&) OVERRIDE;
 };
 
 /* stop moving tool */

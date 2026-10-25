@@ -77,6 +77,7 @@ enum {
 	TOOL_EXEC_SCRIPT,
 	TOOL_EXEC_TWO_CLICK_SCRIPT,
 	TOOL_REASSIGN_CITY, // fork: make city buildings part of another town
+	TOOL_LANDSCAPE, // fork: level, raise, lower, ramp or smooth an area
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
@@ -245,6 +246,9 @@ public:
 	static void exit_menu();
 
 	static void read_menu(const std::string &objfilename);
+
+	/// fork: puts the landscaping tools into the toolbar of the raise land tool, unless menuconf.tab places them
+	static void add_landscape_tools();
 
 	static uint16 const dummy_id = 0xFFFFU;
 
@@ -457,6 +461,7 @@ public:
 	bool exit(player_t*) OVERRIDE;
 	virtual void update(player_t *); // just refresh content
 	void append(tool_t *tool) { tools.append(tool); }
+	slist_tpl<tool_t *> const& get_tools() const { return tools; }
 };
 
 #define MAX_LAST_TOOLS (10)

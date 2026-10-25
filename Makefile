@@ -244,6 +244,7 @@ SOURCES += bauer/brueckenbauer.cc
 SOURCES += bauer/fabrikbauer.cc
 SOURCES += bauer/goods_manager.cc
 SOURCES += bauer/hausbauer.cc
+SOURCES += bauer/landscaper.cc
 SOURCES += bauer/tunnelbauer.cc
 SOURCES += bauer/vehikelbauer.cc
 SOURCES += bauer/wegbauer.cc
