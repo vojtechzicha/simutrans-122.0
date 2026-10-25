@@ -620,7 +620,8 @@ private:
 /**
  * Fork: shapes a dragged rectangle of tiles at once (bauer/landscaper.h). default_param is the mode:
  * L level at the height of the first tile (or the one picked with ctrl+click), + raise or - lower
- * by one level, R ramp from the first tile's height to the last one's, S smooth.
+ * by one level, R ramp from the first tile's height to the last one's, S smooth, G gentle slopes.
+ * The land around slopes gently (one level per tile) unless shift is held.
  */
 class tool_landscape_t : public two_click_tool_t {
 public:

@@ -6338,6 +6338,7 @@ landscaper_t::mode_t tool_landscape_t::get_mode() const
 		case '-': return landscaper_t::LOWER;
 		case 'R': return landscaper_t::RAMP;
 		case 'S': return landscaper_t::SMOOTH;
+		case 'G': return landscaper_t::GENTLE;
 		default:  return landscaper_t::LEVEL;
 	}
 }
@@ -6357,7 +6358,8 @@ const char *tool_landscape_t::plan_area( landscaper_t &plan, player_t *player, c
 	if(  mode == landscaper_t::LEVEL  &&  picked_level != NO_PICK  ) {
 		h_start = picked_level;
 	}
-	return plan.plan( player, mode, start.get_2d(), end.get_2d(), h_start, get_tile_height( end ) );
+	// gentle edges unless shift is held
+	return plan.plan( player, mode, !is_shift_pressed(), start.get_2d(), end.get_2d(), h_start, get_tile_height( end ) );
 }
 
 
@@ -6369,6 +6371,7 @@ const char *tool_landscape_t::get_tooltip( const player_t * ) const
 		case landscaper_t::LOWER:  return tooltip_with_price( "Lower an area by one level", price );
 		case landscaper_t::RAMP:   return tooltip_with_price( "Ramp between two tiles", price );
 		case landscaper_t::SMOOTH: return tooltip_with_price( "Smooth an area", price );
+		case landscaper_t::GENTLE: return tooltip_with_price( "Gentle slopes: no slope steeper than one level per tile", price );
 		default: break;
 	}
 	if(  picked_level != NO_PICK  ) {
@@ -6472,13 +6475,19 @@ void tool_landscape_t::mark_tiles( player_t *player, const koord3d &start, const
 		case landscaper_t::SMOOTH:
 			buf.append( translator::translate( "Smooth the terrain" ) );
 			break;
+		case landscaper_t::GENTLE:
+			buf.append( translator::translate( "Gentle slopes" ) );
+			break;
+	}
+	if(  get_mode() != landscaper_t::GENTLE  ) {
+		buf.append( translator::translate( is_shift_pressed() ? ", steep edges" : ", gentle edges (Shift: steep)" ) );
 	}
 	buf.append( ": " );
 	if(  err  ) {
 		buf.append( translator::translate( err ) );
 	}
 	else if(  plan.get_changed_tiles().empty()  ) {
-		buf.append( translator::translate( plan.get_blocked_tiles() ? "nothing can change here (ways, buildings)" : "nothing to change" ) );
+		buf.append( translator::translate( plan.get_blocked_tiles() ? "nothing can change here" : "nothing to change" ) );
 	}
 	else {
 		buf.printf( translator::translate( "%u tiles change" ), plan.get_changed_tiles().get_count() );
@@ -6487,7 +6496,7 @@ void tool_landscape_t::mark_tiles( player_t *player, const koord3d &start, const
 		buf.append( ", " );
 		buf.append( money );
 		if(  plan.get_blocked_tiles()  ) {
-			buf.printf( translator::translate( ", %u tiles cannot follow (ways, buildings)" ), plan.get_blocked_tiles() );
+			buf.printf( translator::translate( ", %u tiles cannot follow (ways, buildings, water)" ), plan.get_blocked_tiles() );
 		}
 	}
 	tstrncpy( toolstr, buf, sizeof( toolstr ) );

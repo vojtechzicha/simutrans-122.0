@@ -1,6 +1,6 @@
 """Draws the toolbar icons of the fork's landscaping tools into landscape_icons.png.
 
-One row of 32x32 icons, in the order of landscape_icons.dat: level, raise, lower, ramp, smooth.
+One row of 32x32 icons, in the order of landscape_icons.dat: level, raise, lower, ramp, smooth, gentle.
 Drawn at 4x and scaled down; edges are cut hard against Simutrans' transparent colour, so no
 light fringe shows on the toolbar. Run with Pillow: python make_icons.py
 """
@@ -90,7 +90,16 @@ def icon_smooth(d):
     d.polygon([p(16, 2), p(24, 7.5), p(16, 13)], fill=ARROW, outline=OUTLINE, width=S)
 
 
-ICONS = [icon_level, icon_raise, icon_lower, icon_ramp, icon_smooth]
+def icon_gentle(d):
+    # a steep bank on the left, the same rise as a gentle slope on the right
+    d.polygon([p(1, 28), p(1, 12), p(5, 12), p(9, 28)], fill=EARTH, outline=OUTLINE, width=S)
+    d.polygon([p(1, 12), p(5, 12), p(5, 10), p(1, 10)], fill=GRASS, outline=OUTLINE, width=S)
+    d.polygon([p(13, 28), p(13, 12), p(16, 12), p(31, 28)], fill=GRASS_LIGHT, outline=OUTLINE, width=S)
+    d.rectangle([p(6, 4.5), p(14, 8.5)], fill=ARROW, outline=OUTLINE, width=S)
+    d.polygon([p(13, 1.5), p(20, 6.5), p(13, 11.5)], fill=ARROW, outline=OUTLINE, width=S)
+
+
+ICONS = [icon_level, icon_raise, icon_lower, icon_ramp, icon_smooth, icon_gentle]
 
 
 def main():

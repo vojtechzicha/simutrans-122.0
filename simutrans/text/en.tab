@@ -1837,17 +1837,25 @@ Ramp from height %d to %d
 , one level per %.1f tiles
 Smooth the terrain
 Smooth the terrain
-nothing can change here (ways, buildings)
-nothing can change here (ways, buildings)
+nothing can change here
+nothing can change here
 nothing to change
 nothing to change
 %u tiles change
 %u tiles change
-, %u tiles cannot follow (ways, buildings)
-, %u tiles cannot follow (ways, buildings)
+, %u tiles cannot follow (ways, buildings, water)
+, %u tiles cannot follow (ways, buildings, water)
 Too steep: this ramp needs at least %d tiles
 Too steep: this ramp needs at least %d tiles
 Area too large (at most %d x %d tiles)
 Area too large (at most %d x %d tiles)
 Terraforming not possible here
 Terraforming not possible here
+Gentle slopes: no slope steeper than one level per tile
+Gentle slopes: no slope steeper than one level per tile
+Gentle slopes
+Gentle slopes
+, steep edges
+, steep edges
+, gentle edges (Shift: steep)
+, gentle edges (Shift: steep)

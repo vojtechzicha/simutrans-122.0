@@ -30,19 +30,22 @@ public:
 		RAISE,  ///< every grid point one level up
 		LOWER,  ///< every grid point one level down
 		RAMP,   ///< even slope from h_start at the start tile to h_end at the end tile, flat end tiles
-		SMOOTH  ///< every grid point the mean of its neighbours
+		SMOOTH, ///< every grid point the mean of its neighbours
+		GENTLE  ///< no slope steeper than one level per tile, cutting and filling about equally
 	};
 
 	/// longest side of an area in tiles
 	static const sint16 MAX_SIDE = 128;
 
-	landscaper_t() : mode(LEVEL), gx0(0), gy0(0), gw(0), gh(0), corner_changes(0), blocked_tiles(0), ramp_tiles(0), ramp_levels(0) {}
+	landscaper_t() : mode(LEVEL), gentle(true), gx0(0), gy0(0), gw(0), gh(0), corner_changes(0), blocked_tiles(0), ramp_tiles(0), ramp_levels(0) {}
 
 	/**
 	 * Plans the change of the tiles from @p start to @p end (any two opposite corners).
+	 * @param gentle_edges the land around the area (and the area towards ways and buildings) slopes at
+	 *        one level per tile where it can, else at the steepest a tile allows (two with double slopes)
 	 * @return NULL or an error; after an error nothing is planned.
 	 */
-	const char *plan( const player_t *player, mode_t mode, koord start, koord end, sint8 h_start, sint8 h_end );
+	const char *plan( const player_t *player, mode_t mode, bool gentle_edges, koord start, koord end, sint8 h_start, sint8 h_end );
 
 	/**
 	 * Changes the map as planned and books the cost. Call right after plan(), the map must not
@@ -66,6 +69,7 @@ public:
 
 private:
 	mode_t mode;
+	bool gentle;
 
 	/// planned region of grid points: origin and size
 	sint16 gx0, gy0, gw, gh;
@@ -82,6 +86,8 @@ private:
 	sint16 ramp_tiles, ramp_levels;
 
 	inline uint32 idx( sint16 x, sint16 y ) const { return (uint32)(x - gx0) + (uint32)(y - gy0) * (uint32)gw; }
+	/// a point on the border of the planned region that is not on the border of the map
+	bool is_rim( sint16 x, sint16 y ) const;
 	inline bool in_area_grid( sint16 x, sint16 y ) const { return a1.x <= x  &&  x <= a2.x + 1  &&  a1.y <= y  &&  y <= a2.y + 1; }
 
 	/// asked heights of the area points, NULL or an error

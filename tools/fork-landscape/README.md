@@ -3,7 +3,8 @@
 Toolbar icons of the fork's landscaping tools (`tool_landscape_t`, `bauer/landscaper.*`). The game adds
 the tools to the toolbar that holds the raise land tool (pak128.cs: "Landscaping Tools") after a
 separator, each with the menu skin of its name; a tool whose icon is missing stays out of the
-toolbar.
+toolbar. The land around a shaped area slopes at one level per tile; with Shift held at the
+steepest a tile allows.
 
 | Skin             | Tool parameter | Tool                                                  |
 |------------------|----------------|-------------------------------------------------------|
@@ -12,6 +13,7 @@ toolbar.
 | `ForkLandLower`  | `-`            | lower an area by one level                            |
 | `ForkLandRamp`   | `R`            | ramp from the first tile's height to the last one's   |
 | `ForkLandSmooth` | `S`            | smooth an area                                        |
+| `ForkLandGentle` | `G`            | gentle slopes: no slope steeper than one level per tile |
 
 - `make_icons.py` draws `landscape_icons.png` (one row of 32x32 icons, Pillow).
 - `landscape_icons.dat` names them; `tools/windows/steam-fork.sh landscape` builds them with the

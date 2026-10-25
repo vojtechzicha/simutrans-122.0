@@ -20,3 +20,7 @@ Image[0]=landscape_icons.0.3
 Obj=menu
 Name=ForkLandSmooth
 Image[0]=landscape_icons.0.4
+-
+Obj=menu
+Name=ForkLandGentle
+Image[0]=landscape_icons.0.5

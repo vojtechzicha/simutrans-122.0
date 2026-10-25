@@ -965,38 +965,51 @@ under Xvfb with SDL2; a live drag could not be driven there (no pointer motion w
 
 ## Landscaping tools (fork feature, no save change)
 
-Five area tools in the slope toolbar (`tool_landscape_t` in simtool.cc, general tool 45, `default_param` is the mode)
+Six area tools in the slope toolbar (`tool_landscape_t` in simtool.cc, general tool 45, `default_param` is the mode)
 next to the stock ones: drag a rectangle of tiles and it becomes level at the first tile's height (`L`; Ctrl+click a
 tile first to pick its height for the next drags, Ctrl+click it again to drop it), one level higher (`+`) or lower
 (`-`) keeping its shape, an even ramp from the first tile's height to the last one's along the longer side of the drag
-with both end tiles flat (`R`, "Too steep: needs at least N tiles" beyond one level per tile with single slopes, two
-with double), or smoothed (`S`, each corner the rounded mean of its 3x3 neighbours; apply again for more). The tile
+with both end tiles flat (`R`), smoothed (`S`, each corner the rounded mean of its 3x3 neighbours; apply again for
+more), or gentle (`G`: no slope steeper than one level per tile, halfway between cutting every steeper slope down and
+filling it up, so about as much earth is cut as filled; again changes nothing). The land around the area, and the area
+towards ways and buildings, slopes at one level per tile (gentle edges, single slopes that ways can use); with Shift
+held at the steepest a tile allows (two levels with `double_grounds`, as the stock tools do; less land changes). Ramps
+and smoothing keep to one level per tile too unless Shift is held ("Too steep: needs at least N tiles"). The tile
 height picked is its lowest corner. While dragging, the area and every tile around it that changes are framed, and a
-tooltip gives the height, the tiles that change, the price and how many area tiles cannot follow.
-- Planner (`bauer/landscaper.*`, `landscaper_t::plan`/`apply`): a height per grid point for the area plus a margin as
-  far as the change can reach. Tiles that cannot change (`is_plan_height_changeable`: ways, buildings, halts, labels)
-  pin their corners; the area gets its wish clamped to what they allow at the slope limit (1 per tile, 2 with
-  `double_grounds`), and the land around follows the area and the pinned points only as far as the slopes need
-  (`spread_up`/`spread_down`, two-pass chessboard envelopes). Every changed tile is then checked as the stock tools
-  would (`terraformer_t::can_raise_all`/`can_lower_all` for one node: bridges over it, tunnels under it, scenario
-  rules), and the corner span; a tile that fails is pinned and the plan runs again (at most 64 rounds). Never lower a
+tooltip gives the height, the edge style, the tiles that change, the price and how many area tiles cannot follow.
+Refused in any underground view (stock raise/lower allow sliced views below the slice).
+- Planner (`bauer/landscaper.*`, `landscaper_t::plan`/`apply`): a height per grid point for the area plus a margin.
+  Tiles that cannot change (`is_plan_height_changeable`: ways, buildings, halts, labels) pin their corners; the area
+  gets its wish clamped to what they allow at the slope limit, and the land around follows the area and the pinned
+  points only as far as the slopes need (`spread_up`/`spread_down`, two-pass chessboard envelopes). Gentle: the same
+  envelopes at one level per tile, nested inside the steep ones (clamp to gentle, then to steep), so the result is
+  always a valid surface and gentle wherever the pinned points allow. Every changed tile is then checked as the stock
+  tools would (`terraformer_t::can_raise_all`/`can_lower_all` for one node: bridges over it, tunnels under it,
+  scenario rules), and the corner span; a tile that fails is pinned and the plan runs again (at most 64 rounds). The
+  region's border is not pinned: while the plan changes it, the margin doubles (up to 128 tiles); only then is the
+  border pinned, which stops the change short there. Next to a slope already at the limit the change never dies out
+  (a stock-made cliff), so a fixed margin left the area short of its level with no obstacle in sight. Never lower a
   point below the sea or a lake next to it, nor a tile whose lowest corner would end below a neighbouring tile's water:
   stock `lower_to` then drains that water and raises its sea floor (found in testing). Raising into the sea makes land
   as the stock raise tool does.
 - Apply: one raise terraformer for the tiles with a rising corner, then one lower terraformer, both checked first
   (`max(old, new)` is a valid surface in between). Cost: stock `cst_alter_land` per grid point and level, counted from
   each tile's corners as `raise_to`/`lower_to` count them (shore tiles from the water, not the grid), so preview and
-  booked cost agree. Areas up to 128 x 128 tiles. Network: the picked level travels in `rdwr_custom_data`.
-- Toolbar: `tool_t::add_landscape_tools` (end of `read_menu`) appends the five, after a separator, to the toolbar that
+  booked cost agree. Areas up to 128 x 128 tiles. Network: the picked level travels in `rdwr_custom_data`, Shift in the
+  tool flags.
+- Toolbar: `tool_t::add_landscape_tools` (end of `read_menu`) appends the six, after a separator, to the toolbar that
   holds the raise land tool, unless menuconf.tab places general tool 45 itself. Each needs its icon, a menu skin
-  `ForkLandLevel`, `-Raise`, `-Lower`, `-Ramp`, `-Smooth` (`tools/fork-landscape`, `steam-fork.sh landscape` builds
-  `fork-landscape-icons.pak` into the pakset folder); without it that tool stays out of the toolbar.
-Tested headless on pak128.cs with a throwaway hook (a 64x64 world with a hill, a plateau and a sea strip): levelling a
-hill, raising twice over a road (the road stays, the area tapers to it), levelling next to labels, ramps along x up and
-along y down, a too steep ramp, smoothing, levelling into the sea and lowering a coast three times, the tool's two
-clicks and the Ctrl+click pick; after each the whole map checked (corners match the ground, span within the limit), no
-point changed outside the planned tiles, cost booked = cost planned. Level and ramp also through the GDI window
-(toolbar icons, framed preview, tooltip, applied with the previewed cost).
+  `ForkLandLevel`, `-Raise`, `-Lower`, `-Ramp`, `-Smooth`, `-Gentle` (`tools/fork-landscape`, `steam-fork.sh landscape`
+  builds `fork-landscape-icons.pak` into the pakset folder); without it that tool stays out of the toolbar.
+Tested headless on pak128.cs with a throwaway hook (a 64x64 world with a hill, a plateau, a two-level cliff and a sea
+strip): levelling a hill, raising twice over a road (the road stays, the area tapers to it), levelling next to labels,
+ramps along x up and along y down, a too steep ramp, smoothing, levelling into the sea and lowering a coast three
+times, the tool's two clicks and the Ctrl+click pick, levelling 4 down next to the cliff (short of the level with a
+fixed margin, level now), levelling up with gentle edges (no double slope around), gentle slopes over steep banks (32
+double slopes to 0, again: no change); after each the whole map checked (corners match the ground, span within the
+limit), no point changed outside the planned tiles, cost booked = cost planned. Level and ramp also through the GDI
+window (icons, framed preview, tooltip, applied with the previewed cost). Not tested: a bridge over or a tunnel under
+the area, Ctrl and Shift through real input (the window helper cannot fake `GetKeyState`).
 
 ## Convoy names (fork feature, no save change)
 

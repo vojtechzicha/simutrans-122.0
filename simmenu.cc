@@ -433,7 +433,8 @@ void tool_t::add_landscape_tools()
 		{ "+", "ForkLandRaise" },
 		{ "-", "ForkLandLower" },
 		{ "R", "ForkLandRamp" },
-		{ "S", "ForkLandSmooth" }
+		{ "S", "ForkLandSmooth" },
+		{ "G", "ForkLandGentle" }
 	};
 	toolbar_t *target = NULL;
 	FOR( vector_tpl<toolbar_t *>, const tb, toolbar_tool ) {
