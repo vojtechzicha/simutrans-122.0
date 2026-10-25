@@ -140,6 +140,9 @@ tourist_percentage = 16
 # the final years
 locality_factor[0]=1835,1
 locality_factor[1]=2050,2500
+# fork: one factor for every year instead of the table; set in a simuconf.tab it
+# also replaces the factor saved with a game when that game is loaded
+#locality_factor = 300
 
 # A factory will be added as worker's destination to a town, if it has either
 # is within factory_worker_radius

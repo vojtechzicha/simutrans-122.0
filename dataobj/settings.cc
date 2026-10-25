@@ -1355,6 +1355,17 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 		locality_factor_per_year[ j ].year = 0;
 		locality_factor_per_year[ j ].factor = 0;
 	}
+	if(  *contents.get( "locality_factor" )  ) {
+		// fork: one factor for all years; also for saved games, see karte_t::load
+		const sint32 factor = contents.get_int( "locality_factor", 0 );
+		if(  factor <= 0  ) {
+			dbg->error( "Parameter in simuconf.tab wrong!", "locality_factor must be larger than zero!" );
+		}
+		else {
+			set_locality_factor( factor );
+			env_t::locality_factor_override = factor;
+		}
+	}
 
 	// player stuff
 	remove_dummy_player_months = contents.get_int( "remove_dummy_player_months", remove_dummy_player_months );
@@ -1651,6 +1662,17 @@ sint64 settings_t::get_starting_money(sint16 const year) const
 		}
 
 	}
+}
+
+
+void settings_t::set_locality_factor(uint32 const factor)
+{
+	// a year 0 in the first entry ends the table: that factor for every year
+	for(  int i=0;  i<10;  i++  ) {
+		locality_factor_per_year[i].year = 0;
+		locality_factor_per_year[i].factor = 0;
+	}
+	locality_factor_per_year[0].factor = factor;
 }
 
 

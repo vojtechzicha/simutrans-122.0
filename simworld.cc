@@ -5488,6 +5488,10 @@ void karte_t::load(loadsave_t *file)
 		// fork: the far reach set in simuconf.tab wins over the saved one, so a running game can change it
 		settings.set_station_far_reach( env_t::station_far_reach_override );
 	}
+	if(  !env_t::networkmode  &&  env_t::locality_factor_override > 0  ) {
+		// fork: the same for a fixed locality_factor (the cities rebuild their destination weights below)
+		settings.set_locality_factor( env_t::locality_factor_override );
+	}
 
 	// some functions (finish_rd) need to know what version was loaded
 	load_version = file->get_version_int();

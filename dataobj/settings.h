@@ -588,6 +588,8 @@ public:
 	/// fork: entry i (0..9) of the locality_factor year table, year 0 after entry 0 = unused (for the JSON export)
 	sint16 get_locality_factor_year(int i) const { return locality_factor_per_year[i].year; }
 	uint32 get_locality_factor_value(int i) const { return locality_factor_per_year[i].factor; }
+	/// fork: one factor for every year (replaces the table)
+	void set_locality_factor(uint32 factor);
 
 	// disallow using obsolete vehicles in depot
 	bool get_allow_buying_obsolete_vehicles() const { return allow_buying_obsolete_vehicles; }

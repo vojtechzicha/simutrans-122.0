@@ -175,6 +175,10 @@ public:
 	/// saved with a game when loading one (not in network games), so the far reach can be changed later
 	static sint16 station_far_reach_override;
 
+	/// fork: the fixed locality_factor set in simuconf.tab (key without a year), -1 if none; it replaces the
+	/// year table, also of a saved game when loading one (not in network games)
+	static sint32 locality_factor_override;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 
