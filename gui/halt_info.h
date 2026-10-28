@@ -94,6 +94,7 @@ private:
 	gui_scrollpane_t scrolly_freight_departure; ///< fork: the stock departure board, for freight
 
 	gui_textinput_t input;
+	button_t move_name;             ///< fork: selects the tool that shows the name on a clicked tile of the stop
 	gui_chart_t chart;
 	location_view_t view;
 	button_t sort_button;
@@ -106,6 +107,9 @@ private:
 	char edit_name[256];
 
 	void update_components();
+
+	/// fork: pressed while the move name tool works for this stop
+	void update_move_name_button();
 
 	// fork: tabs for the kinds of departures served here (none if only one), and the kind shown
 	void update_board_tabs();

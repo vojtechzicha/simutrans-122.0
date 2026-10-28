@@ -585,6 +585,10 @@ public:
 public:
 	void recalc_basis_pos();
 
+	/// fork: shows the name on this tile of the stop (it becomes the first tile, the stop's position);
+	/// false if gr is no tile of the stop or has a text of its own (a marker)
+	bool move_name_to( grund_t *gr );
+
 	// returns ground closest to this coordinate
 	grund_t *get_ground_closest_to( const koord here ) const;
 

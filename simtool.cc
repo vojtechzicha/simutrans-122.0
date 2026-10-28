@@ -2160,6 +2160,75 @@ const char *tool_reassign_city_t::do_work( player_t *player, const koord3d &star
 }
 
 
+halthandle_t tool_move_halt_name_t::get_target_halt() const
+{
+	halthandle_t halt;
+	if(  default_param  &&  *default_param >= '0'  &&  *default_param <= '9'  ) {
+		halt.set_id( (uint16)atoi( default_param ) );
+	}
+	return halt;
+}
+
+
+bool tool_move_halt_name_t::is_working_for( halthandle_t halt )
+{
+	const tool_move_halt_name_t *tool = static_cast<const tool_move_halt_name_t *>( tool_t::general_tool[TOOL_MOVE_HALT_NAME] );
+	return halt.is_bound()  &&  welt->get_tool( welt->get_active_player_nr() ) == tool  &&  tool->get_target_halt() == halt;
+}
+
+
+const char *tool_move_halt_name_t::get_tooltip( const player_t * ) const
+{
+	const halthandle_t halt = get_target_halt();
+	sprintf( toolstr, translator::translate( "Click a tile of %s to show its name there" ), halt.is_bound() ? halt->get_name() : "-" );
+	return toolstr;
+}
+
+
+bool tool_move_halt_name_t::init( player_t *player )
+{
+	cursor = tool_t::general_tool[TOOL_QUERY]->cursor;
+	const halthandle_t halt = get_target_halt();
+	// as renaming: anyone in a single player game, in network games the owner
+	return halt.is_bound()  &&  (!env_t::networkmode  ||  player_t::check_owner( halt->get_owner(), player ));
+}
+
+
+const char *tool_move_halt_name_t::work( player_t *player, koord3d pos )
+{
+	halthandle_t halt = get_target_halt();
+	if(  !halt.is_bound()  ) {
+		return "";
+	}
+	if(  env_t::networkmode  &&  !player_t::check_owner( halt->get_owner(), player )  ) {
+		return "Das Feld gehoert\neinem anderen Spieler\n";
+	}
+	// the clicked level, else a tile of the stop on another level of that square (a bridge or tunnel stop)
+	grund_t *gr = welt->lookup( pos );
+	if(  gr == NULL  ||  gr->get_halt() != halt  ) {
+		gr = NULL;
+		if(  const planquadrat_t *pl = welt->access( pos.get_2d() )  ) {
+			for(  uint8 i = 0;  i < pl->get_boden_count()  &&  gr == NULL;  i++  ) {
+				if(  pl->get_boden_bei(i)->get_halt() == halt  ) {
+					gr = pl->get_boden_bei(i);
+				}
+			}
+		}
+	}
+	if(  gr == NULL  ) {
+		return "This is no tile of the stop.";
+	}
+	if(  !halt->move_name_to( gr )  ) {
+		return "A marker shows its text on this tile.";
+	}
+	// done: back to the query tool, as after a new headquarters
+	if(  can_use_gui()  &&  player == welt->get_active_player()  ) {
+		welt->set_tool( tool_t::general_tool[TOOL_QUERY], player );
+	}
+	return NULL;
+}
+
+
 /**
  * change water height
  */

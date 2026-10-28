@@ -264,6 +264,25 @@ private:
 	uint8 is_valid_pos(player_t*, koord3d const&, char const*&, koord3d const&) OVERRIDE;
 };
 
+/**
+ * Fork: shows a stop's name on the clicked tile of that stop (selected from the stop window,
+ * default_param is the stop's id); then back to the query tool.
+ */
+class tool_move_halt_name_t : public tool_t {
+public:
+	tool_move_halt_name_t() : tool_t(TOOL_MOVE_HALT_NAME | GENERAL_TOOL) {}
+	char const* get_tooltip(player_t const*) const OVERRIDE;
+	bool init(player_t*) OVERRIDE;
+	char const* work(player_t*, koord3d) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return true; }
+
+	/// the stop this tool works for, unbound if default_param names none
+	halthandle_t get_target_halt() const;
+
+	/// is it the stop window's tool working for this stop?
+	static bool is_working_for( halthandle_t halt );
+};
+
 class tool_plant_tree_t : public kartenboden_tool_t {
 public:
 	tool_plant_tree_t() : kartenboden_tool_t(TOOL_PLANT_TREE | GENERAL_TOOL) {}

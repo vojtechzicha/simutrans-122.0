@@ -21,6 +21,7 @@ Click on a Stop in game-view with the <a href="inspection_tool.txt">Inspection T
 <em>name</em>: assigned name of Stop is shown in name-box at top of <strong>Stop Information</strong>.<br>
 By default name is assigned automatically when the Stop is first built and depends on <a href="citywindow.txt">urban area</a> related to Stop and any <a href="industry_info.txt">industry</a> within catchment area of Stop.<br>
 To change name: click on name-box and type new name.<br>
+To show the name on another tile of the Stop: press <em>Move name</em> next to the name-box, then click that tile in game-view. Whether the name moves to the middle of the Stop when it grows is an option in the Settings (General).<br>
 {Tips: Use <a href="keys.txt">[!]</a> to toggle view of name above a Stop in game-view. Use [v] to toggle view of catchment area of Stop in game-view. Option to number Stops available in simuconf.tab}
 </p>
 <p>

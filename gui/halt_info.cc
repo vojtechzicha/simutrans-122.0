@@ -17,6 +17,7 @@
 #include "../display/simgraph.h"
 #include "../display/viewport.h"
 #include "../simmenu.h"
+#include "../simtool.h"
 #include "../simskin.h"
 #include "../simline.h"
 
@@ -323,7 +324,16 @@ void halt_info_t::init(halthandle_t halt)
 			tstrncpy(edit_name, halt->get_name(), lengthof(edit_name));
 			input.set_text(edit_name, lengthof(edit_name));
 			input.add_listener(this);
-			add_component(&input, 2);
+			add_table(2,1);
+			{
+				add_component(&input);
+				// fork: the name on another tile of the stop
+				move_name.init( button_t::roundbox_state, "Move name" );
+				move_name.set_tooltip( translator::translate( "Click a tile of this stop on the map to show its name there" ) );
+				move_name.add_listener( this );
+				add_component( &move_name );
+			}
+			end_table();
 
 			// status images
 			add_table(5,1)->set_alignment(ALIGN_CENTER_V);
@@ -600,8 +610,17 @@ void halt_info_t::draw(scr_coord pos, scr_size size)
 	assert(halt.is_bound());
 
 	update_components();
+	update_move_name_button();
 
 	gui_frame_t::draw(pos, size);
+}
+
+
+void halt_info_t::update_move_name_button()
+{
+	move_name.pressed = tool_move_halt_name_t::is_working_for( halt );
+	// as renaming: in network games only the owner
+	move_name.enable( !env_t::networkmode  ||  player_t::check_owner( halt->get_owner(), welt->get_active_player() ) );
 }
 
 
@@ -1098,6 +1117,20 @@ bool halt_info_t::action_triggered( gui_action_creator_t *comp,value_t /* */)
 			// since init always returns false, it is safe to delete immediately
 			delete tool;
 		}
+	}
+	else if(  comp == &move_name  ) {
+		if(  tool_move_halt_name_t::is_working_for( halt )  ) {
+			welt->set_tool( tool_t::general_tool[TOOL_QUERY], welt->get_active_player() );
+		}
+		else {
+			// the tool names the stop by its id (it keeps the pointer to this text)
+			static char move_name_param[16];
+			sprintf( move_name_param, "%u", halt.get_id() );
+			tool_t *tool = tool_t::general_tool[TOOL_MOVE_HALT_NAME];
+			tool->set_default_param( move_name_param );
+			welt->set_tool( tool, welt->get_active_player() );
+		}
+		update_move_name_button();
 	}
 	else if (comp == &switch_mode) {
 		departure_board->next_refresh = -1;

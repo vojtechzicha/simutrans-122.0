@@ -283,23 +283,45 @@ void haltestelle_t::recalc_basis_pos()
 	cent = koord((sint16)(cent_x/level_sum),(sint16)(cent_y/level_sum));
 
 	if ( level_sum > 0 ) {
-		grund_t *new_center = get_ground_closest_to( cent );
-		if(  new_center != tiles.front().grund  &&  new_center->get_text()==NULL  ) {
-			// move the name to new center, if there is not yet a name on it
-			new_center->set_text( tiles.front().grund->get_text() );
-
-			// all_names contains pointers to ground-texts
-			// we need to adjust them
-			all_names.remove(tiles.front().grund->get_text());
-			all_names.set(new_center->get_text(), self);
-
-			tiles.front().grund->set_text(NULL);
-			tiles.remove( new_center );
-			tiles.insert( new_center );
-			init_pos = new_center->get_pos().get_2d();
-		}
+		// move the name to new center, if there is not yet a name on it
+		move_name_to( get_ground_closest_to( cent ) );
 	}
 	return;
+}
+
+
+bool haltestelle_t::move_name_to( grund_t *gr )
+{
+	if(  tiles.empty()  ) {
+		return false;
+	}
+	grund_t *old = tiles.front().grund;
+	if(  gr == old  ) {
+		return true;
+	}
+	slist_tpl<tile_t>::iterator i = std::find( tiles.begin(), tiles.end(), gr );
+	if(  i == tiles.end()  ||  gr->get_text() != NULL  ||  old->get_text() == NULL  ) {
+		// not ours, or a marker shows its own text there
+		return false;
+	}
+	gr->set_text( old->get_text() );
+
+	// all_names contains pointers to ground-texts
+	// we need to adjust them
+	all_names.remove( old->get_text() );
+	all_names.set( gr->get_text(), self );
+
+	old->set_text( NULL );
+	// the tile with the name comes first (with its reservation, which stock dropped here)
+	const tile_t moved = *i;
+	tiles.erase( i );
+	tiles.insert( moved );
+	init_pos = gr->get_pos().get_2d();
+	// the window title pointed to the old tile's text (stock left it dangling)
+	if(  halt_info_t *const info_frame = dynamic_cast<halt_info_t *>( win_get_magic( magic_halt_info + self.get_id() ) )  ) {
+		info_frame->set_name( get_name() );
+	}
+	return true;
 }
 
 /**

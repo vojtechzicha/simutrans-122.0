@@ -1251,6 +1251,15 @@ name moves; only the next change of a stop follows the rule in force. Names stoc
 Tested headless on pak128.cs with a throwaway hook (grow, upgrade, remove the name tile, merge, both modes; switching
 both ways moved no name; save/load, the simuconf override, a 0.122.16 copy) and the checkbox in the GDI window.
 
+Moving a name by hand (no save change): the stop window's "Move name" button (next to the name field, pressed while
+active) selects `tool_move_halt_name_t` (general tool `TOOL_MOVE_HALT_NAME`, `default_param` = the stop's id, no
+menuconf entry); a click on a tile of that stop (the clicked level, else the stop's tile on another level of that square)
+puts the name there, then the query tool comes back. Refused: a tile of no or another stop, a tile with a marker (its
+text). `haltestelle_t::move_name_to` does the move for the tool and for `recalc_basis_pos`: it keeps the tile's road
+reservation (stock dropped it when re-centring) and refreshes the open stop window's title, which pointed to the old
+tile's freed text (stock showed garbage there after an extension). Same rights as renaming: anyone in a single player
+game, the owner in network games. With `station_name_on_first_tile` the moved name stays; without it the next change
+of the stop centres it again.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

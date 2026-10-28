@@ -1795,6 +1795,16 @@ station_far_reach
 Far reach: houses no stop reaches go to their nearest stop up to (tiles, 0 = off)
 station_name_on_first_tile
 Stop names stay on their tile (do not move to the centre)
+Move name
+Move name
+Click a tile of this stop on the map to show its name there
+Click a tile of this stop on the map to show its name there
+Click a tile of %s to show its name there
+Click a tile of %s to show its name there
+This is no tile of the stop.
+This is no tile of the stop.
+A marker shows its text on this tile.
+A marker shows its text on this tile.
 (nearest stop)
 (nearest stop)
 Reassign buildings

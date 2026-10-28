@@ -78,6 +78,7 @@ enum {
 	TOOL_EXEC_TWO_CLICK_SCRIPT,
 	TOOL_REASSIGN_CITY, // fork: make city buildings part of another town
 	TOOL_LANDSCAPE, // fork: level, raise, lower, ramp or smooth an area
+	TOOL_MOVE_HALT_NAME, // fork: show a stop's name on another of its tiles
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
