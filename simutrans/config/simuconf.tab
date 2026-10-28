@@ -337,6 +337,13 @@ show_delete_buttons = 0
 # Should stations get numbered names? (1=yes, 0=no)
 #numbered_stations = 0
 
+# fork: stop names stay on the tile they are on when a stop grows, is upgraded or
+# merged (a new stop has its name on its first tile), instead of moving to the
+# centre of the stop (1=yes, 0=no, the default). Saved with the game and switchable
+# in the Settings dialog (General); changing it moves no name. Set here, it also
+# replaces the value saved with a game when that game is loaded.
+#station_name_on_first_tile = 0
+
 # Show name signs and statistic?
 # 0 = don't show anything
 # 1 = station names

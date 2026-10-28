@@ -1230,6 +1230,19 @@ locality 1 (2026-10-25). Two runs with the same settings differ up to 6% in trai
 Tested headless on that save: keys set (1.5, locality 1), saved and loaded without them (kept), an older save (1, the
 2500 table), the stock-format copy (2).
 
+## Stop names stay on their first tile (fork feature, savegame 122.17)
+
+The name of a stop is drawn on the tile that holds it (`tiles.front()`, the ground's text). Stock moves it to the tile
+nearest the level-weighted centre of the stop (`haltestelle_t::recalc_basis_pos`) after every extension, upgrade, merge
+and removal of a tile. `station_name_on_first_tile` (settings_t, saved with the game; checkbox in Settings > General, key
+`i` in the owner's menuconf, next to `numbered_stations`; also simuconf.tab, which then wins over the saved value at load
+like `station_far_reach`) makes `recalc_basis_pos` do nothing: a new stop has its name on its first tile and keeps it
+there; when that tile is removed, `rem_grund` (stock) gives it to the oldest tile left. Switching it runs no code, so no
+name moves; only the next change of a stop follows the rule in force. Names stock already centred stay where they are
+(the first tile is not recorded). Export `station_name_on_first_tile` in the settings.
+Tested headless on pak128.cs with a throwaway hook (grow, upgrade, remove the name tile, merge, both modes; switching
+both ways moved no name; save/load, the simuconf override, a 0.122.16 copy) and the checkbox in the GDI window.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds

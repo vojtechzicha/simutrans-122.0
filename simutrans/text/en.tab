@@ -1793,6 +1793,8 @@ to %s
 to %s
 station_far_reach
 Far reach: houses no stop reaches go to their nearest stop up to (tiles, 0 = off)
+station_name_on_first_tile
+Stop names stay on their tile (do not move to the centre)
 (nearest stop)
 (nearest stop)
 Reassign buildings

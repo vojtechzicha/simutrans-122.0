@@ -260,6 +260,12 @@ koord haltestelle_t::get_next_pos( koord start ) const
  * It is the avarage of all tiles' coordinate weighed by level of the building */
 void haltestelle_t::recalc_basis_pos()
 {
+	if(  welt->get_settings().get_station_name_on_first_tile()  ) {
+		// fork: the name stays where it is (a new stop has it on its first tile; when that tile goes,
+		// rem_grund gives it to the oldest one left)
+		return;
+	}
+
 	sint64 cent_x, cent_y;
 	cent_x = cent_y = 0;
 	uint64 level_sum;

@@ -519,6 +519,7 @@ static void export_settings( json_writer_t &w, karte_t *welt )
 	w.kv_int( "bonus_basefactor", s.get_bonus_basefactor() );
 	w.kv_money( "maintenance_building", s.maint_building );
 	w.kv_bool( "numbered_stations", s.get_numbered_stations() );
+	w.kv_bool( "station_name_on_first_tile", s.get_station_name_on_first_tile() );
 	w.kv_bool( "beginner_mode", s.get_beginner_mode() );
 	w.kv_int( "beginner_price_factor", s.get_beginner_price_factor() );
 	w.kv_int( "city_count", s.get_city_count() );

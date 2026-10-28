@@ -254,6 +254,10 @@ private:
 	 */
 	bool numbered_stations;
 
+	/// fork: a stop's name stays on the tile it is on when the stop grows, is upgraded or merged (the name
+	/// of a new stop is on its first tile), instead of moving to the centre of the stop (savegame 122.17)
+	bool station_name_on_first_tile;
+
 	/* maximum number of steps for breath search */
 	sint32 max_route_steps;
 
@@ -510,6 +514,9 @@ public:
 	bool is_crossconnect_factories() const { return crossconnect_factories; }
 
 	bool get_numbered_stations() const { return numbered_stations; }
+
+	bool get_station_name_on_first_tile() const { return station_name_on_first_tile; }
+	void set_station_name_on_first_tile( bool b ) { station_name_on_first_tile = b; }
 
 	sint32 get_stadtauto_duration() const { return stadtauto_duration; }
 

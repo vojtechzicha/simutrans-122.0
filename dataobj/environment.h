@@ -183,6 +183,10 @@ public:
 	/// the passenger factor, also of a saved game when loading one (not in network games)
 	static sint32 passenger_factor_override;
 
+	/// fork: station_name_on_first_tile as set in simuconf.tab (0 or 1), -1 if no simuconf.tab sets it; it
+	/// wins over the value saved with a game when loading one (not in network games)
+	static sint8 station_name_on_first_tile_override;
+
 	/// show/hide delete buttons in savegame frame
 	static bool show_delete_buttons;
 

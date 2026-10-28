@@ -174,6 +174,7 @@ settings_t::settings_t() :
 
 	// to keep names consistent
 	numbered_stations = false;
+	station_name_on_first_tile = false;
 
 	num_city_roads = 0;
 	num_intercity_roads = 0;
@@ -927,6 +928,10 @@ void settings_t::rdwr(loadsave_t *file)
 				set_passenger_factor_16( passenger_factor_16 );
 			}
 		}
+		if(  file->is_version_atleast(122, 17)  ) {
+			// fork: stop names stay on their first tile
+			file->rdwr_bool(station_name_on_first_tile);
+		}
 		// otherwise the default values of the last one will be used
 	}
 }
@@ -1423,6 +1428,11 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	maint_building = contents.get_int( "maintenance_building", maint_building );
 
 	numbered_stations = contents.get_int( "numbered_stations", numbered_stations );
+	station_name_on_first_tile = contents.get_int( "station_name_on_first_tile", station_name_on_first_tile );
+	if(  *contents.get( "station_name_on_first_tile" )  ) {
+		// fork: also for saved games, see karte_t::load
+		env_t::station_name_on_first_tile_override = station_name_on_first_tile;
+	}
 	station_coverage_size = contents.get_int( "station_coverage", station_coverage_size );
 	station_far_reach = contents.get_int( "station_far_reach", station_far_reach );
 	if(  *contents.get( "station_far_reach" )  ) {

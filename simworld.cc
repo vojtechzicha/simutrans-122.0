@@ -5496,6 +5496,10 @@ void karte_t::load(loadsave_t *file)
 		// fork: and for the passenger factor (the next save stores it, savegame 122.16)
 		settings.set_passenger_factor_16( env_t::passenger_factor_override );
 	}
+	if(  !env_t::networkmode  &&  env_t::station_name_on_first_tile_override >= 0  ) {
+		// fork: and for where stop names stay (moves none, only the next change of a stop follows it)
+		settings.set_station_name_on_first_tile( env_t::station_name_on_first_tile_override != 0 );
+	}
 
 	// some functions (finish_rd) need to know what version was loaded
 	load_version = file->get_version_int();

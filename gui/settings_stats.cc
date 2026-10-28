@@ -81,6 +81,7 @@ void settings_general_stats_t::init(settings_t const* const sets)
 	INIT_NUM( "fast_forward", env_t::max_acceleration, 1, 1000, gui_numberinput_t::AUTOLINEAR, false );
 	SEPERATOR
 	INIT_BOOL( "numbered_stations", sets->get_numbered_stations() );
+	INIT_BOOL( "station_name_on_first_tile", sets->get_station_name_on_first_tile() );
 	INIT_NUM( "show_names", env_t::show_names, 0, 3, gui_numberinput_t::AUTOLINEAR, true );
 	SEPERATOR
 	INIT_NUM( "bits_per_month", sets->get_bits_per_month(), 16, 24, gui_numberinput_t::AUTOLINEAR, false );
@@ -127,6 +128,7 @@ void settings_general_stats_t::read(settings_t* const sets)
 	READ_NUM_VALUE( env_t::max_acceleration );
 
 	READ_BOOL_VALUE( sets->numbered_stations );
+	READ_BOOL_VALUE( sets->station_name_on_first_tile );
 	READ_NUM_VALUE( env_t::show_names );
 
 	READ_NUM_VALUE( sets->bits_per_month );
