@@ -1040,9 +1040,11 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   `station-road/odstavne-stani` (`VZ-Stations-BusLayover-{OneSide,BothSides,DeadEnd}`).
 - Each tile has two bays; owners are in `convoi_t::layover_bays` (keyed by position, rebuilt after
   loading and rotation by `restore_layover_bays`), each bus holds a record (`layover_pos`, `_bay`,
-  `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile and that is one tile
-  long uses bays; longer ones stand in the lane as at any stop. An articulated bus of one tile (pak128.cs:
-  two sections of 7 or 8) is drawn as a whole, centred in the bay: every section moves by the same steps
+  `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile and whose sections
+  together are at most a tile long (`fits_in_bay`, the real lengths; `get_tile_length` counts the last
+  section as at least half a tile, which kept the 9+5 SOR NB 18 out of the bays while the 8+6 Streetway
+  fitted) uses bays; longer ones stand in the lane as at any stop. An articulated bus of one tile (pak128.cs:
+  two sections of 7 or 8, or 9+5) is drawn as a whole, centred in the bay: every section moves by the same steps
   (`road_vehicle_t::get_screen_offset`), and `is_off_lane` holds for all of its vehicles while the front
   is in the bay. Before (2026-10-18) each section was moved to the middle on its own, so they overlapped. Ordinary stop reservations and choose
   signs never use layover tiles (`haltestelle_t::is_reservable` etc., `road_vehicle_t::choose_route`).
@@ -1072,6 +1074,12 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   choose again when they arrive. A line edit that moves the entry off the layover within the same stop
   (stock keeps the route for the same stop) releases the bay and routes the bus anew. Queue order
   compares the time waited, so the tick counter may wrap.
+- Departure order at a timetabled layover: a bus standing in the lane of a layover tile goes before the
+  buses parked in its bays, also ones that arrived earlier or booked their slot (`is_way_out_over` counts
+  the lane of a parked bus's own tile, `leaves_before` checks it for every parked bus). Before, the earlier
+  arrival went first and could not pull out past the bus in the lane, which waited for it: Praha, Suchdol
+  (King's Arms layover, line 107, 2026-10-28) had two SOR buses in the lane and bays, three in a circle
+  and six queued behind for hours.
 - Export: `layover` {pos, bay, parked} per convoy, `waiting_for.reason` `layover_bay`.
 Tested headless (pak128.cs + the art as add-on): a 10-bay cluster (two junctions, five dead-end tiles,
 two stops) with five timetabled lines; 18 buses for 10 bays (queue, every bay used, save/load);
@@ -1242,6 +1250,7 @@ name moves; only the next change of a stop follows the rule in force. Names stoc
 (the first tile is not recorded). Export `station_name_on_first_tile` in the settings.
 Tested headless on pak128.cs with a throwaway hook (grow, upgrade, remove the name tile, merge, both modes; switching
 both ways moved no name; save/load, the simuconf override, a 0.122.16 copy) and the checkbox in the GDI window.
+
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

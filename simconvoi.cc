@@ -5172,6 +5172,15 @@ bool convoi_t::is_way_out_over(const convoi_t *other) const
 	if(  mover->anz_vehikel == 0  ||  other->anz_vehikel == 0  ) {
 		return false;
 	}
+	if(  mover->is_parked_in_bay()  ) {
+		// its way out begins in the lane of its layover tile: a bus standing there (one too long for a bay)
+		// goes first, else each waits for the other (Praha, Suchdol 2026-10-28: line 107 for two hours)
+		for(  uint8 j = 0;  j < other->anz_vehikel;  j++  ) {
+			if(  other->fahr[j]->get_pos() == mover->layover_pos  &&  !other->fahr[j]->is_off_lane()  ) {
+				return true;
+			}
+		}
+	}
 	const route_t *const r = mover->get_route();
 	for(  uint32 i = mover->fahr[0]->get_route_index();  i < r->get_count();  i++  ) {
 		const koord3d &pos = r->at( i );
@@ -7847,7 +7856,7 @@ void convoi_t::plan_layover()
 	}
 	const koord3d target = route.back();
 	const grund_t *gr = welt->lookup( target );
-	if(  get_layover_kind( gr )==0  ||  !haltestelle_t::get_halt( target, owner ).is_bound()  ||  get_tile_length()>1  ) {
+	if(  get_layover_kind( gr )==0  ||  !haltestelle_t::get_halt( target, owner ).is_bound()  ||  !fits_in_bay()  ) {
 		// not a layover, or too long for a bay: stands in the lane as at any stop
 		release_layover();
 		return;
@@ -7976,7 +7985,7 @@ void convoi_t::layover_arrived()
 	release_layover();
 	// came here without a bay of this tile: take one if free, else it stands in the lane
 	const grund_t *gr = welt->lookup( here );
-	if(  get_layover_kind( gr )  &&  get_tile_length()==1  ) {
+	if(  get_layover_kind( gr )  &&  fits_in_bay()  ) {
 		const sint8 bay = find_free_bay( gr, fahr[0]->get_direction() );
 		if(  bay>=0  ) {
 			take_bay( here, bay, LAYOVER_APPROACHING );

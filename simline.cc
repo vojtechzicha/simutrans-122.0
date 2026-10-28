@@ -379,6 +379,12 @@ static bool leaves_before(convoihandle_t other, convoihandle_t cnv, uint8 idx, b
 	if(  other == cnv  ||  !other.is_bound()  ) {
 		return false;
 	}
+	if(  other->is_parked_in_bay()  &&  other->is_way_out_over( cnv.get_rep() )  ) {
+		// a bus standing in the lane of a layover tile blocks the bays there: it goes first, also before a
+		// parked bus that is still loading (else three wait in a circle: lane, a bay with its slot, a bay
+		// that came earlier)
+		return false;
+	}
 	if(  other->is_leaving_stop( idx )  ) {
 		// held at the platform or at its exit signal: it goes first, and a slot that begins while it
 		// stands is its own (convoi_t::book_slots_while_held)

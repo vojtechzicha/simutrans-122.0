@@ -1230,6 +1230,9 @@ public:
 	bool is_queued_for_bay() const { return layover_phase==LAYOVER_QUEUED; }
 	koord3d get_layover_pos() const { return layover_pos; }
 	uint8 get_layover_bay() const { return layover_bay; }
+	/// its sections together are at most a tile long, so it fits in a layover bay (get_tile_length counts the
+	/// last section as at least half a tile, which made a 9+5 articulated bus two tiles and an 8+6 one one)
+	bool fits_in_bay() const { return anz_vehikel>0  &&  get_length()<=CARUNITS_PER_TILE; }
 	/// after drive_to: a bay for the stop the route ends at, or the queue (road convoys)
 	void plan_layover();
 	/// gives up the bay or the place in the queue (idempotent)
