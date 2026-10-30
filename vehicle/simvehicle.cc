@@ -3568,6 +3568,10 @@ skip_choose:
 				return false;
 			}
 		}
+		// fork: onto a single-track section through a station boundary: as a platform signal (see is_signal_clear)
+		if(  get_leave_boundary( cnv->get_route(), start_block )!=koord3d::invalid  ) {
+			return is_platform_signal_clear( sig, start_block, restart_speed );
+		}
 		// just act as normal signal
 		if(  block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 0, true, false )  ) {
 			sig->set_state(  roadsign_t::gruen );
@@ -4809,6 +4813,25 @@ uint32 rail_vehicle_t::get_platform_exit_signal(uint32 here) const
  * station boundary onto a single-track line: then the line up to the next station must be free and a track
  * there is claimed, see documentation/fork-rail-signalling-plan.md
  */
+koord3d rail_vehicle_t::get_leave_boundary(const route_t *route, uint16 next_block) const
+{
+	for(  uint32 i=next_block+1;  i<route->get_count();  i++  ) {
+		grund_t const* const gr = welt->lookup( route->at(i) );
+		if(  gr==NULL  ) {
+			break;
+		}
+		if(  roadsign_t const* const lt = get_station_boundary( gr )  ) {
+			const ribi_t::ribi dir = i+1<route->get_count() ? ribi_type( route->at(i), route->at(i+1) ) : ribi_type( route->at(i-1), route->at(i) );
+			return lt->applies_to( dir ) ? koord3d::invalid : route->at(i);
+		}
+		if(  is_stop_point( route, i )  ) {
+			break;
+		}
+	}
+	return koord3d::invalid;
+}
+
+
 bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed)
 {
 	route_t *route = cnv->access_route();
@@ -4818,23 +4841,8 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 	cnv->clear_section();
 
 	// leaving through a station boundary before any signal that applies?
-	bool section = false;
-	koord3d leave_boundary = koord3d::invalid;
-	for(  uint32 i=next_block+1;  i<route->get_count();  i++  ) {
-		grund_t const* const gr = welt->lookup( route->at(i) );
-		if(  gr==NULL  ) {
-			break;
-		}
-		if(  roadsign_t const* const lt = get_station_boundary( gr )  ) {
-			const ribi_t::ribi dir = i+1<route->get_count() ? ribi_type( route->at(i), route->at(i+1) ) : ribi_type( route->at(i-1), route->at(i) );
-			section = !lt->applies_to( dir );
-			leave_boundary = route->at(i);
-			break;
-		}
-		if(  is_stop_point( route, i )  ) {
-			break;
-		}
-	}
+	const koord3d leave_boundary = get_leave_boundary( route, next_block );
+	const bool section = leave_boundary!=koord3d::invalid;
 
 	if(  !section  ) {
 		// an ordinary exit signal; a claim from before is out of date here
@@ -7289,6 +7297,18 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 
 	// simple signal: fail, if next block is not free
 	if(  sig_desc->is_simple_signal()  ) {
+
+		// fork: onto a single-track section through a station boundary: as a platform signal, so the train
+		// goes only with a track at the station at the end of it. Else it ran up to that station's boundary
+		// and waited there on the line for a track, while the trains in the station waited for the line
+		// (Praha-Vršovice 2026-10-30: from Eden and ONJ in through plain and choose signals)
+		if(  get_leave_boundary( cnv->get_route(), next_block )!=koord3d::invalid  ) {
+			const bool clear = is_platform_signal_clear( sig, next_block, restart_speed );
+			if(  clear  &&  sig_desc->is_autoblock()  ) {
+				sig->refresh_autoblock();
+			}
+			return clear;
+		}
 
 		uint16 next_signal, next_crossing;
 		if(  block_reserver( cnv->get_route(), next_block+1, next_signal, next_crossing, 0, true, false )  ) {

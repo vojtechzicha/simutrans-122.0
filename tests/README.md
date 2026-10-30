@@ -38,6 +38,8 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | Scenario | Checks |
 | --- | --- |
 | `chained_lt_3`, `chained_lt_4` | Two station boundaries in a row (Vršovice -> ONJ, 2026-10-30): a train for the yard does not refuse it because the train on its planned track waits to leave. Fails before 0c1ad07. |
+| `lt_entry_main_3`, `lt_entry_main_4` | A single-track stub between two station boundaries entered through a plain signal (Vršovice from Eden and ONJ, 2026-10-30): the signal acts as a platform signal, so no train waits on the stub for a track at the station. Fail before the fix. |
+| `lt_entry_p_3` | The same stub entered through a P: the layout way to the same result, passes on older builds too. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |

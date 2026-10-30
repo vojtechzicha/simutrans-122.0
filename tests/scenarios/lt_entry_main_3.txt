@@ -1,0 +1,45 @@
+# A single-track stub between two station boundaries entered through a plain signal (tests/layouts/lt_entry.inc),
+# 3 trains. A train coming from the yard must not run up to the station boundary into V while V has no free
+# track: there it stands on the single track that the trains in V need to leave. Before the fix (2026-10-30,
+# Praha-Vršovice from Eden and ONJ) it did, and the trains locked. Expect: V's timetable rate, a departure
+# every 30 minutes, so about 20 stops in 5 hours (both ends), every train moving.
+include ../layouts/lt_entry.inc
+sign VZ-Signals-D1-New-Main 33 22 W
+waits on
+stops on
+convoy 42 23 L 3
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+summary
+expect L stops >= 17
+expect_each L stops >= 5
+expect_stuck <= 0

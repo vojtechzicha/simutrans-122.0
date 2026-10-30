@@ -672,6 +672,27 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   20 stops in 5 hours); 5 trains for 5 tracks lock in both, with true wait texts now. On a copy of
   the owner's save (16:07, 2026-10-30) the old build went from 46 to 68 stuck trains in 2 hours,
   the new one from 25 to 4, the three railjets moving within 15 minutes.
+- Entering a single-track section through another signal (no save change, 2026-10-30): a plain or autoblock
+  signal, or a choose signal that chooses nothing (a station boundary on the way), behind which the route leaves
+  through a station boundary that applies the other way before any signal that applies, acts as a `P`
+  (`get_leave_boundary`, from `is_signal_clear` and `is_choose_signal_clear` into `is_platform_signal_clear`):
+  the line up to the boundary into the next station must be free, and the train claims its track there before it
+  goes. Before, it reserved up to that boundary and waited there for a track, on the line. Praha-Vršovice: five
+  stubs between its east `LT`s and the `LT`s of the junction beyond, entered from Eden through the plain signals
+  2548,2101 and 2548,2103 and from ONJ through the choose signal 2552,2105. Os 2538 and R 864 stood on two of
+  them waiting for a Vršovice track, and every Vršovice track held a train waiting for those stubs: 30 trains
+  stuck, also with the two-boundaries fix above. On a copy of the 18:26 save the old build went from 21 to 94 stuck
+  in 4 hours, with this fix the jam cleared within an hour by itself (5 stuck at the end, Brno trams and coupled
+  trains). Pre-signals already ask the boundary after them; priority and long block signals are unchanged. The
+  harness command `ltentries` lists the signals this applies to (330 signal directions on the owner's map, an upper
+  bound: it follows every branch). A `P` in place of such a signal does the same and works with older builds too.
+  Impact elsewhere (`standwatch`, 4 hours on copies of the owner's game, with and without this fix): on the 10/28
+  autosave without the jam trains stood 41 minutes in all at those 328 signals against 31, rail stops +0.09%, the
+  same stuck counts; on the 18:26 save the differences were within what two runs of the same build differ by (0.2%
+  rail stops, 90 train minutes at those signals). New waits there say "No free track at" (Vršovice, from Eden and
+  ONJ) or "Keeping the last track at X free" (the choose signals into Hostivař 2635,2122 and Libeň 2611,2030).
+  Tested headless on a rebuild (`tests/layouts/lt_entry.inc`, scenarios `lt_entry_*`): with a plain signal the old
+  build locked with 3 and 4 trains, the new one runs both at the timetable's rate; with a `P` both builds run.
 - Claim (`convoi_t::claim_path`, `claim_first`, `claim_stops`, saved 122.7, reserved again in
   `finish_rd`): the path from the `LT` through the chosen track; only its platform tiles are
   reserved. `drive_to` routes through it (`route_via_claim`) and releases it when `claim_stop` (the

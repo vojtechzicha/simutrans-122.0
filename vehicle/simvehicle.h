@@ -806,6 +806,10 @@ private:
 	bool route_through(route_t *route, uint32 start, const route_t &path, bool stops);
 
 	bool is_platform_signal_clear(signal_t *sig, uint16 next_block, sint32 &restart_speed);
+	// the station boundary the route leaves through after the signal at next_block (the first one on the
+	// way, before any signal that applies, and it applies the other way); else koord3d::invalid. Then a
+	// single-track section starts at that signal
+	koord3d get_leave_boundary(const route_t *route, uint16 next_block) const;
 	// route index of the platform signal at the end of the station track the train stands on at a halt,
 	// if it is the first stop point from here on (no switch, crossing, depot or other halt before it);
 	// else INVALID_INDEX. The train waits for it at its stop position (convoi_t::platform_hold)
