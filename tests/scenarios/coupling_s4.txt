@@ -1,0 +1,56 @@
+# Coupling with a unit that runs part of the way only (S4, 2026-10-14; tests/layouts/r18.inc plus a halt
+# M on the single track O - S): S4U runs O - M - S - L and back, U2 (the second unit) only O - M - S and
+# couples with S4U at O and at S (left at S by one S4U, taken back by the next). Two of each.
+include ../layouts/r18.inc
+stations ConcretePlatformTrainStop 38 41 40
+line S4U
+stop 12 40 0 0 T
+timetable 60 0
+stop 39 40
+stop 68 40
+timetable 60 20
+stop 115 40 0 0 T
+timetable 60 35
+stop 68 40
+timetable 60 50
+stop 39 40
+endline
+line U2
+stop 12 40 0 0 T
+couple S4U 5
+timetable 60 0
+stop 39 40
+stop 68 40 0 0 T
+couple S4U 10
+timetable 60 50
+stop 39 40
+endline
+vehicles 1Benst162t Passagierwagen Passagierwagen
+convoy 6 41 S4U
+convoy 6 41 U2
+convoy 6 41 S4U
+convoy 6 41 U2
+events on
+stops on
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+summary
+expect_each U2 couplings >= 4
+expect S4U stops >= 40
+expect_each * offstation <= 30
+expect_stuck <= 0

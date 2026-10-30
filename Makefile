@@ -522,6 +522,7 @@ SOURCES += simmem.cc
 SOURCES += simmenu.cc
 SOURCES += simmesg.cc
 SOURCES += simobj.cc
+SOURCES += tests/fork_test_harness.cc
 SOURCES += simplan.cc
 SOURCES += simskin.cc
 SOURCES += simsound.cc

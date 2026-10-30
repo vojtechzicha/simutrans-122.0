@@ -1,0 +1,50 @@
+# Timetabled buses waiting in the bays of a layover cluster (tests/layouts/layover_cluster.inc): five
+# lines, two buses each, 10 bays. Every bus parks in a bay, none stands in a bay of another, and every
+# bus keeps running (baywatch counts a bus parked away from its bay or two in one bay as an error).
+include ../layouts/layover_cluster.inc
+busline L1
+stop 15 20 0 0 A
+stop 23 15 0 0 H
+timetable 20 2
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+busline L2
+stop 15 20 0 0 A
+stop 23 17 0 0 H
+timetable 20 6
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+busline L3
+stop 15 20 0 0 A
+stop 24 15 0 0 H
+timetable 20 10
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+busline L4
+stop 15 20 0 0 A
+stop 24 17 0 0 H
+timetable 20 14
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+busline L5
+stop 15 20 0 0 A
+stop 25 16 0 0 H
+timetable 20 18
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+baywatch on
+convoy 11 18 L1 2
+convoy 11 18 L2 2
+convoy 11 18 L3 2
+convoy 11 18 L4 2
+convoy 11 18 L5 2
+run 360 0
+bays
+summary
+expect_each L stops >= 20
+expect_each L parks >= 7

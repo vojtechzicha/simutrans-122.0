@@ -1,0 +1,8 @@
+# Fork: the user-dir simuconf.tab of every test run (tests/run.sh copies it into the work dir).
+# Keep the tests independent of the owner's own simuconf.tab: only what the scenarios need.
+
+# the calendar: timetables, passing holds and coupling waits need it (the owner's game uses 480)
+minutes_per_month = 480
+
+# pak128.cs has many doubled objects: only log them
+warn_doubled_objects = 0

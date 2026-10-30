@@ -43,7 +43,8 @@ cd simutrans && ./simutrans -use_workdir -objects pak
   `sys/simsys_s2.cc`; keep it that way. Rendering is unchanged (the game draws a 1x texture).
 - pak64 for 122.0 lives in `simutrans/pak` (ignored by git). No `revision.h` is checked in; the
   build generates it.
-- There is no test suite. Verification means building, launching, and exercising the change in-game.
+- Rail and road behaviour has headless tests (`tests/`, see "Tests" below); the GUI does not.
+  GUI verification means building, launching, and exercising the change in-game.
   `tools/mac-test/` has helpers for that: `shot.sh` screenshots the game window and records its
   geometry, `wclick.sh X Y [left|middle|right]` clicks at content-relative coordinates, `click.swift`
   is the CGEvent tool behind it (build once with `swiftc`, binary is git-ignored). Read the
@@ -123,6 +124,19 @@ in `STRIP_OPTS`. A stripped game needs the far reach: not for the stock exe or a
   `sys/simsys_w.cc` (GDI) too, not only the SDL2 path, and should be re-verified on Windows.
 - Keep Windows build files in sync: a new `.cc` file must be added to the `Makefile` SOURCES list
   and to `Simutrans-Main.vcxitems`, or the Windows build silently lacks it.
+
+## Tests
+
+`tests/run.sh` runs the headless scenarios in `tests/scenarios` (layouts in `tests/layouts`) with the game's
+`-forktest SCRIPT` batch mode and prints PASS/FAIL per scenario; details, the command reference and the list
+of scenarios still to rebuild are in `tests/README.md`. The harness (`tests/fork_test_harness.cc`) is part of
+every build, so it compiles with the code it tests. Scenarios build small worlds with the owner's pak128.cs
+(`PAKSET`, default OneDrive's) and end in `expect` checks.
+- Run `tests/run.sh` before committing a change to rail or road behaviour, and say in the commit what it gave.
+- Every fix of a lock, jam or wrong choice gets a scenario that fails on the build without the fix (build the
+  parent commit, `tests/run.sh -e THAT.exe NAME`) and passes with it. Keep scenarios in the repo, never only in
+  a scratchpad: the earlier set of about 39 lived in Claude's temp folders and a cleanup deleted it.
+- The work dirs (`TESTS_WORK`, outside the repo) link the pakset; remove them only with `tests/run.sh --clean`.
 
 ## Conventions
 

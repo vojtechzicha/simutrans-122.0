@@ -1,0 +1,56 @@
+# Coupling trains (tests/layouts/r18.inc): R2 runs O - S and back, R1 runs O - S - L - S - O and couples
+# with R2 between O and S both ways ("Couple with R2, wait up to 15 min" at O and at S), two pairs on a
+# 60 minute timetable. Expect: the pairs couple and part every hour, and every train keeps running.
+include ../layouts/r18.inc
+line R2
+stop 12 40
+timetable 60 0
+stop 68 40 0 0 T
+timetable 60 50
+endline
+line R1
+stop 12 40
+couple R2 15
+timetable 60 0
+stop 68 40
+timetable 60 17
+stop 115 40 0 0 T
+timetable 60 35
+stop 68 40
+couple R2 15
+timetable 60 50
+endline
+vehicles 1Benst162t Passagierwagen Passagierwagen
+convoy 6 41 R2
+convoy 6 41 R1
+convoy 6 41 R2
+convoy 6 41 R1
+events on
+stops on
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+run 60 0
+stuck
+summary
+expect_each R1 couplings >= 4
+expect R2 stops >= 16
+expect R1 stops >= 16
+expect_each * offstation <= 30
+expect_stuck <= 0

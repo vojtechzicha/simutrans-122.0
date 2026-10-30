@@ -68,6 +68,7 @@
 #include "dataobj/savegame_export.h"
 #include "dataobj/savegame_rename.h"
 #include "dataobj/savegame_strip_parking.h"
+#include "tests/fork_test_harness.h"
 #include "dataobj/tabfile.h"
 #include "dataobj/settings.h"
 #include "dataobj/translator.h"
@@ -470,6 +471,8 @@ int simu_main(int argc, char** argv)
 			"                     near=T or any; -strip-keep FILE, -strip-mail, -strip-free,\n"
 			"                     -strip-report FILE; see dataobj/savegame_strip_parking.h), only\n"
 			"                     with -saveas, else a dry run\n"
+			" -forktest SCRIPT    runs the test script (on -load NAME or a world it builds), log in\n"
+			"                     SCRIPT.log, quits with exit code 1 on a failure (tests/README.md)\n"
 			" -freeplay           play with endless money\n"
 			" -fullscreen         starts simutrans in fullscreen mode\n"
 			" -fps COUNT          framerate (from 5 to 100)\n"
@@ -524,7 +527,9 @@ int simu_main(int argc, char** argv)
 	const char *saveas_filename = gimme_arg(argc, argv, "-saveas", 1);
 	const char *rename_filename = gimme_arg(argc, argv, "-rename", 1);
 	const char *strip_parking_mode = gimme_arg(argc, argv, "-strip-parking", 1);
-	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL  ||  strip_parking_mode != NULL;
+	const char *forktest_filename = gimme_arg(argc, argv, "-forktest", 1);
+	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL  ||  strip_parking_mode != NULL  ||  forktest_filename != NULL;
+	int exit_code = 0;
 
 #ifdef __BEOS__
 	if (1) // since BeOS only supports relative paths ...
@@ -1410,6 +1415,11 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 
 	// batch mode: dump the loaded game as JSON and/or write it as a save file, then quit right away
 	if(  batch_mode  ) {
+		if(  forktest_filename  ) {
+			// fork: the test harness works on the loaded game, or builds its own world (newworld)
+			exit_code = fork_test_run( welt, forktest_filename ) ? 1 : 0;
+			new_world = false;
+		}
 		if(  new_world  ) {
 			dbg->error( "simmain()", "-export and -saveas need a loadable game, use -load NAME" );
 		}
@@ -1587,5 +1597,5 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 	freelist_t::free_all_nodes();
 #endif
 
-	return 0;
+	return exit_code;
 }

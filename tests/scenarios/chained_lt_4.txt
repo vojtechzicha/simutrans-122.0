@@ -1,0 +1,44 @@
+# Two station boundaries in a row (tests/layouts/chained_lt.inc), 4 trains. A train for the yard must
+# not refuse it because the train on its planned track there waits to leave through the junction area
+# (it takes another free track at the yard's LT). Before the fix (2026-10-30) the trains locked within
+# 40-60 minutes: "No free track at" the yard while it had free tracks. Expect: the timetable's rate,
+# 2 departures an hour at each end, so about 19 stops in 5 hours, every train moving.
+include ../layouts/chained_lt.inc
+waits on
+stops on
+convoy 42 23 L 4
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+run 20 0
+stuck
+summary
+expect L stops >= 17
+expect_each L stops >= 2
+expect_stuck <= 0

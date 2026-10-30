@@ -31,6 +31,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)simlinemgmt.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simloadingscreen.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simmain.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)tests\fork_test_harness.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simmem.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simmenu.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simmesg.cc" />
@@ -359,6 +360,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)simlinemgmt.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simloadingscreen.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simmain.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)tests\fork_test_harness.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simmem.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simmenu.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simmesg.h" />

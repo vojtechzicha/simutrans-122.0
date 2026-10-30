@@ -1,0 +1,49 @@
+# Layover tiles beside the lane (tests/layouts/layover_side.inc): four timetabled lines park there while
+# two through lines drive past the parked buses both ways. Expect: no bay error, every bus moving.
+include ../layouts/layover_side.inc
+busline S1
+stop 15 20 0 0 A
+stop 30 16 0 0 H
+timetable 30 5
+stop 25 26 0 0 R
+endline
+busline S2
+stop 15 20 0 0 A
+stop 30 16 0 0 H
+timetable 30 20
+stop 25 26 0 0 R
+endline
+busline S3
+stop 15 20 0 0 A
+stop 32 14 0 0 H
+timetable 30 12
+stop 25 26 0 0 R
+endline
+busline S4
+stop 15 20 0 0 A
+stop 35 17 0 0 H
+timetable 30 25
+stop 25 26 0 0 R
+endline
+busline T1
+stop 20 26 0 0 R
+stop 33 14 0 0 R
+endline
+busline T2
+stop 33 14 0 0 R
+stop 15 20 0 0 R
+endline
+baywatch on
+bays
+convoy 11 18 S1 2
+convoy 11 18 S2 2
+convoy 11 18 S3 2
+convoy 11 18 S4 2
+convoy 11 18 T1 3
+convoy 11 18 T2 3
+run 300 0
+bays
+summary
+expect_each S stops >= 12
+expect_each T stops >= 12
+expect_each S parks >= 4
