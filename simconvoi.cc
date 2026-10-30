@@ -1261,7 +1261,7 @@ void convoi_t::check_deadlocks()
 		if(  (sw==SECTION_WAIT_TRACK  ||  sw==SECTION_WAIT_LAST_TRACK)  &&  cnv->section_wait_halt.is_bound()  ) {
 			// a track there gets free only when one of them leaves
 			vector_tpl<convoihandle_t> on_tracks;
-			rail_vehicle_t::get_station_occupants( cnv->section_wait_halt, cnv->front()->get_waytype(), on_tracks );
+			rail_vehicle_t::get_station_occupants( cnv->section_wait_halt, cnv->front()->get_waytype(), cnv->front()->get_desc()->get_waytype(), on_tracks );
 			on_tracks.remove( cnv );
 			bool all_wait = !on_tracks.empty();
 			const uint32 first = all_members.get_count();

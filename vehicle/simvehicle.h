@@ -888,8 +888,11 @@ public:
 	// fork: the station boundary sign (lichobeznikova tabulka) on this tile, if any
 	static const roadsign_t *get_station_boundary(const grund_t *gr);
 
-	// fork: the trains on (or with a reservation on) the tracks of a station (get_station_tracks)
-	static void get_station_occupants(halthandle_t halt, waytype_t wt, vector_tpl<convoihandle_t> &trains);
+	// fork: the trains on (or with a reservation on) the tracks of a station (get_station_tracks; stop_wt: the
+	// vehicles' own waytype, so a tram stop of the halt is no track for trains)
+	static void get_station_occupants(halthandle_t halt, waytype_t wt, waytype_t stop_wt, vector_tpl<convoihandle_t> &trains);
+	// fork: how many tracks the single-track and keep-a-track rules count at a station (for the tests)
+	static uint16 count_station_tracks(halthandle_t halt, waytype_t wt, waytype_t stop_wt);
 
 	// fork: sets the aspect of the station boundary at pos when it is drawn as an entry signal: green or
 	// yellow for the train let in there or holding a track behind it, else red (display only)

@@ -40,6 +40,7 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `chained_lt_3`, `chained_lt_4` | Two station boundaries in a row (Vršovice -> ONJ, 2026-10-30): a train for the yard does not refuse it because the train on its planned track waits to leave. Fails before 0c1ad07. |
 | `lt_entry_main_3`, `lt_entry_main_4` | A single-track stub between two station boundaries entered through a plain signal (Vršovice from Eden and ONJ, 2026-10-30): the signal acts as a platform signal, so no train waits on the stub for a track at the station. Fail before the fix. |
 | `lt_entry_p_3` | The same stub entered through a P: the layout way to the same result, passes on older builds too. |
+| `station_tracks_tram` | A tram stop in a train station's halt is no track of the station for the train rules (`expect_tracks`). Fails before the fix. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |
@@ -91,6 +92,7 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
 - `expect_stuck OP N`: the count of the last `stuck` (call `stuck` before the run and after).
 - `expect_state PATTERN STATE` (e.g. `LOADING`, `CAN_START`) and `expect_wait PATTERN TEXT...` (part of
   the wait text the convoy window shows): some matching convoy, now.
+- `expect_tracks X Y OP N`: the tracks the single-track and keep-a-track rules count at the halt on that tile.
 
 Vehicles and signals must exist in the owner's pak128.cs. Diesel trains need no catenary: e.g.
 `VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843` (3-car

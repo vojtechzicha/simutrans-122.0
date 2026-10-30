@@ -693,6 +693,14 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   ONJ) or "Keeping the last track at X free" (the choose signals into Hostivař 2635,2122 and Libeň 2611,2030).
   Tested headless on a rebuild (`tests/layouts/lt_entry.inc`, scenarios `lt_entry_*`): with a plain signal the old
   build locked with 3 and 4 trains, the new one runs both at the timetable's rate; with a `P` both builds run.
+- Tram stops are no station tracks (no save change, 2026-10-30): `get_station_tracks` skips the stops of a halt
+  for another waytype than the train's (`is_stop_for_other_waytype`, the vehicle's own waytype as `stop_wt`, so
+  trams still count their stops). Vršovice's halt includes the Ukrajinská tram stop, two more tracks, always free
+  or held by a tram, so the station never looked full: the last free track at a `P` (`keeps_last_track`), keeping a
+  track for the other direction, `station_can_release` and the lock checks all misjudged it (the keep rule
+  counted a tram track as usable when Os 9109 took the last Vršovice track while Os 2538 waited for one). On the
+  copy of the 18:26 save this fix alone cleared the jam too (32 stuck after 20 minutes, 5 after 4 hours); 4 hours of
+  the 10/28 autosave: rail stops +0.2%, standing time -1.2% against the old build. Scenario `station_tracks_tram`.
 - Claim (`convoi_t::claim_path`, `claim_first`, `claim_stops`, saved 122.7, reserved again in
   `finish_rd`): the path from the `LT` through the chosen track; only its platform tiles are
   reserved. `drive_to` routes through it (`route_via_claim`) and releases it when `claim_stop` (the

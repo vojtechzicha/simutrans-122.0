@@ -1950,6 +1950,27 @@ static void cmd_expect_stuck(const char *op, int limit)
 	}
 }
 
+// expect_tracks X Y OP N: the tracks the single-track and keep-a-track rules count for trains at the halt
+// on that tile (get_station_tracks)
+static void cmd_expect_tracks(int x, int y, const char *op, int limit)
+{
+	grund_t *gr = ground(x, y);
+	const halthandle_t halt = gr ? gr->get_halt() : halthandle_t();
+	if(  !halt.is_bound()  ||  op==NULL  ) {
+		logf("ERROR expect_tracks needs a halt at X Y, and OP N\n");
+		failures++;
+		return;
+	}
+	const int n = rail_vehicle_t::count_station_tracks( halt, track_wt, track_wt );
+	if(  compare( n, op, limit )  ) {
+		logf("ok   expect_tracks %d,%d %s %d (%d at %s)\n", x, y, op, limit, n, halt->get_name());
+	}
+	else {
+		logf("FAIL expect_tracks %d,%d %s %d: %d tracks at %s\n", x, y, op, limit, n, halt->get_name());
+		failures++;
+	}
+}
+
 // expect_state PAT STATE: some convoy matching PAT is in that state now (state_name)
 // expect_wait PAT TEXT...: the wait text of some convoy matching PAT (convoy window) contains TEXT
 static void cmd_expect_now(const char *pat, const std::string &what, bool wait_text)
@@ -1997,6 +2018,7 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="expect"  ) cmd_expect( S(1), S(2), S(3), I(4), false );
 	else if(  c=="expect_each"  ) cmd_expect( S(1), S(2), S(3), I(4), true );
 	else if(  c=="expect_stuck"  ) cmd_expect_stuck( S(1), I(2) );
+	else if(  c=="expect_tracks"  ) cmd_expect_tracks( I(1), I(2), S(3), I(4) );
 	else if(  c=="expect_state"  ||  c=="expect_wait"  ) {
 		std::string what;
 		for(  size_t i=2;  i<a.size();  i++  ) what += std::string(i>2 ? " " : "") + a[i];

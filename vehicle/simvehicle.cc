@@ -2828,6 +2828,14 @@ static bool is_bay_tile(const grund_t *gr, waytype_t wt)
 }
 
 
+// fork: a stop of a halt for another waytype on this tile, e.g. a tram stop of a train station's halt on tram track
+static bool is_stop_for_other_waytype(const grund_t *gr, waytype_t wt)
+{
+	gebaeude_t const* const gb = gr->find<gebaeude_t>();
+	return gb  &&  gb->get_tile()->get_desc()->get_extra()!=(uint32)wt;
+}
+
+
 // fork: the bay platform tiles of this halt; has_through: it has a platform that is no bay
 static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &bays, bool &has_through)
 {
@@ -2837,12 +2845,7 @@ static void get_bay_tiles(halthandle_t halt, waytype_t wt, vector_tpl<koord3d> &
 		return;
 	}
 	FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
-		if(  tile.grund->get_weg( wt )==NULL  ) {
-			continue;
-		}
-		gebaeude_t const* const gb = tile.grund->find<gebaeude_t>();
-		if(  gb  &&  gb->get_tile()->get_desc()->get_extra()!=(uint32)wt  ) {
-			// a tram or road stop of the same halt on tram track
+		if(  tile.grund->get_weg( wt )==NULL  ||  is_stop_for_other_waytype( tile.grund, wt )  ) {
 			continue;
 		}
 		if(  is_bay_tile( tile.grund, wt )  ) {
@@ -5250,7 +5253,7 @@ struct station_tracks_t {
 	bool has_through;         // some track is no bay
 };
 
-static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t &st)
+static void get_station_tracks(halthandle_t halt, waytype_t wt, waytype_t stop_wt, station_tracks_t &st)
 {
 	st.tiles.clear();
 	st.track.clear();
@@ -5263,7 +5266,9 @@ static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t
 	vector_tpl<koord3d> todo;
 	vector_tpl<uint8> todo_off; // tiles past the platform
 	FOR( slist_tpl<haltestelle_t::tile_t>, const &tile, halt->get_tiles() ) {
-		if(  tile.grund->get_weg( wt )==NULL  ||  st.tiles.is_contained( tile.grund->get_pos() )  ) {
+		// fork: not the tram stop of the same halt (Praha-Vršovice with Ukrajinská: two more tracks, always
+		// free or held by a tram, so the station never looked full)
+		if(  tile.grund->get_weg( wt )==NULL  ||  st.tiles.is_contained( tile.grund->get_pos() )  ||  is_stop_for_other_waytype( tile.grund, stop_wt )  ) {
 			continue;
 		}
 		const uint16 t = st.count++;
@@ -5295,6 +5300,9 @@ static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t
 					}
 					to_off = off + 1;
 				}
+				else if(  is_stop_for_other_waytype( to, stop_wt )  ) {
+					continue;
+				}
 				st.tiles.append( to->get_pos() );
 				st.track.append( t );
 				todo.append( to->get_pos() );
@@ -5305,11 +5313,19 @@ static void get_station_tracks(halthandle_t halt, waytype_t wt, station_tracks_t
 }
 
 
-void rail_vehicle_t::get_station_occupants(halthandle_t halt, waytype_t wt, vector_tpl<convoihandle_t> &trains)
+uint16 rail_vehicle_t::count_station_tracks(halthandle_t halt, waytype_t wt, waytype_t stop_wt)
+{
+	station_tracks_t st;
+	get_station_tracks( halt, wt, stop_wt, st );
+	return st.count;
+}
+
+
+void rail_vehicle_t::get_station_occupants(halthandle_t halt, waytype_t wt, waytype_t stop_wt, vector_tpl<convoihandle_t> &trains)
 {
 	trains.clear();
 	station_tracks_t st;
-	get_station_tracks( halt, wt, st );
+	get_station_tracks( halt, wt, stop_wt, st );
 	FOR( vector_tpl<koord3d>, const &k, st.tiles ) {
 		grund_t const* const gr = world()->lookup( k );
 		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( wt ) : NULL;
@@ -5480,7 +5496,7 @@ bool rail_vehicle_t::get_section_after(convoi_t *c, halthandle_t at, halthandle_
 
 	// standing there (maybe short of the platform, in front of its platform signal), or on its way in?
 	station_tracks_t st;
-	get_station_tracks( at, get_waytype(), st );
+	get_station_tracks( at, get_waytype(), desc->get_waytype(), st );
 	bool is_there = false;
 	for(  uint8 i=0;  !is_there  &&  i<c->get_vehicle_count();  i++  ) {
 		is_there = st.tiles.is_contained( c->get_vehikel(i)->get_pos() );
@@ -5586,7 +5602,7 @@ bool rail_vehicle_t::get_section_after(convoi_t *c, halthandle_t at, halthandle_
 bool rail_vehicle_t::station_can_release(halthandle_t s, int depth, section_check_t &ck)
 {
 	station_tracks_t st;
-	get_station_tracks( s, get_waytype(), st );
+	get_station_tracks( s, get_waytype(), desc->get_waytype(), st );
 	// which train is on (or has reserved) which track; the newcomer on the track it claims
 	vector_tpl<convoihandle_t> occ_train;
 	vector_tpl<uint16> occ_track;
@@ -5657,7 +5673,7 @@ bool rail_vehicle_t::station_can_release(halthandle_t s, int depth, section_chec
 		}
 		if(  next!=ck.full  ) {
 			station_tracks_t nt;
-			get_station_tracks( next, get_waytype(), nt );
+			get_station_tracks( next, get_waytype(), desc->get_waytype(), nt );
 			if(  count_free_tracks( nt, get_waytype(), koord3d::invalid, false )>0  ) {
 				return true;
 			}
@@ -5700,7 +5716,7 @@ bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint
 		return false;
 	}
 	station_tracks_t st;
-	get_station_tracks( x, get_waytype(), st );
+	get_station_tracks( x, get_waytype(), desc->get_waytype(), st );
 	// a free bay is of no use to a train that runs through, so only other tracks count here
 	if(  count_free_tracks( st, get_waytype(), claimed_tile, false )>0  ) {
 		return false;
@@ -5717,7 +5733,7 @@ bool rail_vehicle_t::keeps_last_track(halthandle_t x, koord3d claimed_tile, uint
 	if(  ck.freed.is_bound()  ) {
 		// our track there gets free only if no other train stands on it or has it reserved
 		station_tracks_t ost;
-		get_station_tracks( ck.freed, get_waytype(), ost );
+		get_station_tracks( ck.freed, get_waytype(), desc->get_waytype(), ost );
 		vector_tpl<uint16> ours;
 		for(  uint8 v=0;  v<cnv->get_vehicle_count();  v++  ) {
 			for(  uint32 i=0;  i<ost.tiles.get_count();  i++  ) {
@@ -5874,7 +5890,7 @@ uint8 rail_vehicle_t::keeps_track_for_other_side(halthandle_t halt, uint16 start
 uint8 rail_vehicle_t::check_track_for_other_side(halthandle_t halt, uint16 start_block, uint32 through_at, koord3d next_stop)
 {
 	station_tracks_t st;
-	get_station_tracks( halt, get_waytype(), st );
+	get_station_tracks( halt, get_waytype(), desc->get_waytype(), st );
 	if(  st.tiles.empty()  ||  count_free_tracks( st, get_waytype(), koord3d::invalid, false )>1  ) {
 		// another stays free (none free: a short train may still find room behind another one)
 		return KEEP_TAKE;

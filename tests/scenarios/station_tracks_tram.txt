@@ -1,0 +1,19 @@
+# A tram stop in the halt of a train station is no track of that station for the train rules (the last free
+# track at a platform signal, keeping a track for the other direction, the lock checks). Before the fix
+# (2026-10-30) they counted it: Praha-Vršovice with its Ukrajinská tram stop had two tracks more, always free
+# or held by a tram, so the station never looked full and no train was held for the last track.
+# Expect: 2 tracks with the tram stop, as without it.
+newworld 40 30
+waydesc Rail_120_Tracks
+track 5 10 20 10
+track 5 11 20 11
+stations ConcretePlatformTrainStop 8 13 10
+stations ConcretePlatformTrainStop 8 13 11
+expect_tracks 10 10 == 2
+waydesc Tram_Track_050_A
+track 5 12 20 12
+track 5 13 20 13
+stations Tram-SedaIDS_Plain_L 8 13 12
+stations Tram-SedaIDS_Plain_L 8 13 13
+expect_tracks 10 10 == 2
+expect_tracks 10 12 == 2
