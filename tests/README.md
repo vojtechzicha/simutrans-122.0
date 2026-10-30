@@ -72,7 +72,12 @@ Running and looking:
 - `diag NAME|ID` state, section, claim, schedule and route with reservations; `tiles X0 Y0 X1 Y1`,
   `dump X0 Y0 X1 Y1` an ASCII map, `res`, `signs`, `bays`, `roadjam`, `linelayout`, `stationmaps`
 - `save NAME`, `load NAME`, `lineedit`, `stoptype`, `retarget`, `delcnv`, `todepot`, `rotate`, `remove`,
-  `pax`, `loads`, `snap` (screenshot) and more: see `run_command` in `fork_test_harness.cc`
+  `pax`, `loads`, `snap` (screenshot) and more: see `run_command` in `fork_test_harness.cc`. A convoy is named
+  by part of its name (one word: arguments split at spaces) or as `id:ID`; `#` starts a comment anywhere
+- `ltentries` lists every signal (no P or block post) that leads onto a single-track section through a
+  station boundary, so it acts as a P (useful on a real save)
+- `standwatch on` counts the minutes rail convoys stand (not loading) per front tile; `standreport` lists them
+  (`STAND x,y,z minutes times`) with the total and the stops done, to compare two builds on a real save
 
 Checking (each failed one logs `FAIL ...` and makes the result FAIL):
 

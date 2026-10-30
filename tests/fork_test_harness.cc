@@ -477,10 +477,17 @@ static void check(bool verbose);
 static void poll_aspects();
 static std::map<std::string, schedule_t *> pending_edit;
 
+// a convoy by part of its name, or by its id as id:ID (names in real saves have spaces)
 static convoihandle_t find_cnv(const char *name)
 {
+	if(  name==NULL  ) {
+		logf("ERROR no convoy named\n");
+		failures++;
+		return convoihandle_t();
+	}
+	const bool by_id = !strncmp( name, "id:", 3 );
 	FOR(vector_tpl<convoihandle_t>, const cnv, W->convoys()) {
-		if(  strstr(cnv->get_name(), name)  ) {
+		if(  by_id ? atoi(name+3)==(int)cnv.get_id() : strstr(cnv->get_name(), name)!=NULL  ) {
 			return cnv;
 		}
 	}
@@ -681,6 +688,58 @@ static void poll_aspects()
 	}
 }
 
+// standwatch on: train minutes standing (not loading) per front tile, for standreport (where a change makes
+// trains wait, on a real save)
+static bool stand_watch = false;
+static std::map<std::string, std::pair<int,int> > stand_minutes; // by tile: minutes, times a train began to stand there
+static std::map<std::string, std::map<std::string, int> > stand_texts; // by tile: the wait texts trains began to stand with
+static std::map<int, koord3d> stand_at;
+
+static void stand_poll(convoihandle_t cnv, const koord3d &p, int st)
+{
+	if(  cnv->front()->get_waytype()!=track_wt  ) {
+		return;
+	}
+	if(  cnv->get_akt_speed()==0  &&  st!=convoi_t::LOADING  &&  st!=convoi_t::COUPLED  &&  st!=convoi_t::UNCOUPLING  ) {
+		std::pair<int,int> &m = stand_minutes[p.get_str()];
+		m.first++;
+		if(  stand_at.count( cnv.get_id() )==0  ||  stand_at[cnv.get_id()]!=p  ) {
+			m.second++;
+			cbuffer_t wb;
+			cnv->append_wait_reason( wb );
+			stand_texts[p.get_str()][wb.len() ? (const char *)wb : "-"]++;
+		}
+		stand_at[cnv.get_id()] = p;
+	}
+	else {
+		stand_at.erase( cnv.get_id() );
+	}
+}
+
+// standreport: every tile trains stood at (STAND x,y,z minutes times), then the totals and the stops done
+static void cmd_stand_report()
+{
+	long long total = 0;
+	for(  std::map<std::string, std::pair<int,int> >::const_iterator i=stand_minutes.begin();  i!=stand_minutes.end();  ++i  ) {
+		std::string texts;
+		const std::map<std::string, int> &t = stand_texts[i->first];
+		for(  std::map<std::string, int>::const_iterator k=t.begin();  k!=t.end();  ++k  ) {
+			char n[16];
+			sprintf( n, " %dx ", k->second );
+			texts += (texts.empty() ? "" : " |") + std::string( n ) + k->first;
+		}
+		logf("STAND %s %d %d%s%s\n", i->first.c_str(), i->second.first, i->second.second, texts.empty() ? "" : " :", texts.c_str());
+		total += i->second.first;
+	}
+	long long rail_stops = 0, other_stops = 0;
+	FOR(vector_tpl<convoihandle_t>, const c, W->convoys()) {
+		if(  c->get_vehicle_count()>0  &&  watch.count( c.get_id() )  ) {
+			(c->front()->get_waytype()==track_wt ? rail_stops : other_stops) += watch[c.get_id()].stops_done;
+		}
+	}
+	logf("standreport: %lld train minutes standing on %d tiles; stops done: rail %lld, other %lld\n", total, (int)stand_minutes.size(), rail_stops, other_stops);
+}
+
 static void check(bool verbose)
 {
 	const sint64 now = W->get_calendar_minutes();
@@ -704,6 +763,9 @@ static void check(bool verbose)
 			continue;
 		}
 		const koord3d p = cnv->front()->get_pos();
+		if(  stand_watch  ) {
+			stand_poll( cnv, p, st );
+		}
 		{ static std::map<int,int> ms; const int m = cnv->has_missed_slot() ? 1 : 0; if(  ms[cnv.get_id()] != m  ) { ms[cnv.get_id()] = m; logf("  [%lld] MISSED %s %s entry %d delay=%d ahead=%d\n", (long long)now, cnv->get_name(), m ? "on" : "off", cnv->get_schedule() ? (int)cnv->get_schedule()->get_current_stop() : -1, (int)cnv->get_departure_delay(), cnv->get_line().is_bound() ? (int)cnv->get_line()->count_earlier_waiting( cnv ) : -1); } }
 		if(  log_wait  ) {
 			cbuffer_t wb;
@@ -1072,6 +1134,67 @@ static void cmd_signs()
 			logf("  %3d,%3d %-28s applies %-4s way ribi %d mask %d\n", x, y, rs->get_desc()->get_name(), d, w->get_ribi_unmasked(), w->get_ribi_maske());
 		}
 	}
+}
+
+// ltentries: every signal (no platform signal or block post) behind which a way, on any branch, leaves
+// through a station boundary that applies the other way before any signal or boundary that applies: there a
+// single-track section starts, so it acts as a platform signal (is_signal_clear). One line per signal and
+// direction with the first such boundary; a train that stops at a halt before it is not affected
+static void cmd_lt_entries()
+{
+	static const char *dname[] = { "N", "E", "S", "W" };
+	int n = 0;
+	for(  int y=0;  y<W->get_size().y;  y++  ) for(  int x=0;  x<W->get_size().x;  x++  ) {
+		const planquadrat_t *pl = W->access(koord(x, y));
+		for(  uint8 b=0;  pl  &&  b<pl->get_boden_count();  b++  ) {
+			grund_t *gr = pl->get_boden_bei(b);
+			const weg_t *w = gr->get_weg(track_wt);
+			const signal_t *sig = w  &&  w->has_signal() ? gr->find<signal_t>() : NULL;
+			if(  !sig  ||  IS_P(sig->get_desc())  ||  IS_H(sig->get_desc())  ) continue;
+			for(  int r=0;  r<4;  r++  ) {
+				const ribi_t::ribi d = ribi_t::nsew[r];
+				grund_t *to;
+				if(  !(w->get_ribi_unmasked() & d)  ||  !sig->applies_to(d)  ||  !gr->get_neighbour(to, track_wt, d)  ) continue;
+				vector_tpl<koord3d> seen;
+				vector_tpl<grund_t *> todo;
+				vector_tpl<ribi_t::ribi> todo_dir;
+				todo.append( to );
+				todo_dir.append( d );
+				koord3d found = koord3d::invalid;
+				while(  !todo.empty()  &&  found==koord3d::invalid  &&  seen.get_count()<512  ) {
+					grund_t *g = todo.pop_back();
+					const ribi_t::ribi from = todo_dir.pop_back();
+					const weg_t *gw = g->get_weg(track_wt);
+					if(  !gw  ||  seen.is_contained( g->get_pos() )  ) continue;
+					seen.append( g->get_pos() );
+					const roadsign_t *lt = rail_vehicle_t::get_station_boundary( g );
+					const signal_t *s2 = gw->has_signal() ? g->find<signal_t>() : NULL;
+					const ribi_t::ribi out = gw->get_ribi_unmasked() & ~ribi_t::backward( from );
+					for(  int q=0;  q<4;  q++  ) {
+						const ribi_t::ribi nd = ribi_t::nsew[q];
+						grund_t *nx;
+						if(  !(out & nd)  ) continue;
+						if(  lt  ) {
+							if(  !lt->applies_to( nd )  ) found = g->get_pos();
+							continue;
+						}
+						if(  s2  &&  s2->applies_to( nd )  ) continue;
+						if(  g->get_neighbour( nx, track_wt, nd )  ) {
+							todo.append( nx );
+							todo_dir.append( nd );
+						}
+					}
+				}
+				if(  found!=koord3d::invalid  ) {
+					char a[32];
+					strcpy( a, gr->get_pos().get_str() );
+					logf("LTENTRY %s %s heading %s -> leaves through the boundary at %s\n", a, sig->get_desc()->get_name(), dname[r], found.get_str());
+					n++;
+				}
+			}
+		}
+	}
+	logf("ltentries: %d\n", n);
 }
 
 // render the main view centred on x,y at zoom level z (0 = closest) into FILE (png)
@@ -1924,6 +2047,9 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="route"  ) cmd_route( S(1) );
 	else if(  c=="dump"  ) cmd_dump( I(1), I(2), I(3), I(4) );
 	else if(  c=="signs"  ) cmd_signs();
+	else if(  c=="ltentries"  ) cmd_lt_entries();
+	else if(  c=="standwatch"  ) stand_watch = S(1)  &&  !strcmp(S(1), "on");
+	else if(  c=="standreport"  ) cmd_stand_report();
 	else if(  c=="res"  ) cmd_res( I(1), I(2), I(3), I(4) );
 	else if(  c=="save"  ) { W->save( S(1), false, env_t::savegame_version_str, true ); logf("saved %s\n", S(1)); }
 	else if(  c=="saveas"  ) { W->save( S(1), false, S(2), true ); logf("saved %s as %s\n", S(1), S(2)); }
