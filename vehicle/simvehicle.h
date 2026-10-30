@@ -772,6 +772,18 @@ private:
 	// fork: locks_with_others for the track at the end of track and our way on from there to next_stop
 	bool track_locks(const route_t &track, koord3d next_stop);
 
+	/* fork: a train passing a station from route index start whose track there ends at the station
+	 * boundary of the next station, where rt stops (entry: the schedule entry rt ends at): it chooses its
+	 * track there at that boundary, so it should go only when one is free for it now. False when none is
+	 * (halt: that station); true otherwise, with boundary set to that station boundary when there is one
+	 * (the train on the planned track there is then no lock partner, see locks_with_others)
+	 */
+	bool next_station_takes(const route_t &rt, uint32 start, uint8 entry, bool first_leg, halthandle_t &halt, koord3d &boundary);
+
+	// fork: the station a train passes from route index start: the halt of the first halt tile up to the
+	// end of its track there (the next stop point), else the halt the route ends at
+	halthandle_t get_passed_halt(const route_t &rt, uint32 start) const;
+
 	bool find_station_track(const route_t *route, uint32 start, halthandle_t halt, uint8 needs, koord3d next_stop, route_t &path, uint32 keep_to);
 
 	// tiles of the way on from a stop at from to next_stop (any track, turning allowed), 0 if there is none;

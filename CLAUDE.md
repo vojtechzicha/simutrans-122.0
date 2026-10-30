@@ -638,6 +638,26 @@ is the blocked one), so an `LT` that looks right is right; its art keeps the sig
   station, facing entering trains. A train reserves only up to it; at the `LT`
   (`is_station_boundary_clear`) it reserves the throat into its claimed track, or waits there
   briefly. Without a claim it chooses a track there.
+- Two station boundaries in a row (no save change, 2026-10-30): a passing train whose track ends at the
+  `LT` of the next station, where its route stops, chooses its track there only at that `LT`, while
+  its planned way runs to the schedule's stop tile. Praha: the junction area between the `LT` out of
+  Vršovice and the dwarf `LT` 2545,2121 into the ONJ siding yard (skupina A). The lock rule above
+  followed that planned way, so a train standing on the stop tile's track, waiting to leave through
+  the area, made every train for that tile refuse the area although 5 of the 6 tracks were free ("No
+  free track at Praha ONJ - skupina A"). The trains filled Vršovice, and the one in the yard then
+  found no Vršovice track to pass through (17 trains stuck, the jam reaching Praha hl.n.). Now such
+  a train first makes the choice it would make at that `LT` (`next_station_takes`, from a `P` and
+  from an `LT`): none free, it waits where it is with "No free track at <that station>"; else its
+  way out ends at that `LT` (`way_out_free_beyond` in `locks_with_others`). Layouts without two
+  boundaries in a row are unchanged. A passing train's "No free track at" now names the station it
+  passes (`get_passed_halt`), not the one its route ends at (railjet 277 in the yard said Praha
+  hl.n. while Vršovice was full). The same layout is at Přerov (5313,3005) and Chomutov (1411,1504).
+  Tested headless on a rebuild (2-track terminus, `LT`, single track, `LT`, junction area, `LT`,
+  3-track yard; one line with a 30 minute timetable at both ends): the old build locked with 3, 4
+  and 5 trains within 40-60 minutes; the new one ran 3 and 4 trains at the timetable's rate (19 of
+  20 stops in 5 hours); 5 trains for 5 tracks lock in both, with true wait texts now. On a copy of
+  the owner's save (16:07, 2026-10-30) the old build went from 46 to 68 stuck trains in 2 hours,
+  the new one from 25 to 4, the three railjets moving within 15 minutes.
 - Claim (`convoi_t::claim_path`, `claim_first`, `claim_stops`, saved 122.7, reserved again in
   `finish_rd`): the path from the `LT` through the chosen track; only its platform tiles are
   reserved. `drive_to` routes through it (`route_via_claim`) and releases it when `claim_stop` (the

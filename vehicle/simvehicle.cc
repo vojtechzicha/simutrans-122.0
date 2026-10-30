@@ -4120,6 +4120,11 @@ static bool has_platform_for(halthandle_t halt, uint16 length, waytype_t wt, con
 }
 
 
+// fork: while a passing train's track ends at the station boundary of a station with a track free for it
+// (next_station_takes), that boundary: its way out ends there, since it chooses its track at it
+static koord3d way_out_free_beyond = koord3d::invalid;
+
+
 void rail_vehicle_t::collect_way_out(const route_t &rt, const uint32 from, vector_tpl<koord3d> &tiles) const
 {
 	for(  uint32 i=from;  i<rt.get_count()  &&  tiles.get_count()<128;  i++  ) {
@@ -4204,8 +4209,20 @@ void rail_vehicle_t::get_way_out(convoihandle_t c, const koord3d via, vector_tpl
 
 bool rail_vehicle_t::locks_with_others(const route_t &track, const uint32 track_from, const vector_tpl<koord3d> &way_out)
 {
+	// past a station boundary into a station with a track free for us the planned way is not ours: the
+	// train standing on the planned track there (the schedule's stop tile) waits for no one of ours
+	uint32 end = way_out.get_count();
+	if(  way_out_free_beyond!=koord3d::invalid  ) {
+		for(  uint32 i=0;  i<way_out.get_count();  i++  ) {
+			if(  way_out[i]==way_out_free_beyond  ) {
+				end = i+1;
+				break;
+			}
+		}
+	}
 	vector_tpl<convoihandle_t> seen;
-	FOR( vector_tpl<koord3d>, const &pos, way_out ) {
+	for(  uint32 w=0;  w<end;  w++  ) {
+		const koord3d &pos = way_out[w];
 		grund_t const* const gr = welt->lookup( pos );
 		schiene_t const* const sch = gr ? (schiene_t const*)gr->get_weg( get_waytype() ) : NULL;
 		const convoihandle_t c = sch ? sch->get_reserved_convoi() : convoihandle_t();
@@ -4241,6 +4258,75 @@ bool rail_vehicle_t::track_locks(const route_t &track, const koord3d next_stop)
 	vector_tpl<koord3d> way_out;
 	collect_way_out( on, 1, way_out );
 	return locks_with_others( track, get_claim_start( track, get_waytype() ), way_out );
+}
+
+
+/* fork: two station boundaries in a row, e.g. Praha: the junction area between the LT out of Vršovice and
+ * the LT into the ONJ siding yard. A train passes the area and chooses its track in the yard only at the
+ * second boundary, while its planned way runs to the schedule's stop tile. Before, a train standing there
+ * to leave through the area made every train for that tile refuse the area (locks_with_others) although
+ * the yard had other tracks free, and the trains queued up in Vršovice until the one in the yard could not
+ * get out either (2026-10-30)
+ */
+bool rail_vehicle_t::next_station_takes(const route_t &rt, const uint32 start, const uint8 entry, const bool first_leg, halthandle_t &halt, koord3d &boundary)
+{
+	halt = halthandle_t();
+	boundary = koord3d::invalid;
+	// the end of the track through this station
+	uint32 end = INVALID_INDEX;
+	for(  uint32 i=start+1;  i+1<rt.get_count();  i++  ) {
+		if(  is_stop_point( &rt, i )  ) {
+			end = i;
+			break;
+		}
+	}
+	if(  end==INVALID_INDEX  ) {
+		return true;
+	}
+	grund_t const* const gr = welt->lookup( rt.at(end) );
+	roadsign_t const* const lt = gr ? get_station_boundary( gr ) : NULL;
+	if(  lt==NULL  ||  !lt->applies_to( ribi_type( rt.at(end), rt.at(end+1) ) )  ) {
+		// it ends at a signal
+		return true;
+	}
+	for(  uint32 i=end+1;  i+1<rt.get_count();  i++  ) {
+		if(  is_stop_point( &rt, i )  ) {
+			// passing that station too: its track is chosen at that boundary as usual
+			return true;
+		}
+	}
+	halt = haltestelle_t::get_halt( rt.back(), get_owner() );
+	schedule_t const* const schedule = cnv->get_schedule();
+	if(  !halt.is_bound()  ||  schedule==NULL  ||  entry>=schedule->get_count()  ) {
+		halt = halthandle_t();
+		return true;
+	}
+	// the choice the train makes at that boundary (is_station_boundary_clear)
+	const uint8 needs = get_platform_needs( schedule->entries[entry], halt );
+	const koord3d next_stop = schedule->entries[ (entry+1) % schedule->get_count() ].pos;
+	const uint32 keep_to = first_leg ? cnv->get_last_waypoint_index( rt, end ) : INVALID_INDEX;
+	route_t path;
+	if(  !find_station_track( &rt, end, halt, needs, next_stop, path, keep_to )  ) {
+		return false;
+	}
+	boundary = rt.at(end);
+	return true;
+}
+
+
+halthandle_t rail_vehicle_t::get_passed_halt(const route_t &rt, const uint32 start) const
+{
+	for(  uint32 i=start+1;  i<rt.get_count();  i++  ) {
+		grund_t const* const gr = welt->lookup( rt.at(i) );
+		if(  gr  &&  gr->get_halt().is_bound()  ) {
+			return gr->get_halt();
+		}
+		if(  i+1<rt.get_count()  &&  is_stop_point( &rt, i )  ) {
+			break;
+		}
+	}
+	grund_t const* const end_gr = welt->lookup( rt.back() );
+	return end_gr ? end_gr->get_halt() : halthandle_t();
 }
 
 
@@ -4912,12 +4998,24 @@ bool rail_vehicle_t::is_platform_signal_clear(signal_t *sig, uint16 next_block, 
 			if(  !to_partner  &&  stops  ) {
 				get_station_overtaker_ways( leave_boundary, enter_boundary );
 			}
+			// fork: passing up to the station boundary of the next station: only with a track free there
+			halthandle_t beyond_halt;
+			koord3d free_beyond = koord3d::invalid;
+			if(  !stops  &&  !next_station_takes( leg_route, at, leg_entry, leg==0, beyond_halt, free_beyond )  ) {
+				sig->set_state( roadsign_t::rot );
+				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, beyond_halt );
+				check_section_lock( beyond_halt, next_block );
+				restart_speed = 0;
+				return false;
+			}
+			way_out_free_beyond = free_beyond;
 			const bool track_found = to_partner  ||  find_station_track( &leg_route, at, halt, needs, next_stop, path, keep_to );
+			way_out_free_beyond = koord3d::invalid;
 			overtaker_ways.clear();
 			overtaker_routes.clear();
 			if(  !track_found  ) {
-				grund_t const* const end_gr = welt->lookup( leg_route.back() );
-				const halthandle_t full_halt = halt.is_bound() ? halt : (end_gr ? end_gr->get_halt() : halthandle_t());
+				// passing: name the station we pass, not the one the route ends at
+				const halthandle_t full_halt = halt.is_bound() ? halt : get_passed_halt( leg_route, at );
 				sig->set_state( roadsign_t::rot );
 				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, full_halt );
 				check_section_lock( full_halt, next_block );
@@ -5047,8 +5145,19 @@ bool rail_vehicle_t::is_station_boundary_clear(uint16 next_block, sint32 &restar
 			const uint8 needs = stops ? get_platform_needs( entry, halt ) : 0;
 			const koord3d next_stop = stops ? schedule->entries[ (cnv->get_route_entry()+1) % schedule->get_count() ].pos : koord3d::invalid;
 			route_t path;
-			if(  !find_station_track( route, next_block, halt, needs, next_stop, path, keep_to )  ) {
-				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, halt );
+			// fork: passing up to the station boundary of the next station: only with a track free there
+			halthandle_t beyond_halt;
+			koord3d free_beyond = koord3d::invalid;
+			if(  !stops  &&  !next_station_takes( *route, next_block, cnv->get_route_entry(), true, beyond_halt, free_beyond )  ) {
+				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, beyond_halt );
+				restart_speed = 0;
+				return false;
+			}
+			way_out_free_beyond = free_beyond;
+			const bool found = find_station_track( route, next_block, halt, needs, next_stop, path, keep_to );
+			way_out_free_beyond = koord3d::invalid;
+			if(  !found  ) {
+				cnv->set_section_wait( convoi_t::SECTION_WAIT_TRACK, stops ? halt : get_passed_halt( *route, next_block ) );
 				restart_speed = 0;
 				return false;
 			}
