@@ -1,0 +1,31 @@
+# A bus queued for one layover tile takes a free bay of the layover tile in front of it
+# (tests/layouts/layover_gate.inc, tiles 50,20 and 51,20). Line A lays over at 51,20 every 60 minutes
+# (+30), line B at 50,20 every 10. A#3 finds all four bays booked and queues at the gate (49,20) for
+# 51,20; when a B bus leaves, a bay of 50,20 right in front of it is free. Before (2026-11-02) the search
+# for another layover tile found no way to the tile in front of the gate, so A#3 waited for an A bus to
+# leave 51,20 at minute 30, with B's buses queued behind it. Expect: A#3 parks within minutes.
+include ../layouts/layover_gate.inc
+busline A
+stop 51 20 0 0 H
+timetable 60 30
+stop 40 26 0 0 R
+stop 20 20 0 0 R
+endline
+busline B
+stop 50 20 0 0 H
+timetable 10 0
+stop 40 26 0 0 R
+stop 20 20 0 0 R
+endline
+baywatch on
+convoy 47 18 A 2
+convoy 47 18 B 2
+run 1 0
+convoy 47 18 A 1
+run 4 0
+bays
+run 25 0
+bays
+summary
+expect_each A parks >= 1
+expect_each A offstation < 12

@@ -414,6 +414,11 @@ private:
 	static void get_layover_group(koord3d start, const player_t *owner, vector_tpl<koord3d> &group);
 	/// first among the convoys queued in front of that waiting area (by layover_since, then id)
 	bool is_first_in_layover_queue(const vector_tpl<koord3d> &group) const;
+	/// at the gate (layover_gate): a free bay of our tile, else of another tile of the area; true: taken
+	bool take_bay_at_gate(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index);
+	/// at the gate with every bay of the area booked: the bay of a bus whose way to it runs over our
+	/// tiles (it could never get there first), which queues instead; true: taken
+	bool take_bay_from_behind(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index);
 	/// a layover tile of the group, or of a stop of the group (another waiting area, if no bus waits
 	/// there longer than we do), other than not_here with a bay for us and the shortest way there from
 	/// start (and on to the next stop of the schedule); false if none

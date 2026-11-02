@@ -1137,6 +1137,15 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   choose again when they arrive. A line edit that moves the entry off the layover within the same stop
   (stock keeps the route for the same stop) releases the bay and routes the bus anew. Queue order
   compares the time waited, so the tick counter may wrap.
+- Bays are booked when a bus sets off (`plan_layover`), so a bus from nearer can get to the gate first, find every
+  bay booked and queue on the way in, in front of the buses that booked them. When every bay of the area is booked, a bus at the gate
+  takes the bay of a bus whose way to it runs over a tile it stands on (`take_bay_from_behind`, whatever its place in
+  the queue: such a bay is of no use to the buses in front of it either); that bus queues instead and does the same
+  at the gate if needed. Found at Praha-Uhříněves (2026-11-02, line 126): four buses out of
+  the Vršovice depot booked all four bays (2703,2170 and 2704,2170), one out of Hostivař stood on 2702,2170, the start
+  stop and only tile in, with them behind it, and the buses of five other lines queued behind those. Also: a bus queued
+  for one tile never took a free bay of the layover tile right in front of the gate (`find_other_layover` found no
+  route to the tile it searched from). Scenarios `layover_gate`, `layover_gate_near`.
 - Departure order at a timetabled layover: a bus standing in the lane of a layover tile goes before the
   buses parked in its bays, also ones that arrived earlier or booked their slot (`is_way_out_over` counts
   the lane of a parked bus's own tile, `leaves_before` checks it for every parked bus). Before, the earlier

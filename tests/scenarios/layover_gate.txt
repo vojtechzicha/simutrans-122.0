@@ -1,0 +1,24 @@
+# A bus queued for a layover bay must not wait in front of the layover for good while the bays are
+# booked by buses that have to drive past it to get there (tests/layouts/layover_gate.inc). Found at
+# Praha-Uhříněves (2026-11-02, line 126): four buses left a far depot and booked all four bays, a fifth
+# from a depot near by got there first, queued on the only tile into the layover and the four stood
+# behind it with their bays empty. The queued bus now takes the bay of a bus behind it, which queues
+# instead. Expect: every bus parks and goes round again; without the fix the first five stay stuck.
+include ../layouts/layover_gate.inc
+busline L
+stop 50 20 0 0 H
+timetable 20 0
+stop 40 26 0 0 R
+stop 20 20 0 0 R
+endline
+baywatch on
+convoy 11 18 L 4
+run 1 0
+convoy 47 18 L 1
+run 3 0
+bays
+run 240 0
+bays
+summary
+expect_each L stops >= 6
+expect_each L parks >= 2

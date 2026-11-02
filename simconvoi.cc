@@ -7812,7 +7812,11 @@ bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d star
 		}
 		// (route_t directly: road_vehicle_t::calc_route would drop a choose sign's reservation)
 		route_t r;
-		if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ||  r.get_count() >= best  ) {
+		if(  p==start  &&  start!=here  ) {
+			// the tile in front of a bus at the gate (calc_route finds no way to the tile it starts on)
+			r.append( start );
+		}
+		else if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ||  r.get_count() >= best  ) {
 			continue;
 		}
 		if(  start!=here  &&  r.get_count()>1  &&  r.at(1)==here  ) {
@@ -7903,6 +7907,86 @@ void convoi_t::plan_layover()
 }
 
 
+bool convoi_t::take_bay_at_gate(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index)
+{
+	sint8 bay = find_free_bay( welt->lookup( layover_pos ), get_arrival_dir( route ) );
+	if(  bay>=0  ) {
+		take_bay( layover_pos, bay, LAYOVER_APPROACHING );
+		return true;
+	}
+	koord3d pos;
+	route_t way;
+	if(  schedule_target==koord3d::invalid  &&  next_index < route.get_count()  &&  route.at(next_index)==next->get_pos()
+		&&  find_other_layover( group, next->get_pos(), layover_pos, pos, way )  ) {
+		// a way of the next tile only: we arrive from our tile
+		const ribi_t::ribi dir = way.get_count()==1  &&  next_index>0 ? ribi_type( route.at(next_index-1), way.back() ) : get_arrival_dir( way );
+		bay = find_free_bay( welt->lookup( pos ), dir );
+		if(  bay>=0  ) {
+			// the next tile stays the same, only the way after it changes
+			route.remove_koord_from( next_index );
+			route.append( &way );
+			take_bay( pos, bay, LAYOVER_APPROACHING );
+			return true;
+		}
+	}
+	return false;
+}
+
+
+/*
+ * Bays are booked when a bus sets off for the layover (plan_layover), so a bus that set off later from
+ * nearer can get to the gate first, find every bay booked and queue on the way in, in front of the buses
+ * that booked them (Praha-Uhříněves 2026-11-02: four buses of line 126 out of a far depot booked all
+ * four bays, one out of a near one stood on the only tile into the layover with them behind it).
+ */
+bool convoi_t::take_bay_from_behind(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index)
+{
+	vector_tpl<koord3d> tiles;
+	tiles.append( layover_pos );
+	FOR( vector_tpl<koord3d>, const p, group ) {
+		tiles.append_unique( p );
+	}
+	FOR( vector_tpl<koord3d>, const p, tiles ) {
+		if(  !get_bay_owner( p, 0 ).is_bound()  ||  !get_bay_owner( p, 1 ).is_bound()  ) {
+			// a bay is free: it goes by the queue (it may be one we cannot use, then we wait as before)
+			return false;
+		}
+	}
+	FOR( vector_tpl<koord3d>, const p, tiles ) {
+		for(  uint8 bay=0;  bay<2;  bay++  ) {
+			const convoihandle_t holder = get_bay_owner( p, bay );
+			if(  !holder.is_bound()  ||  holder==self  ||  holder->layover_phase!=LAYOVER_APPROACHING  ||  holder->anz_vehikel==0
+				||  holder->route.empty()  ||  holder->route.back()!=p  ) {
+				continue;
+			}
+			// its way on to the bay runs over a tile we stand on
+			bool behind = false;
+			for(  uint32 i=holder->front()->get_route_index();  i<holder->route.get_count()  &&  !behind;  i++  ) {
+				for(  uint8 v=0;  v<anz_vehikel  &&  !behind;  v++  ) {
+					behind = holder->route.at(i)==fahr[v]->get_pos();
+				}
+			}
+			if(  !behind  ) {
+				continue;
+			}
+			// it queues (from its arrival at the gate, so behind us) and we try again
+			holder->release_layover();
+			holder->layover_phase = LAYOVER_QUEUED;
+			holder->layover_pos = p;
+			holder->layover_since = 0;
+			layover_queue.append( holder );
+			if(  take_bay_at_gate( group, next, next_index )  ) {
+				dbg->message( "convoi_t::take_bay_from_behind()", "%s takes the layover bay at %s of %s behind it", get_name(), layover_pos.get_str(), holder->get_name() );
+				return true;
+			}
+			// no use to us (the other way there is closed): it keeps it
+			holder->take_bay( p, bay, LAYOVER_APPROACHING );
+		}
+	}
+	return false;
+}
+
+
 bool convoi_t::layover_gate(const grund_t *next, uint32 next_index)
 {
 	if(  layover_phase!=LAYOVER_QUEUED  ) {
@@ -7931,25 +8015,13 @@ bool convoi_t::layover_gate(const grund_t *next, uint32 next_index)
 		// arrived in front of the waiting area: in the queue from now on
 		layover_since = nonzero_ticks( welt->get_ticks() );
 	}
-	if(  is_first_in_layover_queue( group )  ) {
-		sint8 bay = find_free_bay( target, get_arrival_dir( route ) );
-		if(  bay>=0  ) {
-			take_bay( layover_pos, bay, LAYOVER_APPROACHING );
-			return true;
-		}
-		koord3d pos;
-		route_t way;
-		if(  schedule_target==koord3d::invalid  &&  next_index < route.get_count()  &&  route.at(next_index)==next->get_pos()
-			&&  find_other_layover( group, next->get_pos(), layover_pos, pos, way )  ) {
-			bay = find_free_bay( welt->lookup( pos ), get_arrival_dir( way ) );
-			if(  bay>=0  ) {
-				// the next tile stays the same, only the way after it changes
-				route.remove_koord_from( next_index );
-				route.append( &way );
-				take_bay( pos, bay, LAYOVER_APPROACHING );
-				return true;
-			}
-		}
+	if(  is_first_in_layover_queue( group )  &&  take_bay_at_gate( group, next, next_index )  ) {
+		return true;
+	}
+	// a bay booked by a bus behind us is no use to the buses in front of us in the queue either (they
+	// may wait at another gate of the area), so this does not wait for our turn
+	if(  take_bay_from_behind( group, next, next_index )  ) {
+		return true;
 	}
 	// wait here; warn once after half an hour
 	const sint64 limit = welt->has_calendar() ? welt->calendar_minutes_to_ticks( 30 ) : (sint64)(welt->ticks_per_world_month >> 4);

@@ -45,6 +45,8 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |
 | `layover_side` | Layover tiles beside the lane with through buses driving past both ways. |
+| `layover_gate` | A bus queued at the only way into a layover takes the bay of a bus behind it (Praha-Uhříněves, 2026-11-02): every bus parks. Fails before the fix. |
+| `layover_gate_near` | A bus queued for one layover tile takes a free bay of the tile in front of the gate. Fails before the fix. |
 
 Layouts shared by several scenarios are in `layouts/` and read with `include`.
 
