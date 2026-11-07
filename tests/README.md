@@ -81,10 +81,13 @@ Running and looking:
   change with the bay's tiles and, parked, where the vehicles stand; two buses in one bay, or a long bus with a
   section off its bay, is an error)
 - `view X Y` centres the view on a tile; a `save` keeps it, so the save opens there in the game window
+- `layovers X0 Y0 X1 Y1` lists the bus layover tiles in the box (kind, layout, road directions, stop, a bus parked)
 - `diag NAME|ID` state, section, claim, schedule and route with reservations; `tiles X0 Y0 X1 Y1`,
   `dump X0 Y0 X1 Y1` an ASCII map, `res`, `signs`, `bays`, `roadjam`, `linelayout`, `stationmaps`
 - `save NAME`, `load NAME`, `lineedit`, `stoptype`, `retarget`, `delcnv`, `todepot`, `rotate`, `remove`,
-  `pax`, `loads`, `snap` (screenshot) and more: see `run_command` in `fork_test_harness.cc`. A convoy is named
+  `pax`, `loads`, `snap` (screenshot) and more: see `run_command` in `fork_test_harness.cc`. On a loaded game,
+  `useline ID NAME` names a line for them, and `lineedit NAME interval IDX MINUTES OFFSET` sets an entry's
+  timetable (0: none). A convoy is named
   by part of its name (one word: arguments split at spaces) or as `id:ID`; `#` starts a comment anywhere
 - `ltentries` lists every signal (no P or block post) that leads onto a single-track section through a
   station boundary, so it acts as a P (useful on a real save)

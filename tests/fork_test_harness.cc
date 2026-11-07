@@ -522,6 +522,11 @@ static void cmd_lineedit(const char *linename, const char *op, int idx, int a1, 
 	else if(  !strcmp(op, "offset")  ) {
 		s->entries[idx].departure_offset = a1;
 	}
+	else if(  !strcmp(op, "interval")  ) {
+		// a timetable on an entry of a loaded line (0: none)
+		s->entries[idx].departure_interval = a1;
+		s->entries[idx].departure_offset = a2;
+	}
 	logf("  [%lld] LINEEDIT %s %s %d -> %d entries%s\n", (long long)W->get_calendar_minutes(), linename, op, idx, (int)s->get_count(), batch ? " (pending)" : "");
 	if(  !batch  ) {
 		s->finish_editing();
@@ -2227,6 +2232,22 @@ static void run_command(std::vector<char *> &a)
 		grund_t *g = ground( I(2), I(3) );
 		const char *err = g ? use_tool( TOOL_BUILD_STATION, S(1), g->get_pos() ) : "no ground";
 		logf("  [%lld] BUILD %s %d,%d: %s\n", (long long)W->get_calendar_minutes(), S(1), I(2), I(3), err && *err ? translator::translate(err) : "done");
+	}
+	else if(  c=="layovers"  ) {   // layovers X0 Y0 X1 Y1: the bus layover tiles in the box (kind, layout, road, stop)
+		for(  int y=I(2);  y<=I(4);  y++  ) for(  int x=I(1);  x<=I(3);  x++  ) {
+			const planquadrat_t *pl = W->access( koord(x, y) );
+			for(  uint8 bi=0;  pl  &&  bi<pl->get_boden_count();  bi++  ) {
+				const grund_t *g = pl->get_boden_bei( bi );
+				const uint8 kind = convoi_t::get_layover_kind( g );
+				if(  !kind  ) continue;
+				const gebaeude_t *gb = g->find<gebaeude_t>();
+				const halthandle_t h = g->get_halt();
+				const weg_t *w = g->get_weg( road_wt );
+				logf("  LAYOVER %d,%d,%d kind %d layout %d ribi %d stop '%s' building %s%s\n", x, y, g->get_pos().z, (int)kind, (int)gb->get_tile()->get_layout(),
+					w ? (int)w->get_ribi_unmasked() : -1, h.is_bound() ? h->get_name() : "-", gb->get_tile()->get_desc()->get_name(),
+					convoi_t::is_bay_occupied( g->get_pos() ) ? " (a bus parked)" : "");
+			}
+		}
 	}
 	else if(  c=="view"  ) {   // view X Y: centre the view on that tile (kept in a save, to look at it in the game window)
 		grund_t *g = ground( I(1), I(2) );
