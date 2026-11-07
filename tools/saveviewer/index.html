@@ -1528,7 +1528,8 @@ function viewConvoyDetail(host, id) {
     (c.hold_marker ? "<dt>Hold marker</dt><dd>lets passing trains overtake</dd>" : "") +
     (c.hold_divert ? "<dt>Diverted</dt><dd>heading for a platform to let a passing train by</dd>" : "") +
     (c.layover ? "<dt>Layover</dt><dd>" + (obj(c.layover).parked ? "parked in" : "on its way to") + " bay " + (num(obj(c.layover).bay) + 1) +
-      ' <span class="mono">' + esc(posText(obj(c.layover).pos)) + "</span></dd>" : "") +
+      ' <span class="mono">' + esc(posText(obj(c.layover).pos)) + "</span>" +
+      (Array.isArray(obj(c.layover).tiles) && obj(c.layover).tiles.length > 1 ? " and " + (obj(c.layover).tiles.length - 1) + " tile" + (obj(c.layover).tiles.length > 2 ? "s" : "") + " behind" : "") + "</dd>" : "") +
     (c.claim_boundary ? "<dt>Claimed track</dt><dd>at the next station, boundary " +
       '<span class="mono">(' + esc(c.claim_boundary) + ")</span></dd>" : "") +
     "<dt>Loading</dt><dd>" + loadBar(c.loading_level) +

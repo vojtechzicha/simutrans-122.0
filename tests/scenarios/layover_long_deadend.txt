@@ -1,0 +1,30 @@
+# A bus longer than a tile at a layover with dead-end tiles only (tests/layouts/layover_cluster.inc): no row of
+# bays to hold it, so it stands in the lane as at any stop and never queues for a bay it cannot get, while short
+# buses park in the bays. Line D: a 24 m bus (8+5+6 car units) laying over at 25,16; line S: two short buses at
+# 23,15. Expect: D keeps running and never parks, S parks.
+include ../layouts/layover_cluster.inc
+busline D
+stop 15 20 0 0 A
+stop 25 16 0 0 H
+timetable 20 0
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+busline S
+stop 15 20 0 0 A
+stop 23 15 0 0 H
+timetable 20 10
+stop 30 20 0 0 R
+stop 25 26 0 0 R
+endline
+baywatch on
+vehicles VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-A VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-B VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-C
+convoy 11 18 D 1
+vehicles CZ-ODIS-SOR_BN95-Green
+convoy 11 18 S 2
+run 240 0
+bays
+summary
+expect_each D stops >= 20
+expect_each D parks == 0
+expect_each S parks >= 5

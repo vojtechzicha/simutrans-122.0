@@ -866,9 +866,24 @@ static std::string bay_sig(convoihandle_t cnv)
 	if(  cnv->get_layover_pos()!=koord3d::invalid  ) {
 		sprintf( b, "@%d,%d#%d", cnv->get_layover_pos().x, cnv->get_layover_pos().y, (int)cnv->get_layover_bay() );
 		s += b;
+		if(  cnv->get_layover_tiles().get_count()>1  ) {
+			// a bay of several tiles in a row (a bus longer than a tile)
+			sprintf( b, "+%d", (int)cnv->get_layover_tiles().get_count()-1 );
+			s += b;
+		}
+	}
+	if(  cnv->is_parked_in_bay()  ) {
+		// where its vehicles stand
+		s += " veh=";
+		for(  uint8 i=0;  i<cnv->get_vehicle_count();  i++  ) {
+			sprintf( b, "%s%d,%d", i ? ";" : "", cnv->get_vehikel(i)->get_pos().x, cnv->get_vehikel(i)->get_pos().y );
+			s += b;
+		}
 	}
 	return s;
 }
+// parks per convoy and front tile ("x,y"), for expect_parkedat
+static std::map<int, std::map<std::string, int> > bay_parked_at;
 static void bay_poll()
 {
 	std::map<std::string, int> parked;
@@ -882,14 +897,31 @@ static void bay_poll()
 		watch_t &w = watch[cnv.get_id()];
 		if(  cnv->is_parked_in_bay()  &&  !w.parked  ) {
 			w.parks++;
+			char k[32];
+			sprintf( k, "%d,%d", cnv->get_layover_pos().x, cnv->get_layover_pos().y );
+			bay_parked_at[cnv.get_id()][k]++;
 		}
 		w.parked = cnv->is_parked_in_bay();
 		if(  cnv->is_parked_in_bay()  ) {
-			char k[64];
-			sprintf( k, "%d,%d,%d#%d", cnv->get_layover_pos().x, cnv->get_layover_pos().y, cnv->get_layover_pos().z, (int)cnv->get_layover_bay() );
-			if(  parked.count(k)  ) { logf("  [%lld] BAY-ERROR two convoys parked in bay %s\n", (long long)W->get_calendar_minutes(), k); bay_errors++; failures++; }
-			parked[k] = 1;
+			// every tile of its bay (several for a bus longer than a tile)
+			vector_tpl<koord3d> tiles( cnv->get_layover_tiles() );
+			tiles.append_unique( cnv->get_layover_pos() );
+			FOR(vector_tpl<koord3d>, const p, tiles) {
+				char k[64];
+				sprintf( k, "%d,%d,%d#%d", p.x, p.y, p.z, (int)cnv->get_layover_bay() );
+				if(  parked.count(k)  ) { logf("  [%lld] BAY-ERROR two convoys parked in bay %s\n", (long long)W->get_calendar_minutes(), k); bay_errors++; failures++; }
+				parked[k] = 1;
+			}
 			if(  cnv->front()->get_pos()!=cnv->get_layover_pos()  ) { logf("  [%lld] BAY-ERROR %s parked away from its bay\n", (long long)W->get_calendar_minutes(), cnv->get_name()); bay_errors++; failures++; }
+			// a bus longer than a tile stands on the tiles of its bay only (a shorter one heading north or west
+			// may have its rear on the tile before, as since the bays came)
+			for(  uint8 i=0;  tiles.get_count()>1  &&  i<cnv->get_vehicle_count();  i++  ) {
+				if(  !tiles.is_contained( cnv->get_vehikel(i)->get_pos() )  ) {
+					logf("  [%lld] BAY-ERROR %s vehicle %d at %s is off its bay\n", (long long)W->get_calendar_minutes(), cnv->get_name(), (int)i, cnv->get_vehikel(i)->get_pos().get_str());
+					bay_errors++;
+					failures++;
+				}
+			}
 		}
 	}
 }
@@ -1934,6 +1966,33 @@ static void cmd_expect(const char *pat, const char *field, const char *op, int l
 	}
 }
 
+// expect_parkedat PATTERN X Y OP N: how often the matching convoys parked in a layover bay with their front
+// at X,Y (baywatch on)
+static void cmd_expect_parkedat(const char *pat, int x, int y, const char *op, int limit)
+{
+	if(  pat==NULL  ||  op==NULL  ) {
+		logf("ERROR expect_parkedat needs PATTERN X Y OP NUMBER\n");
+		failures++;
+		return;
+	}
+	char k[32];
+	sprintf( k, "%d,%d", x, y );
+	int n = 0, total = 0;
+	FOR(vector_tpl<convoihandle_t>, const cnv, W->convoys()) {
+		if(  cnv->get_vehicle_count()==0  ||  !cnv_matches( cnv, pat )  ) continue;
+		n++;
+		std::map<std::string, int> &m = bay_parked_at[cnv.get_id()];
+		if(  m.count(k)  ) total += m[k];
+	}
+	if(  n>0  &&  compare( total, op, limit )  ) {
+		logf("ok   expect_parkedat %s %s %s %d (%d over %d convoys)\n", pat, k, op, limit, total, n);
+	}
+	else {
+		logf("FAIL expect_parkedat %s %s %s %d: %d over %d convoys\n", pat, k, op, limit, total, n);
+		failures++;
+	}
+}
+
 // expect_stuck OP N: the count of the last stuck command
 static void cmd_expect_stuck(const char *op, int limit)
 {
@@ -2018,6 +2077,7 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="expect"  ) cmd_expect( S(1), S(2), S(3), I(4), false );
 	else if(  c=="expect_each"  ) cmd_expect( S(1), S(2), S(3), I(4), true );
 	else if(  c=="expect_stuck"  ) cmd_expect_stuck( S(1), I(2) );
+	else if(  c=="expect_parkedat"  ) cmd_expect_parkedat( S(1), I(2), I(3), S(4), I(5) );
 	else if(  c=="expect_tracks"  ) cmd_expect_tracks( I(1), I(2), S(3), I(4) );
 	else if(  c=="expect_state"  ||  c=="expect_wait"  ) {
 		std::string what;
@@ -2167,6 +2227,11 @@ static void run_command(std::vector<char *> &a)
 		grund_t *g = ground( I(2), I(3) );
 		const char *err = g ? use_tool( TOOL_BUILD_STATION, S(1), g->get_pos() ) : "no ground";
 		logf("  [%lld] BUILD %s %d,%d: %s\n", (long long)W->get_calendar_minutes(), S(1), I(2), I(3), err && *err ? translator::translate(err) : "done");
+	}
+	else if(  c=="view"  ) {   // view X Y: centre the view on that tile (kept in a save, to look at it in the game window)
+		grund_t *g = ground( I(1), I(2) );
+		if(  g  ) { W->get_viewport()->change_world_position( g->get_pos() ); logf("view %d,%d\n", I(1), I(2)); }
+		else { logf("ERROR view: no ground at %d,%d\n", I(1), I(2)); failures++; }
 	}
 	else if(  c=="baywatch"  ) bay_watch = S(1) && !strcmp(S(1), "on");
 	else if(  c=="bays"  ) cmd_bays();

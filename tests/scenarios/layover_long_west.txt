@@ -1,0 +1,29 @@
+# Buses longer than a tile heading west into a bay of two layover tiles (tests/layouts/layover_long.inc): the
+# front stops halfway through its tile heading north or west (vehicle_t::hop), so the last section stands on
+# the tile behind, which must be the second tile of the bay. Line W: two 24 m buses (8+5+6 car units) from
+# 55,20 laying over at 40,20, heading west: the pair 40,20 + 41,20. The game is saved and loaded while they
+# lay over and then rotated. Expect: they park before and after both, every section on the pair, no two
+# buses in one bay (baywatch). Before: they stood in the lane.
+include ../layouts/layover_long.inc
+busline W
+stop 55 20 0 0 R
+stop 40 20 0 0 H
+timetable 20 5
+stop 20 26 0 0 R
+endline
+baywatch on
+vehicles VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-A VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-B VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-C
+convoy 11 18 W 2
+run 30 0
+bays
+save layover_long_west.sve
+load layover_long_west.sve
+bays
+run 90 0
+bays
+expect_each W parks >= 2
+rotate
+run 90 0
+bays
+summary
+expect_each W parks >= 4

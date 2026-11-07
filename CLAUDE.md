@@ -1103,10 +1103,10 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   `station-road/odstavne-stani` (`VZ-Stations-BusLayover-{OneSide,BothSides,DeadEnd}`).
 - Each tile has two bays; owners are in `convoi_t::layover_bays` (keyed by position, rebuilt after
   loading and rotation by `restore_layover_bays`), each bus holds a record (`layover_pos`, `_bay`,
-  `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile and whose sections
-  together are at most a tile long (`fits_in_bay`, the real lengths; `get_tile_length` counts the last
-  section as at least half a tile, which kept the 9+5 SOR NB 18 out of the bays while the 8+6 Streetway
-  fitted) uses bays; longer ones stand in the lane as at any stop. An articulated bus of one tile (pak128.cs:
+  `_phase`, `_since`, saved 122.12). Only a bus whose route ends on a layover tile uses bays. One whose
+  sections together are at most a tile long (`get_bay_tiles_needed` 1, the real lengths; `get_tile_length`
+  counts the last section as at least half a tile, which kept the 9+5 SOR NB 18 out of the bays while the
+  8+6 Streetway fitted) takes a bay of one tile; see below for longer ones. An articulated bus of one tile (pak128.cs:
   two sections of 7 or 8, or 9+5) is drawn as a whole, centred in the bay: every section moves by the same steps
   (`road_vehicle_t::get_screen_offset`), and `is_off_lane` holds for all of its vehicles while the front
   is in the bay. Before (2026-10-18) each section was moved to the middle on its own, so they overlapped. Ordinary stop reservations and choose
@@ -1152,7 +1152,31 @@ in the lane and others pass it (passing standing buses, only while LOADING/ROUTI
   arrival went first and could not pull out past the bus in the lane, which waited for it: Praha, Suchdol
   (King's Arms layover, line 107, 2026-10-28) had two SOR buses in the lane and bays, three in a circle
   and six queued behind for hours.
-- Export: `layover` {pos, bay, parked} per convoy, `waiting_for.reason` `layover_bay`.
+- Buses longer than a tile (2026-11-07, line 59 in Praha: Škoda/Solaris 24 m, 8+5+6 car units): such a bus takes the
+  same bay on the tile it stops on and the tiles behind it that it drove over (`get_bay_run`: one-side or both-sides
+  layover tiles of the owner's stops with the same layout, in a straight row; dead ends never), as many as hold it
+  whole (`get_bay_tiles_needed`: its length in tiles, and heading north or west, where the front stops halfway
+  through its tile, the tile of its last vehicle; 2 for the 24 m bus, at most `MAX_BAY_TILES` 4). The tiles are in
+  `layover_tiles` (not saved: `restore_layover_bays` finds them again from `layover_pos`, the direction and the
+  length), each holds the bus as the owner of that bay, so the queue, removal refusals, `take_bay_from_behind`,
+  `may_leave_bay` (the lanes of all of them) and the departure order (`is_way_out_over`) see every tile. It pulls
+  up to the end of the row: no place whose next tile of the row has that bay free (`find_place`); schedule the Hold
+  on the row's last tile, else it moves on to it (`find_other_layover`). It is drawn centred on the bay's tiles.
+  An area without a row long enough that it can drive into along the row and go on from to its next stop (dead
+  ends, single tiles: `has_bay_run_for_us`, owners ignored; with waypoints pending, the scheduled tile must be a
+  row's end) leaves it in the lane as before, never queued for good.
+- Short buses keep the rows free (`get_long_places_lost`: pairs of free bays of a row before and after taking a
+  bay): they take the bay that costs the fewest long places, so single tiles, dead ends and a row's end tile first,
+  and another tile of the area instead of their scheduled one when that costs fewer (at most 16 tiles further,
+  `find_other_layover`'s `max_loss`/`max_count`); with nothing else free they break a pair. This applies to every
+  layover area, also where no long bus comes (it then only changes which bay of a row a short bus takes).
+- Export: `layover` {pos, bay, parked, tiles} per convoy, `waiting_for.reason` `layover_bay`.
+Long buses: scenarios `layover_long_pair` (24 m buses in a pair, short ones on the single tile beside it),
+`layover_long_west` (heading west, the rear on the second tile; save/load and rotation while parked),
+`layover_long_row` (row of three: long buses at its end, a short bus on an end tile) fail on the build before and
+pass; `layover_long_deadend` (a long bus at dead ends stays in the lane) passes on both; the older layover scenarios
+pass, `layover_cluster`/`layover_side` byte-identical, `layover_gate*` with the same results but other bays of the
+pair. Seen in the GDI window: both directions drawn in the pair, off the lane, at the same place.
 Tested headless (pak128.cs + the art as add-on): a 10-bay cluster (two junctions, five dead-end tiles,
 two stops) with five timetabled lines; 18 buses for 10 bays (queue, every bay used, save/load);
 one-side and both-sides tiles with through buses both ways; an articulated bus; curbside Hold;

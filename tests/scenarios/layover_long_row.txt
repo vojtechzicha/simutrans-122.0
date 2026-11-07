@@ -1,0 +1,31 @@
+# A row of three layover tiles (tests/layouts/layover_long.inc, 30..32,26, entered at 32 heading west): a bus
+# longer than a tile pulls up to the end of the row, and a short bus takes an end tile, which leaves a pair
+# for the long ones, never the middle one. Line R: two 24 m buses laying over at 32,26, the first tile of the
+# row. Line Q: a short bus laying over at 31,26. Expect: R buses park with their front at 30,26 (the end) or,
+# while that bay is taken, 31,26, never at 32,26; Q never at 31,26. Before: R stood in the lane at 32,26.
+include ../layouts/layover_long.inc
+busline R
+stop 55 26 0 0 R
+stop 32 26 0 0 H
+timetable 20 0
+stop 20 20 0 0 R
+endline
+busline Q
+stop 55 26 0 0 R
+stop 31 26 0 0 H
+timetable 20 10
+stop 20 20 0 0 R
+endline
+baywatch on
+vehicles VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-A VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-B VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-C
+convoy 11 18 R 2
+vehicles CZ-ODIS-SOR_BN95-Green
+convoy 11 18 Q 1
+run 240 0
+bays
+summary
+expect_each R parks >= 4
+expect_each Q parks >= 5
+expect_parkedat R 30 26 >= 8
+expect_parkedat R 32 26 == 0
+expect_parkedat Q 31 26 == 0

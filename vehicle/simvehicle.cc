@@ -2250,13 +2250,17 @@ void road_vehicle_t::get_screen_offset( int &xoff, int &yoff, const sint16 raste
 			yoff += (raster_width * (bdx + bdy)) / 4000;
 			// it stopped at the end of the tile: draw it in the middle, where the bay is. All sections of
 			// an articulated bus move by the same steps, so they stay behind each other; the middle is that
-			// of the whole bus (each image centred on its position, the next one a length behind)
+			// of the whole bus (each image centred on its position, the next one a length behind). A bay of
+			// several tiles in a row (a bus longer than a tile): the middle of those, counted back from the
+			// end of the front tile
 			const vehicle_t *first = cnv->front();
 			const vehicle_t *last = cnv->back();
 			const sint32 first_pos = first->get_steps();
 			const sint32 front_end = first_pos + first->get_desc()->get_length_in_steps()/2;
 			const sint32 rear_end = first_pos - (sint32)(cnv->get_length_in_steps() - last->get_desc()->get_length_in_steps()) - (sint32)last->get_desc()->get_length_in_steps()/2;
-			const sint32 shift = VEHICLE_STEPS_PER_TILE/2 - (front_end + rear_end)/2;
+			const sint32 bay_tiles = cnv->get_layover_tiles().get_count()>1 ? (sint32)cnv->get_layover_tiles().get_count() : 1;
+			const sint32 bay_middle = VEHICLE_STEPS_PER_TILE - (bay_tiles * VEHICLE_STEPS_PER_TILE)/2;
+			const sint32 shift = bay_middle - (front_end + rear_end)/2;
 			const sint32 drawn = ((sint32)steps * raster_width) & 0xFFFFFC00;
 			const sint32 middle = (((sint32)steps + shift) * raster_width) & 0xFFFFFC00;
 			xoff += ((middle - drawn) * dx) >> 10;

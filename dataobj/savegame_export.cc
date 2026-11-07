@@ -1202,6 +1202,12 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			w.kv_koord3d( "pos", cnv->get_layover_pos() );
 			w.kv_int( "bay", cnv->get_layover_bay() );
 			w.kv_bool( "parked", cnv->is_parked_in_bay() );
+			// the tiles of the bay, pos first (more than one for a bus longer than a tile)
+			w.array_key( "tiles" );
+			FOR( vector_tpl<koord3d>, const &p, cnv->get_layover_tiles() ) {
+				w.koord3d_value( p );
+			}
+			w.end_array();
 			w.end_object();
 		}
 

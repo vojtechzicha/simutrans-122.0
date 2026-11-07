@@ -988,6 +988,9 @@ void convoi_t::rotate90( const sint16 y_size )
 	if(  layover_pos!=koord3d::invalid  ) {
 		layover_pos.rotate90( y_size );
 	}
+	for(  uint32 i=0;  i<layover_tiles.get_count();  i++  ) {
+		layover_tiles[i].rotate90( y_size );
+	}
 	// fork: the claimed track turns with the map
 	for(  uint32 i=0;  i<claim_path.get_count();  i++  ) {
 		claim_path[i].rotate90( y_size );
@@ -5175,8 +5178,10 @@ bool convoi_t::is_way_out_over(const convoi_t *other) const
 	if(  mover->is_parked_in_bay()  ) {
 		// its way out begins in the lane of its layover tile: a bus standing there (one too long for a bay)
 		// goes first, else each waits for the other (Praha, Suchdol 2026-10-28: line 107 for two hours)
+		// (a bus longer than a tile: the lane of every tile of its bay)
 		for(  uint8 j = 0;  j < other->anz_vehikel;  j++  ) {
-			if(  other->fahr[j]->get_pos() == mover->layover_pos  &&  !other->fahr[j]->is_off_lane()  ) {
+			const koord3d p = other->fahr[j]->get_pos();
+			if(  (p == mover->layover_pos  ||  mover->layover_tiles.is_contained( p ))  &&  !other->fahr[j]->is_off_lane()  ) {
 				return true;
 			}
 		}
@@ -7578,7 +7583,8 @@ convoihandle_t convoi_t::get_bay_owner(koord3d pos, uint8 bay)
 {
 	if(  layover_bays_t *b = layover_bays.access( layover_key(pos) )  ) {
 		const convoihandle_t c = b->owner[bay];
-		if(  c.is_bound()  &&  c->layover_pos==pos  &&  c->layover_bay==bay  &&  (c->layover_phase==LAYOVER_APPROACHING  ||  c->layover_phase==LAYOVER_PARKED)  ) {
+		if(  c.is_bound()  &&  c->layover_bay==bay  &&  (c->layover_phase==LAYOVER_APPROACHING  ||  c->layover_phase==LAYOVER_PARKED)
+			&&  (c->layover_pos==pos  ||  c->layover_tiles.is_contained( pos ))  ) {
 			return c;
 		}
 	}
@@ -7606,14 +7612,128 @@ static bool is_far_bay(const grund_t *gr, uint8 bay, ribi_t::ribi dir)
 }
 
 
-sint8 convoi_t::find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const
+uint8 convoi_t::get_bay_tiles_needed() const
 {
+	if(  anz_vehikel==0  ) {
+		return 0;
+	}
+	const uint32 len = get_length();
+	if(  len<=CARUNITS_PER_TILE  ) {
+		return 1;
+	}
+	uint32 n = (len + CARUNITS_PER_TILE - 1) / CARUNITS_PER_TILE;
+	// heading north or west the front stops halfway through its tile (vehicle_t::hop), so the last vehicle
+	// stands up to half a tile further back: it must still be on a tile of the bay
+	const uint32 behind = len - fahr[anz_vehikel-1]->get_desc()->get_length();
+	const uint32 half = CARUNITS_PER_TILE / 2;
+	const uint32 nw = 1 + (behind > half ? (behind - half + CARUNITS_PER_TILE - 1) / CARUNITS_PER_TILE : 0);
+	if(  nw > n  ) {
+		n = nw;
+	}
+	return n<=MAX_BAY_TILES ? (uint8)n : 0;
+}
+
+
+// tile gr continues a row of bays of a tile like first heading along dir: a one-side or both-sides layover
+// tile of the owner with the same layout (so the same bay lies at the same place), on a road along dir
+static bool continues_bay_row(const grund_t *first, const grund_t *gr, ribi_t::ribi dir, const player_t *owner)
+{
+	const uint8 kind = convoi_t::get_layover_kind( gr );
+	if(  kind==0  ||  kind==building_desc_t::LAYOVER_DEAD_END  ||  kind!=convoi_t::get_layover_kind( first )  ) {
+		return false;
+	}
+	if(  gr->find<gebaeude_t>()->get_tile()->get_layout()!=first->find<gebaeude_t>()->get_tile()->get_layout()  ) {
+		return false;
+	}
+	if(  !haltestelle_t::get_halt( gr->get_pos(), owner ).is_bound()  ) {
+		return false;
+	}
+	const weg_t *w = gr->get_weg( road_wt );
+	const ribi_t::ribi axis = ribi_t::doubles( dir );
+	return w  &&  (w->get_ribi_unmasked() & axis)==axis;
+}
+
+
+bool convoi_t::get_bay_run(koord3d pos, ribi_t::ribi dir, uint8 n, const player_t *owner, vector_tpl<koord3d> &tiles)
+{
+	tiles.clear();
+	const grund_t *first = welt->lookup( pos );
+	if(  !first  ||  get_layover_kind( first )==0  ) {
+		return false;
+	}
+	tiles.append( pos );
+	if(  n<=1  ) {
+		return true;
+	}
+	if(  !ribi_t::is_single( dir )  ||  !continues_bay_row( first, first, dir, owner )  ) {
+		tiles.clear();
+		return false;
+	}
+	const grund_t *gr = first;
+	while(  tiles.get_count() < n  ) {
+		grund_t *to;
+		if(  !gr->get_neighbour( to, road_wt, ribi_t::backward( dir ) )  ||  !continues_bay_row( first, to, dir, owner )  ||  tiles.is_contained( to->get_pos() )  ) {
+			tiles.clear();
+			return false;
+		}
+		tiles.append( to->get_pos() );
+		gr = to;
+	}
+	return true;
+}
+
+
+uint8 convoi_t::get_long_places_lost(const vector_tpl<koord3d> &tiles, uint8 bay, ribi_t::ribi dir) const
+{
+	if(  tiles.empty()  ||  !ribi_t::is_single( dir )  ) {
+		return 0;
+	}
+	const grund_t *first = welt->lookup( tiles[0] );
+	if(  !first  ||  !continues_bay_row( first, first, dir, owner )  ) {
+		// a dead end, or a tile across the road: no row
+		return 0;
+	}
+	// free bays of the row ahead of the front tile and behind the last one
+	uint32 free_side[2] = { 0, 0 };
+	for(  uint8 side=0;  side<2;  side++  ) {
+		const grund_t *gr = welt->lookup( side==0 ? tiles[0] : tiles.back() );
+		const ribi_t::ribi d = side==0 ? dir : ribi_t::backward( dir );
+		grund_t *to;
+		while(  gr  &&  free_side[side] < 8  &&  gr->get_neighbour( to, road_wt, d )  &&  continues_bay_row( first, to, dir, owner )  &&  !tiles.is_contained( to->get_pos() )  ) {
+			const convoihandle_t holder = get_bay_owner( to->get_pos(), bay );
+			if(  holder.is_bound()  &&  holder!=self  ) {
+				break;
+			}
+			free_side[side]++;
+			gr = to;
+		}
+	}
+	// a long place is two tiles of a bay in a row
+	const uint32 before = (free_side[0] + tiles.get_count() + free_side[1]) / 2;
+	const uint32 after = free_side[0] / 2 + free_side[1] / 2;
+	return (uint8)(before - after);
+}
+
+
+sint8 convoi_t::find_place(const grund_t *gr, ribi_t::ribi arrive_dir, vector_tpl<koord3d> &tiles, uint8 &loss) const
+{
+	tiles.clear();
+	loss = 0;
 	const uint8 kind = get_layover_kind( gr );
-	if(  kind==0  ) {
+	const uint8 n = get_bay_tiles_needed();
+	if(  kind==0  ||  n==0  ) {
 		return -1;
 	}
-	// both sides: the bay on our driving side first, the one beyond the other lane only when it is taken
-	// (a one-way loop has all buses on one side)
+	// a bus longer than a tile: the same bay on the tiles behind, which it drives over to get there
+	vector_tpl<koord3d> run;
+	if(  !get_bay_run( gr->get_pos(), arrive_dir, n, owner, run )  ) {
+		return -1;
+	}
+	// the bay that costs the buses longer than a tile the fewest places (short buses keep to single tiles
+	// and dead ends while those have room), then both sides: the bay on our driving side first, the one
+	// beyond the other lane only when it is taken (a one-way loop has all buses on one side)
+	sint8 best = -1;
+	uint8 best_loss = 255;
 	for(  uint8 pass=0;  pass<2;  pass++  ) {
 		for(  uint8 bay=0;  bay<2;  bay++  ) {
 			if(  kind==building_desc_t::LAYOVER_BOTH_SIDES  &&  is_far_bay( gr, bay, arrive_dir )!=(pass==1)  ) {
@@ -7622,29 +7742,123 @@ sint8 convoi_t::find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const
 			if(  kind!=building_desc_t::LAYOVER_BOTH_SIDES  &&  pass==1  ) {
 				continue;
 			}
-			const convoihandle_t holder = get_bay_owner( gr->get_pos(), bay );
-			if(  !holder.is_bound()  ||  holder==self  ) {
-				return bay;
+			bool free = true;
+			FOR( vector_tpl<koord3d>, const p, run ) {
+				const convoihandle_t holder = get_bay_owner( p, bay );
+				if(  holder.is_bound()  &&  holder!=self  ) {
+					free = false;
+					break;
+				}
+			}
+			if(  !free  ) {
+				continue;
+			}
+			if(  n>1  ) {
+				// a bus longer than a tile pulls up to the end of the row: not here while that bay of the next
+				// tile of the row is free
+				grund_t *ahead;
+				if(  gr->get_neighbour( ahead, road_wt, arrive_dir )  &&  continues_bay_row( gr, ahead, arrive_dir, owner )  ) {
+					const convoihandle_t holder = get_bay_owner( ahead->get_pos(), bay );
+					if(  !holder.is_bound()  ||  holder==self  ) {
+						continue;
+					}
+				}
+			}
+			const uint8 l = get_long_places_lost( run, bay, arrive_dir );
+			if(  l < best_loss  ) {
+				best = bay;
+				best_loss = l;
 			}
 		}
 	}
-	return -1;
+	if(  best>=0  ) {
+		tiles.clear();
+		FOR( vector_tpl<koord3d>, const p, run ) { tiles.append( p ); }
+		loss = best_loss;
+	}
+	return best;
 }
 
 
-void convoi_t::take_bay(koord3d pos, uint8 bay, uint8 phase)
+bool convoi_t::has_bay_run_for_us(const vector_tpl<koord3d> &group, koord3d start) const
 {
+	const uint8 n = get_bay_tiles_needed();
+	if(  n==0  ) {
+		return false;
+	}
+	vector_tpl<koord3d> candidates( group );
+	FOR( vector_tpl<koord3d>, const p, group ) {
+		const halthandle_t halt = haltestelle_t::get_halt( p, owner );
+		if(  halt.is_bound()  ) {
+			FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
+				if(  get_layover_kind( t.grund )  ) {
+					candidates.append_unique( t.grund->get_pos() );
+				}
+			}
+		}
+	}
+	// the next stop after the layover, to check that we can go on from there (as find_other_layover)
+	koord3d next = koord3d::invalid;
+	if(  schedule  &&  schedule->get_count()>1  ) {
+		next = schedule->entries[ (schedule->get_current_stop()+1) % schedule->get_count() ].pos;
+	}
+	const sint32 speed = speed_to_kmh( min_top_speed );
+	vector_tpl<koord3d> run;
+	FOR( vector_tpl<koord3d>, const p, candidates ) {
+		// cheap first: a row of bays there in some direction
+		bool any = false;
+		for(  uint8 i=0;  i<4  &&  !any;  i++  ) {
+			any = get_bay_run( p, ribi_t::nsew[i], n, owner, run );
+		}
+		if(  !any  ) {
+			continue;
+		}
+		// we can drive in along the row (find_place's rules: its end, the bay tiles behind) and go on from there
+		route_t r;
+		if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ||  r.get_count()<2  ) {
+			continue;
+		}
+		const ribi_t::ribi dir = ribi_type( r.at( r.get_count()-2 ), r.back() );
+		const grund_t *gr = welt->lookup( p );
+		grund_t *ahead;
+		if(  !get_bay_run( p, dir, n, owner, run )  ||  r.at( r.get_count()-2 )!=run[1]
+			||  (gr->get_neighbour( ahead, road_wt, dir )  &&  continues_bay_row( gr, ahead, dir, owner ))  ) {
+			continue;
+		}
+		if(  next!=koord3d::invalid  ) {
+			route_t on;
+			if(  on.calc_route( welt, p, next, fahr[0], speed, 1 )==route_t::no_route  ) {
+				continue;
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
+
+void convoi_t::take_bay(koord3d pos, uint8 bay, uint8 phase, const vector_tpl<koord3d> &tiles_in)
+{
+	// (a copy: tiles_in may be our own layover_tiles, which release_layover clears)
+	vector_tpl<koord3d> tiles( tiles_in );
+	if(  tiles.empty()  ) {
+		tiles.append( pos );
+	}
 	release_layover();
 	layover_pos = pos;
 	layover_bay = bay;
 	layover_phase = phase;
-	const uint64 key = layover_key( pos );
-	layover_bays_t *b = layover_bays.access( key );
-	if(  !b  ) {
-		layover_bays.put( key, layover_bays_t() );
-		b = layover_bays.access( key );
+	layover_tiles.clear();
+	FOR( vector_tpl<koord3d>, const p, tiles ) { layover_tiles.append( p ); }
+	FOR( vector_tpl<koord3d>, const p, tiles ) {
+		const uint64 key = layover_key( p );
+		layover_bays_t *b = layover_bays.access( key );
+		if(  !b  ) {
+			layover_bays.put( key, layover_bays_t() );
+			b = layover_bays.access( key );
+		}
+		b->owner[bay] = self;
 	}
-	b->owner[bay] = self;
 }
 
 
@@ -7654,13 +7868,17 @@ void convoi_t::release_layover()
 		layover_queue.remove( self );
 	}
 	else if(  layover_phase==LAYOVER_APPROACHING  ||  layover_phase==LAYOVER_PARKED  ) {
-		const uint64 key = layover_key( layover_pos );
-		if(  layover_bays_t *b = layover_bays.access( key )  ) {
-			if(  b->owner[layover_bay]==self  ) {
-				b->owner[layover_bay] = convoihandle_t();
-			}
-			if(  !b->owner[0].is_bound()  &&  !b->owner[1].is_bound()  ) {
-				layover_bays.remove( key );
+		vector_tpl<koord3d> tiles( layover_tiles );
+		tiles.append_unique( layover_pos );
+		FOR( vector_tpl<koord3d>, const p, tiles ) {
+			const uint64 key = layover_key( p );
+			if(  layover_bays_t *b = layover_bays.access( key )  ) {
+				if(  b->owner[layover_bay]==self  ) {
+					b->owner[layover_bay] = convoihandle_t();
+				}
+				if(  !b->owner[0].is_bound()  &&  !b->owner[1].is_bound()  ) {
+					layover_bays.remove( key );
+				}
 			}
 		}
 	}
@@ -7679,6 +7897,7 @@ void convoi_t::release_layover()
 	layover_bay = 0;
 	layover_since = 0;
 	layover_warned = false;
+	layover_tiles.clear();
 }
 
 
@@ -7767,7 +7986,8 @@ static ribi_t::ribi get_arrival_dir(const route_t &r)
 }
 
 
-bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, koord3d &pos, route_t &way)
+bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, uint8 max_loss, uint32 max_count,
+	koord3d &pos, route_t &way, sint8 &bay, vector_tpl<koord3d> &tiles, uint8 &loss)
 {
 	if(  anz_vehikel==0  ) {
 		return false;
@@ -7794,12 +8014,15 @@ bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d star
 	const koord3d here = fahr[0]->get_pos();
 	const sint32 speed = speed_to_kmh( min_top_speed );
 	uint32 best = 0xFFFFFFFFu;
+	uint8 best_loss = 255;
+	vector_tpl<koord3d> place;
 	FOR( vector_tpl<koord3d>, const p, candidates ) {
 		const grund_t *gr = welt->lookup( p );
 		if(  p==not_here  ||  get_layover_kind( gr )==0  ) {
 			continue;
 		}
-		if(  get_bay_owner( p, 0 ).is_bound()  &&  get_bay_owner( p, 1 ).is_bound()  ) {
+		const convoihandle_t h0 = get_bay_owner( p, 0 ), h1 = get_bay_owner( p, 1 );
+		if(  h0.is_bound()  &&  h0!=self  &&  h1.is_bound()  &&  h1!=self  ) {
 			continue;
 		}
 		if(  !group.is_contained( p )  ) {
@@ -7816,14 +8039,28 @@ bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d star
 			// the tile in front of a bus at the gate (calc_route finds no way to the tile it starts on)
 			r.append( start );
 		}
-		else if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ||  r.get_count() >= best  ) {
+		else if(  r.calc_route( welt, start, p, fahr[0], speed, 1 )==route_t::no_route  ) {
+			continue;
+		}
+		if(  r.get_count() > max_count  ) {
 			continue;
 		}
 		if(  start!=here  &&  r.get_count()>1  &&  r.at(1)==here  ) {
 			// would turn round on the road behind us
 			continue;
 		}
-		if(  find_free_bay( gr, get_arrival_dir( r ) ) < 0  ) {
+		// the way in (a way of one tile: from our tile)
+		const ribi_t::ribi dir = r.get_count()>1 ? get_arrival_dir( r ) : (start!=here ? ribi_type( here, start ) : (ribi_t::ribi)ribi_t::all);
+		uint8 l;
+		const sint8 b = find_place( gr, dir, place, l );
+		if(  b<0  ||  l>max_loss  ) {
+			continue;
+		}
+		if(  l > best_loss  ||  (l==best_loss  &&  r.get_count() >= best)  ) {
+			continue;
+		}
+		if(  place.get_count()>1  &&  (r.get_count()>1 ? r.at( r.get_count()-2 ) : here)!=place[1]  ) {
+			// a bus longer than a tile must come in over the tiles of its bay
 			continue;
 		}
 		if(  next!=koord3d::invalid  ) {
@@ -7833,7 +8070,12 @@ bool convoi_t::find_other_layover(const vector_tpl<koord3d> &group, koord3d star
 			}
 		}
 		best = r.get_count();
+		best_loss = l;
 		pos = p;
+		bay = b;
+		tiles.clear();
+		FOR( vector_tpl<koord3d>, const p, place ) { tiles.append( p ); }
+		loss = l;
 		way.clear();
 		way.append( &r );
 	}
@@ -7870,27 +8112,53 @@ void convoi_t::plan_layover()
 	}
 	vector_tpl<koord3d> group;
 	get_layover_group( target, owner, group );
+	const bool may_move = schedule_target==koord3d::invalid;
+	if(  get_bay_tiles_needed()>1  ) {
+		// longer than a tile: a bay on a row of layover tiles; with none in reach (dead ends, single tiles) it
+		// stands in the lane as before rather than wait for good
+		bool possible = may_move  &&  has_bay_run_for_us( group, route.front() );
+		if(  !may_move  ) {
+			// waypoints on the way: only the scheduled tile, which must be the end of a row (find_place)
+			const ribi_t::ribi dir = get_arrival_dir( route );
+			vector_tpl<koord3d> run;
+			grund_t *ahead;
+			possible = get_bay_run( target, dir, get_bay_tiles_needed(), owner, run )
+				&&  !(ribi_t::is_single( dir )  &&  gr->get_neighbour( ahead, road_wt, dir )  &&  continues_bay_row( gr, ahead, dir, owner ));
+		}
+		if(  !possible  ) {
+			release_layover();
+			return;
+		}
+	}
 	const bool queued_here = layover_phase==LAYOVER_QUEUED  &&  group.is_contained( layover_pos );
 	if(  !queued_here  ) {
 		release_layover();
 	}
 	if(  is_first_in_layover_queue( group )  ) {
-		sint8 bay = find_free_bay( gr, get_arrival_dir( route ) );
-		if(  bay>=0  ) {
-			take_bay( target, bay, LAYOVER_APPROACHING );
+		vector_tpl<koord3d> tiles;
+		uint8 loss;
+		const sint8 bay = find_place( gr, get_arrival_dir( route ), tiles, loss );
+		if(  bay>=0  &&  loss==0  ) {
+			take_bay( target, bay, LAYOVER_APPROACHING, tiles );
 			return;
 		}
-		// another layover tile of the area with a free bay (only without waypoints: the new route would skip them)
+		// another layover tile of the area with a free bay (only without waypoints: the new route would skip
+		// them); with a bay here, only one that costs the longer buses fewer places and is not far out of the way
 		koord3d pos;
 		route_t way;
-		if(  schedule_target==koord3d::invalid  &&  find_other_layover( group, route.front(), target, pos, way )  ) {
-			bay = find_free_bay( welt->lookup( pos ), get_arrival_dir( way ) );
-			if(  bay>=0  ) {
-				route.clear();
-				route.append( &way );
-				take_bay( pos, bay, LAYOVER_APPROACHING );
-				return;
-			}
+		vector_tpl<koord3d> other_tiles;
+		sint8 other_bay;
+		uint8 other_loss;
+		if(  may_move  &&  find_other_layover( group, route.front(), target, bay>=0 ? loss-1 : 255, bay>=0 ? route.get_count()+16 : 0xFFFFFFFFu,
+				pos, way, other_bay, other_tiles, other_loss )  ) {
+			route.clear();
+			route.append( &way );
+			take_bay( pos, other_bay, LAYOVER_APPROACHING, other_tiles );
+			return;
+		}
+		if(  bay>=0  ) {
+			take_bay( target, bay, LAYOVER_APPROACHING, tiles );
+			return;
 		}
 	}
 	// no bay: it will wait in front of the waiting area
@@ -7909,25 +8177,33 @@ void convoi_t::plan_layover()
 
 bool convoi_t::take_bay_at_gate(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index)
 {
-	sint8 bay = find_free_bay( welt->lookup( layover_pos ), get_arrival_dir( route ) );
-	if(  bay>=0  ) {
-		take_bay( layover_pos, bay, LAYOVER_APPROACHING );
+	vector_tpl<koord3d> tiles;
+	uint8 loss;
+	const koord3d target = layover_pos;
+	const sint8 bay = find_place( welt->lookup( target ), get_arrival_dir( route ), tiles, loss );
+	if(  bay>=0  &&  loss==0  ) {
+		take_bay( target, bay, LAYOVER_APPROACHING, tiles );
 		return true;
 	}
 	koord3d pos;
 	route_t way;
+	vector_tpl<koord3d> other_tiles;
+	sint8 other_bay;
+	uint8 other_loss;
+	// with a bay at our tile, another only if it costs the longer buses fewer places and is not far out of the way
+	const uint32 left = route.get_count() > next_index ? route.get_count() - next_index : 0;
 	if(  schedule_target==koord3d::invalid  &&  next_index < route.get_count()  &&  route.at(next_index)==next->get_pos()
-		&&  find_other_layover( group, next->get_pos(), layover_pos, pos, way )  ) {
-		// a way of the next tile only: we arrive from our tile
-		const ribi_t::ribi dir = way.get_count()==1  &&  next_index>0 ? ribi_type( route.at(next_index-1), way.back() ) : get_arrival_dir( way );
-		bay = find_free_bay( welt->lookup( pos ), dir );
-		if(  bay>=0  ) {
-			// the next tile stays the same, only the way after it changes
-			route.remove_koord_from( next_index );
-			route.append( &way );
-			take_bay( pos, bay, LAYOVER_APPROACHING );
-			return true;
-		}
+		&&  find_other_layover( group, next->get_pos(), target, bay>=0 ? loss-1 : 255, bay>=0 ? left+16 : 0xFFFFFFFFu,
+			pos, way, other_bay, other_tiles, other_loss )  ) {
+		// the next tile stays the same, only the way after it changes
+		route.remove_koord_from( next_index );
+		route.append( &way );
+		take_bay( pos, other_bay, LAYOVER_APPROACHING, other_tiles );
+		return true;
+	}
+	if(  bay>=0  ) {
+		take_bay( target, bay, LAYOVER_APPROACHING, tiles );
+		return true;
 	}
 	return false;
 }
@@ -7946,17 +8222,21 @@ bool convoi_t::take_bay_from_behind(const vector_tpl<koord3d> &group, const grun
 	FOR( vector_tpl<koord3d>, const p, group ) {
 		tiles.append_unique( p );
 	}
+	vector_tpl<koord3d> place;
+	uint8 loss;
 	FOR( vector_tpl<koord3d>, const p, tiles ) {
-		if(  !get_bay_owner( p, 0 ).is_bound()  ||  !get_bay_owner( p, 1 ).is_bound()  ) {
-			// a bay is free: it goes by the queue (it may be one we cannot use, then we wait as before)
-			return false;
+		for(  uint8 i=0;  i<4;  i++  ) {
+			if(  find_place( welt->lookup( p ), ribi_t::nsew[i], place, loss )>=0  ) {
+				// a place for us is free: it goes by the queue (it may be one we cannot reach, then we wait as before)
+				return false;
+			}
 		}
 	}
 	FOR( vector_tpl<koord3d>, const p, tiles ) {
 		for(  uint8 bay=0;  bay<2;  bay++  ) {
 			const convoihandle_t holder = get_bay_owner( p, bay );
 			if(  !holder.is_bound()  ||  holder==self  ||  holder->layover_phase!=LAYOVER_APPROACHING  ||  holder->anz_vehikel==0
-				||  holder->route.empty()  ||  holder->route.back()!=p  ) {
+				||  holder->route.empty()  ||  holder->route.back()!=p  ||  holder->layover_pos!=p  ) {
 				continue;
 			}
 			// its way on to the bay runs over a tile we stand on
@@ -7970,6 +8250,7 @@ bool convoi_t::take_bay_from_behind(const vector_tpl<koord3d> &group, const grun
 				continue;
 			}
 			// it queues (from its arrival at the gate, so behind us) and we try again
+			const vector_tpl<koord3d> holder_tiles( holder->layover_tiles );
 			holder->release_layover();
 			holder->layover_phase = LAYOVER_QUEUED;
 			holder->layover_pos = p;
@@ -7979,8 +8260,8 @@ bool convoi_t::take_bay_from_behind(const vector_tpl<koord3d> &group, const grun
 				dbg->message( "convoi_t::take_bay_from_behind()", "%s takes the layover bay at %s of %s behind it", get_name(), layover_pos.get_str(), holder->get_name() );
 				return true;
 			}
-			// no use to us (the other way there is closed): it keeps it
-			holder->take_bay( p, bay, LAYOVER_APPROACHING );
+			// no use to us (the other way there is closed, or too short for us): it keeps it
+			holder->take_bay( p, bay, LAYOVER_APPROACHING, holder_tiles );
 		}
 	}
 	return false;
@@ -8058,9 +8339,11 @@ void convoi_t::layover_arrived()
 	// came here without a bay of this tile: take one if free, else it stands in the lane
 	const grund_t *gr = welt->lookup( here );
 	if(  get_layover_kind( gr )  &&  fits_in_bay()  ) {
-		const sint8 bay = find_free_bay( gr, fahr[0]->get_direction() );
+		vector_tpl<koord3d> tiles;
+		uint8 loss;
+		const sint8 bay = find_place( gr, fahr[0]->get_direction(), tiles, loss );
 		if(  bay>=0  ) {
-			take_bay( here, bay, LAYOVER_APPROACHING );
+			take_bay( here, bay, LAYOVER_APPROACHING, tiles );
 			layover_arrived();
 		}
 	}
@@ -8078,18 +8361,27 @@ bool convoi_t::may_leave_bay() const
 	const ribi_t::ribi dir = fahr[0]->get_direction();
 	const uint8 kind = get_layover_kind( gr );
 	const bool crosses = kind==building_desc_t::LAYOVER_ONE_SIDE  ||  (kind==building_desc_t::LAYOVER_BOTH_SIDES  &&  is_far_bay( gr, layover_bay, dir ));
-	for(  uint8 i=1;  i<gr->get_top();  i++  ) {
-		const vehicle_base_t *v = obj_cast<vehicle_base_t>( gr->obj_bei(i) );
-		if(  !v  ||  v->get_typ()==obj_t::pedestrian  ||  v->get_waytype()!=road_wt  ||  v->is_off_lane()  ) {
+	// every tile of the bay: a bus longer than a tile comes back into the lane on all of them
+	vector_tpl<koord3d> tiles( layover_tiles );
+	tiles.append_unique( layover_pos );
+	FOR( vector_tpl<koord3d>, const p, tiles ) {
+		const grund_t *t = welt->lookup( p );
+		if(  !t  ) {
 			continue;
 		}
-		if(  const road_vehicle_t *rv = obj_cast<road_vehicle_t>( v )  ) {
-			if(  rv->get_convoi()==this  ) {
+		for(  uint8 i=1;  i<t->get_top();  i++  ) {
+			const vehicle_base_t *v = obj_cast<vehicle_base_t>( t->obj_bei(i) );
+			if(  !v  ||  v->get_typ()==obj_t::pedestrian  ||  v->get_waytype()!=road_wt  ||  v->is_off_lane()  ) {
 				continue;
 			}
-		}
-		if(  crosses  ||  v->get_direction()==dir  ) {
-			return false;
+			if(  const road_vehicle_t *rv = obj_cast<road_vehicle_t>( v )  ) {
+				if(  rv->get_convoi()==this  ) {
+					continue;
+				}
+			}
+			if(  crosses  ||  v->get_direction()==dir  ) {
+				return false;
+			}
 		}
 	}
 	return true;
@@ -8124,15 +8416,32 @@ void convoi_t::restore_layover_bays()
 			}
 			continue;
 		}
-		if(  usable  &&  cnv->layover_bay<2  &&  !get_bay_owner( cnv->layover_pos, cnv->layover_bay ).is_bound()  ) {
+		// the tiles of its bay: the tiles behind the front one for a bus longer than a tile, heading the way
+		// it stands (parked) or comes in (on its way there)
+		vector_tpl<koord3d> tiles;
+		bool free = usable  &&  cnv->layover_bay<2;
+		if(  free  ) {
+			ribi_t::ribi dir = cnv->front()->get_direction();
+			if(  cnv->layover_phase==LAYOVER_APPROACHING  &&  cnv->route.get_count()>1  &&  cnv->route.back()==cnv->layover_pos  ) {
+				dir = get_arrival_dir( cnv->route );
+			}
+			free = cnv->get_bay_tiles_needed()>0  &&  get_bay_run( cnv->layover_pos, dir, cnv->get_bay_tiles_needed(), cnv->owner, tiles );
+			FOR( vector_tpl<koord3d>, const p, tiles ) {
+				if(  get_bay_owner( p, cnv->layover_bay ).is_bound()  ) {
+					free = false;
+				}
+			}
+		}
+		if(  free  ) {
 			const uint8 phase = cnv->layover_phase;
 			cnv->layover_phase = LAYOVER_NONE;
-			cnv->take_bay( cnv->layover_pos, cnv->layover_bay, phase );
+			cnv->take_bay( cnv->layover_pos, cnv->layover_bay, phase, tiles );
 		}
 		else {
 			// the bay is taken or gone: it stands in the lane
 			cnv->layover_phase = LAYOVER_NONE;
 			cnv->layover_pos = koord3d::invalid;
+			cnv->layover_tiles.clear();
 		}
 	}
 }

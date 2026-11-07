@@ -47,6 +47,10 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `layover_side` | Layover tiles beside the lane with through buses driving past both ways. |
 | `layover_gate` | A bus queued at the only way into a layover takes the bay of a bus behind it (Praha-Uhříněves, 2026-11-02): every bus parks. Fails before the fix. |
 | `layover_gate_near` | A bus queued for one layover tile takes a free bay of the tile in front of the gate. Fails before the fix. |
+| `layover_long_pair` | 24 m buses (line 59, Praha, 2026-11-07) park in a bay of two layover tiles in a row; short buses take the single tile beside it, never the pair. Fails before. |
+| `layover_long_west` | The same heading west (the front stops halfway, the rear on the second tile), with save/load and rotation while parked. Fails before. |
+| `layover_long_row` | A row of three layover tiles: long buses pull up to its end, a short bus takes an end tile, not the middle one. Fails before. |
+| `layover_long_deadend` | A long bus at a layover of dead ends only stands in the lane and keeps running, short buses park. Passes before too. |
 
 Layouts shared by several scenarios are in `layouts/` and read with `include`.
 
@@ -73,7 +77,10 @@ Running and looking:
 
 - `run MINUTES [VERBOSE_EVERY]` calendar minutes; `run_until NAME STATE MAXMIN`
 - `stuck` rail convoys that did not move since the last `stuck`; `summary` per convoy counters
-- `events on|off`, `stops on`, `waits on` (log every wait text change), `baywatch on` (bus bays)
+- `events on|off`, `stops on`, `waits on` (log every wait text change), `baywatch on` (bus bays: a line per
+  change with the bay's tiles and, parked, where the vehicles stand; two buses in one bay, or a long bus with a
+  section off its bay, is an error)
+- `view X Y` centres the view on a tile; a `save` keeps it, so the save opens there in the game window
 - `diag NAME|ID` state, section, claim, schedule and route with reservations; `tiles X0 Y0 X1 Y1`,
   `dump X0 Y0 X1 Y1` an ASCII map, `res`, `signs`, `bays`, `roadjam`, `linelayout`, `stationmaps`
 - `save NAME`, `load NAME`, `lineedit`, `stoptype`, `retarget`, `delcnv`, `todepot`, `rotate`, `remove`,
@@ -92,6 +99,8 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
   signal or station boundary), which take the largest. OP: `>=`, `<=`, `==`, `>`, `<`.
 - `expect_each PATTERN FIELD OP N`: every matching convoy.
 - `expect_stuck OP N`: the count of the last `stuck` (call `stuck` before the run and after).
+- `expect_parkedat PATTERN X Y OP N`: how often the matching convoys parked in a layover bay with their front at
+  X,Y (`baywatch on`).
 - `expect_state PATTERN STATE` (e.g. `LOADING`, `CAN_START`) and `expect_wait PATTERN TEXT...` (part of
   the wait text the convoy window shows): some matching convoy, now.
 - `expect_tracks X Y OP N`: the tracks the single-track and keep-a-track rules count at the halt on that tile.

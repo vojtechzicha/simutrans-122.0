@@ -395,6 +395,10 @@ private:
 	uint32 layover_since;
 	/// fork, bus layover: warned once that it waits long for a bay (not saved)
 	bool layover_warned;
+	/// fork, bus layover: the tiles of the bay it holds, layover_pos first, then for a bus longer than a tile
+	/// the tiles behind it (the same bay on each, a row of layover tiles, see get_bay_run). Not saved:
+	/// restore_layover_bays rebuilds it from layover_pos, the direction and the bus's length.
+	vector_tpl<koord3d> layover_tiles;
 
 	struct layover_bays_t {
 		convoihandle_t owner[2];
@@ -402,11 +406,25 @@ private:
 	/// fork, bus layover: owners of the bays by tile (layover_key); rebuilt after loading
 	static inthashtable_tpl<uint64, layover_bays_t> layover_bays;
 	static uint64 layover_key(koord3d pos) { return ((uint64)(uint16)pos.z<<32) | ((uint32)(uint16)pos.x<<16) | (uint16)pos.y; }
-	/// a bay of that tile this convoy may use (arriving from arrive_dir), or -1
-	sint8 find_free_bay(const grund_t *gr, ribi_t::ribi arrive_dir) const;
+	/// the place this convoy may take with its front at gr, arriving heading arrive_dir: the bay (-1: none),
+	/// its tiles (gr's tile and, for a bus longer than a tile, the ones behind it) and how many long places
+	/// (two tiles of one bay in a row, see get_long_places_lost) it costs; the bay costing the fewest first. A
+	/// bus longer than a tile pulls up to the end of the row: no bay whose next tile of the row is free
+	sint8 find_place(const grund_t *gr, ribi_t::ribi arrive_dir, vector_tpl<koord3d> &tiles, uint8 &loss) const;
+	/// the tiles of a bay n tiles long with its front at pos, for a bus arriving heading dir: pos and the
+	/// n-1 tiles behind it, all one-side or both-sides layover tiles of the owner's stops with the same layout
+	/// on a straight road (the same bay lies on each); false if there is no such row
+	static bool get_bay_run(koord3d pos, ribi_t::ribi dir, uint8 n, const player_t *owner, vector_tpl<koord3d> &tiles);
+	/// the long places lost when a bay of these tiles (front first, heading dir) is taken: free bays of that
+	/// row in pairs before and after, minus those left (0 at dead ends and single tiles)
+	uint8 get_long_places_lost(const vector_tpl<koord3d> &tiles, uint8 bay, ribi_t::ribi dir) const;
+	/// some layover tile of these (or of their stops) is the end of a row of bay tiles long enough for us, taken
+	/// or not, that we can drive into along the row from start and go on from to the next stop
+	bool has_bay_run_for_us(const vector_tpl<koord3d> &group, koord3d start) const;
 	/// a convoy that holds the bay according to its own record, or unbound
 	static convoihandle_t get_bay_owner(koord3d pos, uint8 bay);
-	void take_bay(koord3d pos, uint8 bay, uint8 phase);
+	/// takes the bay on these tiles (front first; empty: pos only)
+	void take_bay(koord3d pos, uint8 bay, uint8 phase, const vector_tpl<koord3d> &tiles);
 	/// the waiting area: road tiles that are layover tiles of the owner's stops or next to one
 	static bool is_in_layover_area(const grund_t *gr, const player_t *owner);
 	/// the layover tiles of the waiting area of the one at start (one or several stops: rows of bays
@@ -420,9 +438,11 @@ private:
 	/// tiles (it could never get there first), which queues instead; true: taken
 	bool take_bay_from_behind(const vector_tpl<koord3d> &group, const grund_t *next, uint32 next_index);
 	/// a layover tile of the group, or of a stop of the group (another waiting area, if no bus waits
-	/// there longer than we do), other than not_here with a bay for us and the shortest way there from
-	/// start (and on to the next stop of the schedule); false if none
-	bool find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, koord3d &pos, route_t &way);
+	/// there longer than we do), other than not_here with a bay for us costing at most max_loss long places
+	/// (fewest first) and the shortest way there from start, at most max_count tiles (and on to the next stop
+	/// of the schedule); its bay, tiles and cost; false if none
+	bool find_other_layover(const vector_tpl<koord3d> &group, koord3d start, koord3d not_here, uint8 max_loss, uint32 max_count,
+		koord3d &pos, route_t &way, sint8 &bay, vector_tpl<koord3d> &tiles, uint8 &loss);
 
 	/**
 	* the convoi caches its freight info; it is only recalculation after loading or resorting
@@ -1235,9 +1255,16 @@ public:
 	bool is_queued_for_bay() const { return layover_phase==LAYOVER_QUEUED; }
 	koord3d get_layover_pos() const { return layover_pos; }
 	uint8 get_layover_bay() const { return layover_bay; }
-	/// its sections together are at most a tile long, so it fits in a layover bay (get_tile_length counts the
-	/// last section as at least half a tile, which made a 9+5 articulated bus two tiles and an 8+6 one one)
-	bool fits_in_bay() const { return anz_vehikel>0  &&  get_length()<=CARUNITS_PER_TILE; }
+	/// fork, bus layover: the layover tiles in a row a bay must have for this bus: 1 when its sections together
+	/// are at most a tile long (get_tile_length counts the last section as at least half a tile, which made a
+	/// 9+5 articulated bus two tiles and an 8+6 one one), else as many as hold it whole, also heading north or
+	/// west, where it stops with its front halfway through its tile (vehicle_t::hop); 0: longer than
+	/// MAX_BAY_TILES, no bay
+	uint8 get_bay_tiles_needed() const;
+	enum { MAX_BAY_TILES = 4 };
+	bool fits_in_bay() const { return get_bay_tiles_needed()>0; }
+	/// the tiles of the bay it holds or goes to (front first), empty without one
+	const vector_tpl<koord3d> &get_layover_tiles() const { return layover_tiles; }
 	/// after drive_to: a bay for the stop the route ends at, or the queue (road convoys)
 	void plan_layover();
 	/// gives up the bay or the place in the queue (idempotent)

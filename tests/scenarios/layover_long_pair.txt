@@ -1,0 +1,34 @@
+# Buses longer than a tile in a bay of two layover tiles in a row (tests/layouts/layover_long.inc), and short
+# buses keeping to the single tile while it has room (2026-11-07, line 59 in Praha). Line L: two 24 m buses
+# (8+5+6 car units) laying over at 41,20, heading east, so the pair 40,20 + 41,20 is their bay. Line K: two
+# short buses laying over at 41,20 too; the single tile 43,20 of the same waiting area costs the long buses
+# no place, so they park there. Expect: every L bus parks with its front at 41,20 and all its sections on the
+# pair (baywatch), every K bus at 43,20 and never on the pair. Before: the long buses stood in the lane and
+# the short ones parked at 41,20.
+include ../layouts/layover_long.inc
+busline L
+stop 20 20 0 0 R
+stop 41 20 0 0 H
+timetable 20 0
+stop 55 26 0 0 R
+endline
+busline K
+stop 20 20 0 0 R
+stop 41 20 0 0 H
+timetable 20 10
+stop 55 26 0 0 R
+endline
+baywatch on
+vehicles VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-A VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-B VZ-DPPraha-Skoda_Solaris_24m-pidsedocervena-Skoda_Solaris_24m-C
+convoy 11 18 L 2
+vehicles CZ-ODIS-SOR_BN95-Green
+convoy 11 18 K 2
+run 240 0
+bays
+summary
+expect_each L parks >= 5
+expect_each K parks >= 5
+expect_parkedat L 41 20 >= 10
+expect_parkedat K 43 20 >= 10
+expect_parkedat K 41 20 == 0
+expect_parkedat K 40 20 == 0
