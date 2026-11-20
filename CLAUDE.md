@@ -1357,6 +1357,19 @@ tile's freed text (stock showed garbage there after an extension). Same rights a
 game, the owner in network games. With `station_name_on_first_tile` the moved name stays; without it the next change
 of the stop centres it again.
 
+## Platforms (planned fork feature, design only)
+
+Plan: `documentation/fork-platforms-plan.md`; nothing is implemented. The owner writes about 14,200 map markers
+by hand that list the lines at a stop ("N3/7: Praha hlavní nádraží (Ex1…)", "6: 532 Radíkov", "1,7,8,13 směr
+aut.st."); the feature generates them. A platform is a station track or a stand (the stop tiles of a road or
+tram stop in one travel direction); each gets a card on the map with its number, the lines that board there and
+an arrow for the way they leave. Tracks show next stop and destination together, stands the next stop (a stop's
+stands can be switched to next stop + destination). The same numbers go on the departure boards (Track and
+Stand columns: planned, confirmed, changed), the convoy window and optional display and sign objects. Order of
+work, save format 122.18 and the marker import and strip tools are in the plan. The pixel mockups (the owner's
+Hranice na Moravě) come from `tools/mockups` (README there; screenshots and results in OneDrive's
+`Games/Simutrans/docs/platforms-mockups`), published at https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i.
+
 ## Windows: the fork is the Steam game (since 2026-09-12)
 
 The owner plays the fork through Steam. `tools/windows/steam-fork.sh` (run from Git Bash) builds
