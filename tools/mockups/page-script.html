@@ -1,0 +1,44 @@
+<script>
+(function () {
+  var FRAMES = {
+    board: ["{{board_trains_0}}", "{{board_trains_1}}"],
+    objr: ["{{obj_rail_0}}", "{{obj_rail_1}}"],
+    objd: ["{{obj_road_0}}", "{{obj_road_1}}"]
+  };
+  var frame = 0, zoom = 1, timer = null;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var animBtn = document.getElementById("anim");
+  var note = document.getElementById("frame-note");
+  function imgs() { return Array.prototype.slice.call(document.querySelectorAll("img[data-frames], img.zoomable")); }
+  function applyFrames() {
+    document.querySelectorAll("img[data-frames]").forEach(function (im) { im.src = FRAMES[im.getAttribute("data-frames")][frame]; });
+    note.textContent = frame === 0 ? "frame A" : "frame B";
+  }
+  function applyZoom() {
+    imgs().forEach(function (im) {
+      var z = Math.max(zoom, parseInt(im.getAttribute("data-minzoom") || "1", 10));
+      im.style.width = (parseInt(im.getAttribute("width"), 10) * z) + "px";
+      im.style.height = (parseInt(im.getAttribute("height"), 10) * z) + "px";
+    });
+    document.querySelectorAll(".seg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(parseInt(b.getAttribute("data-z"), 10) === zoom));
+    });
+  }
+  function setAnim(on) {
+    animBtn.setAttribute("aria-pressed", String(on));
+    if (timer) { clearInterval(timer); timer = null; }
+    if (on) { timer = setInterval(function () { frame = 1 - frame; applyFrames(); }, 3000); }
+  }
+  document.querySelectorAll(".seg button").forEach(function (b) {
+    b.addEventListener("click", function () { zoom = parseInt(b.getAttribute("data-z"), 10); applyZoom(); });
+  });
+  animBtn.addEventListener("click", function () {
+    var on = animBtn.getAttribute("aria-pressed") !== "true";
+    if (!on) { frame = 0; applyFrames(); }
+    setAnim(on);
+  });
+  applyFrames();
+  applyZoom();
+  setAnim(!reduce);
+})();
+</script>

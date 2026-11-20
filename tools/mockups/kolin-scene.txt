@@ -1,0 +1,74 @@
+# THROWAWAY: platform mockup scene (not committed)
+newworld 84 40
+waydesc Rail_120_Tracks
+track 4 19 79 19
+track 4 20 79 20
+track 26 18 49 18
+track 26 18 26 19
+track 49 18 49 19
+track 27 21 48 21
+track 27 21 27 20
+track 48 21 48 20
+track 15 19 15 20
+track 60 19 60 20
+stations ConcretePlatformTrainStop 31 42 18
+stations ConcretePlatformTrainStop 31 42 19
+stations ConcretePlatformTrainStop 31 42 20
+stations ConcretePlatformTrainStop 31 42 21
+stations ConcretePlatformTrainStop 6 12 19
+stations ConcretePlatformTrainStop 6 12 20
+stations ConcretePlatformTrainStop 71 78 19
+stations ConcretePlatformTrainStop 71 78 20
+wire rail 4 19 79 20
+wire rail 26 18 49 18
+wire rail 27 21 48 21
+wire rail 26 19 26 19
+depot TrainDepot 4 19
+depot TrainDepot 4 20
+depot TrainDepot 79 19
+haltname 35 19 Kolín <011,230>
+haltname 8 19 Praha hl.n. <011>
+haltname 74 19 Pardubice hl.n. <010,031>
+line [S1]
+stop 8 19 0 0 R
+stop 41 18 0 0 T
+timetable 60 50
+endline
+line [R9]
+stop 8 20 0 0 R
+stop 41 19 0 0 R
+timetable 60 52
+stop 77 19 0 0 T
+endline
+line Os5003
+stop 77 19 0 0 R
+stop 32 20 0 0 R
+timetable 60 55
+stop 8 20 0 0 T
+endline
+line [S7]
+stop 8 19 0 0 R
+stop 41 21 0 0 T
+timetable 60 58
+endline
+vehicles VZ-CeskeDrahy-471-pidsedocervena-471 VZ-CeskeDrahy-471-pidsedocervena-071 VZ-CeskeDrahy-471-pidsedocervena-971
+convoy 4 19 [S1] 1
+vehicles VZ-CeskeDrahy-1216-railjet-1216-front VZ-CeskeDrahy-1216-railjet-1216-rear
+convoy 4 20 [R9] 1
+vehicles VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843
+convoy 79 19 Os5003 1
+vehicles VZ-CeskeDrahy-471-najbrt2-471 VZ-CeskeDrahy-471-najbrt2-071 VZ-CeskeDrahy-471-najbrt2-971
+convoy 4 19 [S7] 1
+cnvname 0 Os 2513: Praha hl.n. - Kolín
+cnvname 1 R 981 "Vysočina": Praha hl.n. - Pardubice
+cnvname 2 Os 5003: Pardubice - Praha
+cnvname 3 Os 9105: Praha hl.n. - Kolín
+run 45 0
+cnvlist
+snap 36 19 3 zz_n.png
+snap 36 19 2 zz_z2.png
+save zz_scene.sve
+winsnap halt 35 19 60 40 zz_halt.png
+winsnap convoy 0 0 60 40 zz_cnv0.png
+winsnap convoy 1 0 60 40 zz_cnv1.png
+summary

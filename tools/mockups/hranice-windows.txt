@@ -1,0 +1,12 @@
+load save/czr.sve
+labels 0 0 7191 5402
+cnvfind 1123
+cnvfind 3320
+cnvfind 3224
+winsnap halt 5560 2849 60 40 hr_haltbig0.png 0 660 560
+winsnap halt 5560 2849 60 40 hr_haltbig1.png 1 660 420
+winsnap convoy 6699 0 60 40 hr_cnv_bus.png
+labels 5525 2830 5595 2885 del
+snap 5561 2851 3 hrc_rail.png
+snap 5560 2858 3 hrc_road.png
+snap 5549 2866 3 hrc_city.png

@@ -1,0 +1,6 @@
+load save/czr.sve
+snap 5562 2855 3 t_station.png
+snap 5552 2860 3 t_city.png
+labels 5525 2830 5595 2885 del
+snap 5562 2855 3 c_station.png
+snap 5552 2860 3 c_city.png

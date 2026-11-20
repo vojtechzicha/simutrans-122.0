@@ -1,0 +1,315 @@
+<style>
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: .8rem; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .7rem .9rem; display: grid; gap: .15rem; }
+.stat b { font: 700 1.7rem var(--font-display); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat span { font-size: .84rem; color: var(--muted); }
+ol.rules { margin: 0; padding-left: 1.3rem; display: grid; gap: .5rem; max-width: 78ch; }
+.pair { display: grid; gap: 1.2rem; }
+.tag { font: 500 .74rem var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+table.plain { border-collapse: collapse; font-size: .9rem; }
+table.plain th, table.plain td { text-align: left; padding: .35rem .8rem .35rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.plain th { font-weight: 600; color: var(--muted); font-size: .8rem; }
+.scroll { overflow-x: auto; max-width: 100%; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Simutrans fork · feature design · 20 Nov 2026 · version 5</div>
+    <h1>Platforms: what leaves from where</h1>
+    <p class="lede">The game writes the signs you now write by hand. Every station track and every bus or tram stand gets a card on the map with its number, the lines that board there and the direction each one leaves in. The cards follow the schedules, so they are never out of date. The same numbers show on the departure boards, in the convoy window and on optional displays and signs.</p>
+    <p class="muted">No screenshots arrived with your message, so I loaded your save of 8 November into the test harness and looked at Hranice. Every picture below is your Hranice na Moravě at 11:20 on 10 May 1931, with the new parts drawn in the game's own font and colours. As a check, the renderer redrew your real 13-row train board with no pixel different (0 of 221,760).</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Figure display">
+    <span class="label" id="zoom-label">Zoom</span>
+    <div class="seg" role="group" aria-labelledby="zoom-label">
+      <button type="button" id="z1" data-z="1" aria-pressed="true">1×</button>
+      <button type="button" id="z2" data-z="2" aria-pressed="false">2×</button>
+      <button type="button" id="z3" data-z="3" aria-pressed="false">3×</button>
+    </div>
+    <button type="button" class="toggle" id="anim" aria-pressed="true">Alternate every 3 s</button>
+    <span class="frame-note" id="frame-note">frame A</span>
+  </div>
+
+  <section id="today">
+    <div class="sec-head">
+      <h2>What you write by hand today</h2>
+      <p>Your map holds 61,939 markers. About 14,200 of them sit at a stop and list lines: "N3/7: Praha hlavní nádraží (Ex1/1,2,4…)", "6: 532 Radíkov, 538 Horní újezd, 927 Nový Jičín", "1,7,8,13 směr aut.st.". Each one has to be edited when a line changes.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>61,939</b><span>markers on the map</span></div>
+      <div class="stat"><b>~14,200</b><span>list lines at a stop; these are what the feature replaces</span></div>
+      <div class="stat"><b>1,691</b><span>of those start with a track or stand number that can be imported</span></div>
+      <div class="stat"><b>~23,200</b><span>are road signs ("směr Kutná Hora", motorway exits); they stay yours</span></div>
+    </div>
+    <figure>
+      <div class="px"><img src="{{station_today}}" alt="Hranice na Moravě station and bus station covered in hand-written line markers" width="1400" height="700" class="zoomable"></div>
+      <figcaption>Hranice na Moravě today: your markers on the platforms and the fifteen bus stands.</figcaption>
+    </figure>
+  </section>
+
+  <section id="cards">
+    <div class="sec-head">
+      <h2>Platform cards, written by the game</h2>
+      <p>The same view with your markers removed and the cards drawn from the schedules in the save. The numbers are the ones on your markers (track 7 from "N3/7", stands 1 to 15).</p>
+    </div>
+    <figure>
+      <div class="px"><img src="{{station_combined}}" alt="The same station with automatic cards: tracks with next stops and destinations, bus stands with next stops" width="1400" height="700" class="zoomable"></div>
+      <figcaption>Tracks 7, 6, 3 and 2 and eleven bus stands, as they look with no switch touched. Line chips are navy for trains and blue for buses, as on the departure boards. The stop's own name tag stays; cards keep clear of it.</figcaption>
+    </figure>
+    <ol class="rules">
+      <li><b>A platform</b> is a station track, or a stand: the tiles where one bus or tram stops, in one travel direction.</li>
+      <li><b>Lines</b> are the line numbers the departure board shows, for every line with at least one vehicle that takes passengers on board there.</li>
+      <li><b>Groups by next stop.</b> Lines that go on to the same next stop share a group. The next stop is the next place in the schedule where passengers can get off; waypoints, Hold stops and depots are skipped.</li>
+      <li><b>The arrow points the way the vehicle leaves, on the screen.</b> It replaces "směr". Trains for Olomouc leave Hranice to the upper left, trains for Ostrava to the lower right.</li>
+      <li><b>The next stop is named only when it says something:</b> the lines of a platform split up (track 7), or a line also boards at another platform of the stop for another next stop (Ex2 on tracks 2 and 3). Stand 9 has one line going one way and shows just the chip.</li>
+      <li><b>A line that leaves two ways</b> appears in both groups (930 on stand 11).</li>
+      <li><b>Arrivals only.</b> A platform where a line only lets people off shows "arr." and the line, like your "příjezd".</li>
+      <li><b>Tracks show both the next stop and the destination.</b> A track's card is a small table: one row per next stop on the left, and on the right every line with where it ends. Trains need no switching: a track has few lines, and your own track markers already name destinations. Track 7 takes four rows where your marker takes one line of about 970 pixels.</li>
+      <li><b>Stands show the next stop,</b> because a kerb can carry twenty lines. A stop's stands can be switched to name destinations too (next section).</li>
+    </ol>
+  </section>
+
+  <section id="final">
+    <div class="sec-head">
+      <h2>Stands at some stops: next stop and destination</h2>
+      <p>Tracks always show both. Stands show the next stop until you switch the stop; then each line also names where it ends, which is what your bus-station markers do ("1: 345 Olomouc, 521 Lipník n.B."). The switch is kept per stop and per kind, so at Hranice it changes the bus stands and leaves the tracks alone. If a big station ever gets crowded, the same switch on a track card makes that stop's tracks compact (next stop only).</p>
+    </div>
+    <figure>
+      <div class="px"><img src="{{station_full}}" alt="Hranice na Moravě with cards that name each line's destination before the next stop" width="1400" height="700" class="zoomable"></div>
+      <figcaption>Hranice with its stands switched (the tracks here are drawn in the same flowing form for comparison; in the game they keep their table). Stand 1 reads: 345 to Olomouc and 521 to Lipník, each with its first stop after the arrow. Lines that end at the same place share one name (1 and 13 to Kaufland on stand 15). Bus destinations here are read off your markers; the game takes them from the departure board.</figcaption>
+    </figure>
+    <div class="spec">
+      <article>
+        <h3>From the stop window</h3>
+        <p>The Platforms tab has a button that reads <b>Stands: next stop</b>. Press it and it reads <b>Stands: next stop + destination</b>. A stop with tracks has the same button for them. The choice is kept with the stop in the save.</p>
+      </article>
+      <article>
+        <h3>Straight on the map</h3>
+        <p><b>Shift+click</b> a stand's card switches that stop's stands between the two forms, without opening a window. A plain click still opens the platform window.</p>
+      </article>
+      <article>
+        <h3>Set for you at the start</h3>
+        <p>The marker import switches a stop to the second form when your markers there name a destination after a line number, and lists those stops in its report. Your bus stations start the way you already label them.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="city">
+    <div class="sec-head">
+      <h2>City stops: a layout the markers could not have</h2>
+      <p>A marker is one line of text centred above a tile. A card is drawn by the game, so it can do more. Line numbers are chips that wrap six to a row, so twenty lines make a small block. Each kerb has its own card, on its own side of the road, tied to the stand by a short leader.</p>
+    </div>
+    <div class="pair">
+      <figure>
+        <div class="tag">Today</div>
+        <div class="px"><img src="{{city_today}}" alt="Streets south-west of the station with long one-line markers" width="1220" height="600" class="zoomable"></div>
+        <figcaption>Slávie, ZZN and Máchova with your markers. The Slávie list runs past 500 pixels.</figcaption>
+      </figure>
+      <figure>
+        <div class="tag">With cards</div>
+        <div class="px"><img src="{{city_labels}}" alt="The same streets with compact cards of line chips at each kerb" width="1220" height="600" class="zoomable"></div>
+        <figcaption>The same stops. Slávie outbound fits eleven lines for třída 1.máje, two for pošta and two for Kaufland in a card 230 pixels wide. Slávie inbound holds eighteen lines in three rows. Arrow directions and kerb sides in this mockup are estimated from the stop positions; the game takes them from the routes.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="grammar">
+    <div class="sec-head">
+      <h2>The card in all its forms</h2>
+    </div>
+    <figure>
+      <div class="px"><img src="{{forms}}" alt="Nine variants of platform cards" width="860" height="358" class="zoomable"></div>
+    </figure>
+    <ol class="rules">
+      <li><b>Row 1:</b> track 7 by next stop, the default.</li>
+      <li><b>Row 2:</b> the same track as tracks show by default: a row per next stop, every line with where it ends. Row 1 is its compact form.</li>
+      <li><b>Row 3:</b> direction only where it tells something; a stand without a number; arrivals only; arrivals next to departures.</li>
+      <li><b>Row 4:</b> many lines wrap six to a row. After three rows the rest becomes "+4". A kerb shared by trams (red) and buses (blue) keeps them in separate groups.</li>
+      <li><b>Row 5, left:</b> zoomed out one step, cards shrink to chips and arrows. Further out they hide.</li>
+      <li><b>Row 5, right:</b> pointing at a card opens it: every line with the place it ends.</li>
+    </ol>
+    <div class="spec">
+      <article>
+        <h3>When cards show</h3>
+        <p>A view switch with three positions, on a key and in the display settings: <b>off</b>, <b>chosen stops</b> (the default, as you confirmed), <b>all stops</b>. A stop is chosen with one button in its window and stays chosen in the save. Whatever the switch says, the stop under the mouse and a stop with its window open show their cards.</p>
+      </article>
+      <article>
+        <h3>Where cards sit</h3>
+        <p>A track's card starts at the end of the platform that is further left on screen. A stand's card sits beside its kerb, to the right of the travel direction, so the two directions of a street stop never share a side. A card that would cover the stop's name or another card moves down a row.</p>
+      </article>
+      <article>
+        <h3>What a click does</h3>
+        <p>Clicking a card opens the platform window; Shift+click switches the stop's form. Clicking a line chip in the window opens that line. Cards do not block building: with a build tool selected, clicks pass through them.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="road">
+    <div class="sec-head">
+      <h2>How it works on the road</h2>
+      <p>A road tile serves both directions, so a tile alone cannot be a platform. The stand is the unit.</p>
+    </div>
+    <div class="scroll">
+    <table class="plain">
+      <tr><th>Question</th><th>Rule</th></tr>
+      <tr><td>What is a stand?</td><td>The stop tiles in a row along one road, in one travel direction. A through tile has two stands, one per kerb. A dead-end tile or bay has one.</td></tr>
+      <tr><td>Which stand does a line use?</td><td>The tile comes from the schedule, as now. The direction comes from the route: when a schedule is set the game works it out once (in <code>step</code>, never per frame), and every bus that calls confirms it.</td></tr>
+      <tr><td>Numbers</td><td>Stands have no number until you give one, because a street stop needs none. Bus stations get your 1 to 15, Praha your letters. The board shows a Stand column only at stops where a stand has a number.</td></tr>
+      <tr><td>Choose signs</td><td>A bus that takes another free place shows a changed stand on the board, in yellow, exactly like a train on another track.</td></tr>
+      <tr><td>Layover tiles and Hold stops</td><td>Never a stand, never a card: nobody boards there.</td></tr>
+      <tr><td>Exit-only places</td><td>An arrival tile with All off shows "arr." and its lines, so your arrival, layover, departure pattern reads correctly.</td></tr>
+      <tr><td>Trams</td><td>The same as buses: stands, cards with red chips, the amber board.</td></tr>
+      <tr><td>Ships and aircraft</td><td>Piers and gates are listed in the Platforms tab and on the board. They get no cards.</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="boards">
+    <div class="sec-head">
+      <h2>The numbers on the boards</h2>
+      <p>The train board gets a <b>Track</b> column, the bus and tram board a <b>Stand</b> column. Choose signals and <code>P</code> signals pick the real track on the way in, so the board says how sure it is.</p>
+      <div class="legend" aria-label="Track states">
+        <span><i class="chip planned">7</i> Planned: the schedule's track; nothing is reserved yet.</span>
+        <span><i class="chip confirmed">7</i> Confirmed: standing there, or the way in is reserved or claimed.</span>
+        <span><i class="chip changed">3</i> Changed: sent elsewhere. Blinks; the planned number is crossed out below.</span>
+      </div>
+    </div>
+    <div class="two">
+      <figure>
+        <div class="px"><img data-frames="board" alt="Stop window of Hranice na Moravě with the train board and a Track column" width="660" height="560"></div>
+        <figcaption>Your real board with the Track column added. The tracks come from the schedules. The three states are set by hand here to show them: R 1122 is drawn as if its choose signal had sent it to track 3 instead of 7.</figcaption>
+      </figure>
+      <div class="text">
+        <figure>
+          <div class="px"><img src="{{board_buses}}" alt="Bus and tram board with a Stand column" width="660" height="420" class="zoomable"></div>
+          <figcaption>Buses &amp; trams: 950 from stand 7, 538 and 927 from stand 6.</figcaption>
+        </figure>
+        <figure>
+          <div class="px"><img src="{{convoy_bus}}" alt="Convoy window of bus 950 with the stand number on its destination sign" width="536" height="397" class="zoomable"></div>
+          <figcaption>The convoy window's destination sign ends with the stand. A convoy with a timetable also gets it in the departure row: "Departure: 11:34 (in 14 min), track 6", or "track 3 instead of 7".</figcaption>
+        </figure>
+      </div>
+    </div>
+    <p class="muted" style="max-width:75ch">The schedule editor shows the same number after each stop in the entry list ("Hranice na Moravě, track 7"), and the tooltip names the track or stand while you pick a tile. No message is posted when a track changes.</p>
+  </section>
+
+  <section id="tab">
+    <div class="sec-head">
+      <h2>The Platforms tab</h2>
+      <p>One list of the stop's tracks and stands, in the stop window. It is where you number them and where you see the whole stop at once.</p>
+    </div>
+    <div class="two">
+      <figure>
+        <div class="px"><img src="{{platforms_tab}}" alt="Platforms tab listing five tracks and eleven stands with their lines by next stop" width="660" height="560" class="zoomable"></div>
+        <figcaption>Track 6 is under the mouse; its tiles are marked on the map.</figcaption>
+      </figure>
+      <div class="text">
+        <ul class="notes">
+          <li><b>No.</b> is one short text, up to 7 characters. Type it here, or use <b>Number tracks</b> and click a platform in the world.</li>
+          <li><b>Map labels: this stop</b> chooses the stop for the "chosen stops" view.</li>
+          <li><b>Show: next stop</b> switches this stop to next stop + destination and back.</li>
+          <li><b>Numbers from markers</b> reads the numbers off your markers at this stop (see below).</li>
+          <li>New tracks are numbered across the station as they appear and keep their number afterwards. Stands stay without one.</li>
+          <li>A platform where no line boards is listed, so you can see unused tracks.</li>
+        </ul>
+        <figure>
+          <div class="px"><img src="{{platform_0}}" alt="Platform window for track 7 with the next departure and the lines by next stop with destinations" width="560" height="232" class="zoomable"></div>
+          <figcaption>The platform window: the next departure from track 7, then every line with where it ends.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="objects">
+    <div class="sec-head">
+      <h2>Displays and signs you can build</h2>
+      <p>Cards are information. These are decoration for the stations you care about: pak objects placed with the sign tool, with text drawn by the game. A display shows the next departure only, one row per track, and alternates the destination with "VIA".</p>
+    </div>
+    <div class="two">
+      <figure>
+        <div class="px"><img data-frames="objr" alt="Platform display and track signs on the island between tracks 7 and 6" width="320" height="260" data-minzoom="2"></div>
+        <figcaption>The island between tracks 7 and 6: one display for both, a sign for each.</figcaption>
+      </figure>
+      <figure>
+        <div class="px"><img data-frames="objd" alt="Amber display and stand signs at the bus station" width="380" height="220" data-minzoom="2"></div>
+        <figcaption>The bus station: stand signs 6 and 9, an amber display at stand 7 where bus 950 is loading.</figcaption>
+      </figure>
+    </div>
+    <ul class="notes" style="max-width:78ch">
+      <li>Two road sign flags (bits 13 and 14 are free): <code>PLATFORM_DISPLAY</code> and <code>TRACK_SIGN</code>, for rail, tram and road. They never stop a vehicle and no search sees them.</li>
+      <li>A tile holds one sign, as now. On a road tile the sign serves one kerb or both, cycled by clicking again like a signal. Ctrl+click puts a sign on every stand of the stop.</li>
+      <li>The text uses a 3×5 LED font with Czech accents and steps down one pixel for every two along, the slope of the tile edge. It is drawn at the normal zoom and closer.</li>
+    </ul>
+  </section>
+
+  <section id="migration">
+    <div class="sec-head">
+      <h2>Moving over from your markers</h2>
+      <p>Two batch tools, built like <code>-strip-parking</code>: a dry run first, a report for every marker, a backup, and nothing touched that the tool is not sure about.</p>
+    </div>
+    <div class="spec">
+      <article>
+        <h3>1. Take the numbers</h3>
+        <p><code>steam-fork.sh platform-numbers NAME</code> reads markers within one tile of a platform that start with <code>N3/7:</code>, <code>K2:</code>, <code>14 –</code>, <code>J –</code> or <code>3:</code> and gives the platform that number (from "N3/7" the track, 7). A marker that covers two stands ("5: … | 6: …") is reported and left for you. On your save 1,691 markers qualify. The same run switches stops whose markers name destinations to the second form.</p>
+      </article>
+      <article>
+        <h3>2. Remove the line lists</h3>
+        <p><code>steam-fork.sh strip-line-markers NAME</code> removes a marker at a stop only when every line number in it is on that stop's cards (numbers in <code>&lt;…&gt;</code> are ignored). Markers with anything else stay: "zaměstnanecké linky", "nevyužito", "ostatní", and all your road signs.</p>
+      </article>
+      <article>
+        <h3>3. Check the rest</h3>
+        <p>The report lists what was kept and why, sorted by town, so the leftovers are a short list to walk through. You can also keep any marker for good by naming its stop in a keep file.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="sec-head"><h2>Under the hood</h2></div>
+    <div class="spec">
+      <article>
+        <h3>Data</h3>
+        <p>Each stop keeps a list of platforms: the tiles, the travel direction for stands, the number and whether it was typed. The lines of a platform are worked out, not saved, whenever a line starts or stops calling or a schedule changes; this is the pass that already rebuilds the stop's connections. Nothing is computed per frame.</p>
+      </article>
+      <article>
+        <h3>Save and export</h3>
+        <p>Savegame <b>122.18</b>: numbers, the chosen-stop switch, the form of each stop and each line's stand direction. Older saves load with tracks numbered across. <code>-saveversion 0.122.0</code> leaves it all out. The JSON export gains <code>platforms</code> per stop and <code>platform</code> per convoy and schedule entry, and <code>-rename</code> takes <code>PLATFORM</code> rows.</p>
+      </article>
+      <article>
+        <h3>Drawing</h3>
+        <p>Cards are drawn in the label pass, for visible stops only, from a layout kept per stop. The layout is a flow of group cells: chips six to a row, then arrow and name; cells wrap at 420 pixels for tracks and 190 for stands. Chosen stops are few, and the all-stops view lays out only what is on screen.</p>
+      </article>
+      <article>
+        <h3>Tests</h3>
+        <p>Headless scenarios with new checks: the platforms of a layout and their lines (<code>expect_platform</code>), stand direction on a through tile, numbers kept through extending, cutting and joining a stop, save and load, a choose signal turning a track from planned to changed.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="phases">
+    <div class="sec-head">
+      <h2>In what order</h2>
+      <p>Each step is usable on its own.</p>
+    </div>
+    <ol class="phases">
+      <li><div><b>Platforms and cards.</b> Tracks and stands, stand direction, lines by next stop, the cards with all three views, the Platforms tab and the platform window. This alone replaces the hand-written line lists.</div></li>
+      <li><div><b>Numbers.</b> Typing and the numbering tool, the marker import and strip tools, save format 122.18, the export.</div></li>
+      <li><div><b>Boards.</b> Track and Stand columns with the three states, the convoy window, the schedule editor.</div></li>
+      <li><div><b>Displays and signs.</b> The two sign flags, makeobj keys, the LED text, pakset art.</div></li>
+    </ol>
+  </section>
+
+  <section id="questions">
+    <div class="sec-head"><h2>Decided</h2></div>
+    <ul class="qs">
+      <li>One number per platform.</li>
+      <li>Tracks show next stop and destination together, with no switching. Stands show the next stop; a stop's stands can be switched to next stop + destination in its Platforms tab, by Shift+click on a card, or by the marker import.</li>
+      <li>The default view is chosen stops plus the stop under the mouse.</li>
+      <li>Displays say "VIA" and show the next departure only. No message on a track change.</li>
+    </ul>
+  </section>
+
+  <footer class="provenance">
+    <p>How the images were made: the test harness loaded <code>FORK-CZR-VZ.sve</code> and took the screenshots (with a temporary command that is not in the repo's harness). The lines per platform, the next stops and the marker counts come from an export of the same save. A Python renderer drew the new parts with the game's BDF font and 16-bit colours.</p>
+  </footer>
+</div>

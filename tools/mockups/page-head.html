@@ -1,0 +1,109 @@
+<title>Platform Displays and Track Numbers</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of spec text; the pixel figures break out wider and scroll on their own. */
+:root {
+  --bg: #eef2f6;
+  --panel: #ffffff;
+  --fg: #172033;
+  --muted: #56627a;
+  --line: #ccd6e3;
+  --accent: #0057a8;      /* SZ blue, the track sign plate */
+  --board: #0b1f4b;       /* departure board ground */
+  --board-head: #a9c4f0;
+  --changed: #ffd030;     /* board delay / changed track */
+  --chip-fg: #0b1f4b;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1424; --panel: #121d33; --fg: #e3e9f3; --muted: #9aa8c0; --line: #24334f;
+    --accent: #5aa2ec; --board: #0b1f4b; --board-head: #a9c4f0; --changed: #ffd030; --chip-fg: #0b1f4b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1424; --panel: #121d33; --fg: #e3e9f3; --muted: #9aa8c0; --line: #24334f;
+  --accent: #5aa2ec; --board: #0b1f4b; --board-head: #a9c4f0; --changed: #ffd030; --chip-fg: #0b1f4b;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+}
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 2.5rem 4rem;
+  display: grid; gap: 3.25rem;
+}
+header { display: grid; gap: .9rem; max-width: 70ch; }
+.eyebrow { font-family: var(--font-mono); font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 4.6vw, 3.1rem); line-height: 1.05; margin: 0; text-wrap: balance; letter-spacing: -.005em; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.7rem; line-height: 1.15; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.2rem; margin: 0; }
+p { margin: 0; }
+.lede { font-size: 1.08rem; }
+.muted { color: var(--muted); }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+.tracknum {
+  display: inline-grid; place-items: center; min-width: 1.35em; height: 1.35em; padding: 0 .2em;
+  background: var(--accent); color: #fff; font-family: var(--font-display); font-weight: 700; border-radius: 2px;
+}
+
+.controls {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .55rem .8rem;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.controls .label { font-size: .82rem; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button {
+  font: 500 .85rem var(--font-mono); padding: .25rem .7rem; border: 0; background: transparent; color: var(--fg); cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.seg button:focus-visible, .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle { font: 500 .85rem var(--font-body); padding: .25rem .75rem; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); cursor: pointer; }
+.toggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.frame-note { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); }
+
+section { display: grid; gap: 1.1rem; }
+.sec-head { display: grid; gap: .45rem; max-width: 72ch; }
+.two { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 1.5rem 2rem; align-items: start; }
+@media (max-width: 1000px) { .two { grid-template-columns: minmax(0, 1fr); } }
+figure { margin: 0; display: grid; gap: .5rem; min-width: 0; }
+.px {
+  overflow-x: auto; max-width: 100%;
+  background: #1b2433; border: 1px solid var(--line); border-radius: 4px; padding: 8px;
+  justify-self: start;
+}
+.px img { display: block; max-width: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+figcaption { font-size: .85rem; color: var(--muted); max-width: 70ch; }
+ul.notes { margin: 0; padding-left: 1.1rem; display: grid; gap: .5rem; }
+ul.notes li { padding-left: .1rem; }
+.text { display: grid; gap: .85rem; min-width: 0; max-width: 62ch; }
+
+.legend { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; font-size: .86rem; }
+.legend span { display: inline-flex; align-items: center; gap: .45rem; }
+.chip { display: inline-grid; place-items: center; width: 1.6em; height: 1.4em; background: var(--board); font: 600 .85rem var(--font-mono); border-radius: 2px; }
+.chip.planned { color: #9fb8e0; }
+.chip.confirmed { color: #fff; }
+.chip.changed { color: var(--board); background: var(--changed); outline: 2px solid var(--board); }
+
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 1rem; }
+.spec article { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; display: grid; gap: .55rem; align-content: start; }
+.spec article p, .spec article li { font-size: .92rem; }
+.phases { display: grid; gap: .6rem; counter-reset: ph; margin: 0; padding: 0; list-style: none; }
+.phases li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: .8rem; align-items: baseline; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: .75rem 1rem; }
+.phases li::before { counter-increment: ph; content: counter(ph); font: 700 1.35rem var(--font-display); color: var(--accent); }
+.qs { display: grid; gap: .7rem; max-width: 75ch; margin: 0; padding-left: 1.2rem; }
+.provenance { border-top: 1px solid var(--line); padding-top: 1.2rem; font-size: .85rem; color: var(--muted); max-width: 80ch; display: grid; gap: .5rem; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
