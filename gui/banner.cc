@@ -3,6 +3,8 @@
  * (see LICENSE.txt)
  */
 
+#include <string.h>
+
 #include "../simcolor.h"
 #include "../simevent.h"
 #include "../display/simimg.h"
@@ -97,8 +99,31 @@ banner_t::banner_t() : gui_frame_t("")
 	lb->update();
 	lb->set_shadow(SYSCOL_TEXT_SHADOW, true);
 
+	// only the start of each subject: subjects can run to thousands of characters, and the
+	// window grew taller than the screen, pushing the buttons off it
 	for(  int i = 0;  fork_build_commits[i];  i++  ) {
-		fork_commits.printf("- %s\n", fork_build_commits[i]);
+		const char *subject = fork_build_commits[i];
+		const size_t max_len = 90;
+		size_t len = strlen( subject );
+		if(  len <= max_len  ) {
+			fork_commits.printf( "- %s\n", subject );
+			continue;
+		}
+		// cut at the last space before the limit (never inside a UTF-8 character)
+		len = max_len;
+		while(  len > 0  &&  subject[len] != ' '  ) {
+			len--;
+		}
+		if(  len == 0  ) {
+			len = max_len;
+			while(  len > 0  &&  (subject[len] & 0xC0) == 0x80  ) {
+				len--;
+			}
+		}
+		while(  len > 0  &&  (subject[len-1] == ' '  ||  subject[len-1] == ','  ||  subject[len-1] == ':'  ||  subject[len-1] == '('  )  ) {
+			len--;
+		}
+		fork_commits.printf( "- %.*s...\n", (int)len, subject );
 	}
 	if(  FORK_BUILD_MORE > 0  ) {
 		fork_commits.printf(translator::translate("... and %d older ones"), FORK_BUILD_MORE);
