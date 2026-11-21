@@ -79,6 +79,7 @@ enum {
 	TOOL_REASSIGN_CITY, // fork: make city buildings part of another town
 	TOOL_LANDSCAPE, // fork: level, raise, lower, ramp or smooth an area
 	TOOL_MOVE_HALT_NAME, // fork: show a stop's name on another of its tiles
+	TOOL_NUMBER_PLATFORM, // fork: click a track or stand of a stop to type its number in the stop window
 	GENERAL_TOOL_COUNT,
 	GENERAL_TOOL = 0x1000
 };
@@ -121,6 +122,8 @@ enum {
 	TOOL_TOGGLE_RESERVATION,
 	TOOL_VIEW_OWNER,
 	TOOL_HIDE_UNDER_CURSOR,
+	TOOL_CHANGE_PLATFORMS, // fork: platform numbers and card settings of a stop
+	TOOL_PLATFORM_CARDS,   // fork: the platform card view: off, chosen stops, all stops
 	SIMPLE_TOOL_COUNT,
 	SIMPLE_TOOL = 0x2000
 };

@@ -1,0 +1,27 @@
+# Platforms (2026-11-21): the boards say how sure they are about the track. R1 stands at S on track 1 (y19) waiting
+# for its slot; R5 is planned to track 1 too, and the choose signal at 22,20 sends it to a free track.
+# Expect: R1 confirmed on track 1 while it stands there; R5 planned on track 1 before it reaches the signal, then
+# changed (another track) once the signal reserved its way in, and still changed while it stands there.
+include ../layouts/platforms.inc
+sign VZ-Signals-D1-New-Choose 22 20 E
+line [R1]
+stop 7 20 0 0 T
+stop 33 19 0 0 R
+timetable 120 100
+stop 57 20 0 0 T
+endline
+line [R5]
+stop 6 20 0 0 T
+stop 34 19 0 0 R
+timetable 120 110
+stop 56 20 0 0 T
+endline
+vehicles VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843
+convoy 4 20 [R1] 1
+run_until [R1] LOADING 120 1
+convoy 4 20 [R5] 1
+expect_platform_state [R1] confirmed 1
+expect_platform_state [R5] planned 1
+run_until [R5] LOADING 120 1
+expect_platform_state [R1] confirmed 1
+expect_platform_state [R5] changed *

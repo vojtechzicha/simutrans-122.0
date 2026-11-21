@@ -30,6 +30,7 @@
 
 #include "depot_frame.h"
 #include "schedule_gui.h"
+#include "../simplatform.h"
 #include "departure_board.h"
 #include "line_item.h"
 
@@ -109,14 +110,16 @@ class gui_schedule_entry_t : public gui_aligned_container_t, public gui_action_c
 	bool is_current;
 	uint number;
 	player_t* player;
+	const schedule_t *schedule;   ///< fork, platforms: for the track or stand of the entry
 	gui_image_t arrow;
 	gui_stop_type_badge_t badge;
 	gui_label_buf_t stop;
 
 public:
-	gui_schedule_entry_t(player_t* pl, schedule_entry_t e, uint n) : badge(e.stop_type)
+	gui_schedule_entry_t(player_t* pl, schedule_entry_t e, uint n, const schedule_t *s = NULL) : badge(e.stop_type)
 	{
 		player = pl;
+		schedule = s;
 		entry  = e;
 		number = n;
 		is_current = false;
@@ -140,6 +143,10 @@ public:
 			stop.buf().append(" ");
 		}
 		schedule_t::gimme_stop_name(stop.buf(), welt, player, entry, -1);
+		// fork, platforms: the track or stand it stops at, when it has a number
+		if(  schedule  &&  number < schedule->get_count()  &&  schedule->entries[number].pos == entry.pos  ) {
+			platforms_t::append_entry_platform( stop.buf(), schedule, number, linehandle_t(), player );
+		}
 		if(  entry.has_coupling()  ) {
 			// coupling marker behind the name: [+ R12a]
 			const char *name = "?";
@@ -312,7 +319,7 @@ public:
 			}
 			else {
 				for(uint i=0; i<schedule->entries.get_count(); i++) {
-					entries.append( new_component<gui_schedule_entry_t>(player, schedule->entries[i], i));
+					entries.append( new_component<gui_schedule_entry_t>(player, schedule->entries[i], i, schedule));
 					entries.back()->add_listener( this );
 				}
 				entries[ schedule->get_current_stop() ]->set_active(true);

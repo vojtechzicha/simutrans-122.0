@@ -336,7 +336,36 @@ station_settings_t::station_settings_t()
 	buttons[ IDBTN_SHOW_WAITING_BARS ].pressed = env_t::show_names & 2;
 	add_component( buttons + IDBTN_SHOW_WAITING_BARS, 2 );
 
+	// fork, platforms: the platform cards on the map
+	new_component<gui_label_t>( "Platform cards" );
+	platform_cards.set_focusable( false );
+	platform_cards.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate( "off" ), SYSCOL_TEXT );
+	platform_cards.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate( "chosen stops" ), SYSCOL_TEXT );
+	platform_cards.new_component<gui_scrolled_list_t::const_text_scrollitem_t>( translator::translate( "all stops" ), SYSCOL_TEXT );
+	platform_cards.set_selection( env_t::platform_cards );
+	platform_cards.add_listener( this );
+	add_component( &platform_cards );
+
 	end_table();
+}
+
+
+bool station_settings_t::action_triggered( gui_action_creator_t *comp, value_t v )
+{
+	if(  comp == &platform_cards  &&  v.i >= 0  &&  v.i <= 2  ) {
+		env_t::platform_cards = (uint8)v.i;
+		world()->set_dirty();
+	}
+	return true;
+}
+
+
+void station_settings_t::draw( scr_coord offset )
+{
+	if(  platform_cards.get_selection() != env_t::platform_cards  ) {
+		platform_cards.set_selection( env_t::platform_cards );
+	}
+	gui_aligned_container_t::draw( offset );
 }
 
 traffic_settings_t::traffic_settings_t()
@@ -591,7 +620,7 @@ void color_gui_t::draw(scr_coord pos, scr_size size)
 	buttons[IDBTN_UNDERGROUND_VIEW].pressed = grund_t::underground_mode == grund_t::ugm_all;
 	buttons[IDBTN_TRANSPARENT_STATION_COVERAGE].pressed = env_t::use_transparency_station_coverage;
 	buttons[IDBTN_TRANSPARENT_INSTEAD_OF_HIDDEN].pressed = env_t::hide_with_transparency;
-	
+
 
 	// All components are updated, now draw them...
 	gui_frame_t::draw(pos, size);

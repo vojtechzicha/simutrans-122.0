@@ -1,0 +1,75 @@
+# Platforms (documentation/fork-platforms-plan.md, 2026-11-21): tracks and stands of a stop, the lines that board
+# on each grouped by next stop, numbers and the way the vehicles were seen to come and go.
+# Layout tests/layouts/platforms.inc. Lines: R1 A > S (track y19) > B, R3 B > S (y19) > A, S2 A > S (y21) > C;
+# buses B1 Street > Bay (arrives at Street westbound, back from the bay), B2 West > Street (arrives eastbound),
+# B3 South > Street: South (25,46) lies east of Street, so the guess says westbound, but the bus goes round the
+# west side of the ring (shorter) and comes in eastbound: only the run puts B3 on the right stand.
+# Expect: S's tracks numbered 1, 2, 3 across (y19, y20, y21); y19 has R1 for B and R3 for A, y21 S2 for C, y20
+# nothing; B lists R1 for A (its schedule runs straight back) and R3 for S; Street has a stand per direction, each with its own line once the buses ran;
+# the bay is one stand; numbers stay through save and load, a typed number replaces the automatic one.
+include ../layouts/platforms.inc
+line [R1]
+stop 7 20 0 0 T
+stop 33 19 0 0 R
+stop 57 20 0 0 T
+endline
+line [R3]
+stop 56 20 0 0 T
+stop 34 19 0 0 R
+stop 6 20 0 0 T
+endline
+line [S2]
+stop 8 20 0 0 T
+stop 33 21 0 0 R
+stop 57 35 0 0 T
+endline
+vehicles VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843
+convoy 4 20 [R1] 1
+convoy 4 20 [R3] 1
+convoy 4 20 [S2] 1
+busline [B1]
+stop 20 40 0 0 R
+stop 30 37 0 0 R
+endline
+busline [B2]
+stop 10 43 0 0 R
+stop 20 40 0 0 R
+endline
+vehicles CZ-ODIS-SOR_BN95-Green
+busline [B3]
+stop 25 46 0 0 R
+stop 20 40 0 0 R
+endline
+convoy 11 38 [B1] 1
+convoy 11 38 [B2] 1
+convoy 11 38 [B3] 1
+
+platforms 33 20
+expect_platform 33 19 - 1
+expect_platform 33 20 - 2
+expect_platform 33 21 - 3
+expect_lines 33 19 - R1>B|R3>A
+expect_lines 33 20 -
+expect_lines 33 21 - S2>C
+expect_lines 56 20 - R1>A|R3>S
+# before the buses ran: B3 on the stand the guess gives
+expect_lines 20 40 W B1>Bay|B3>South
+
+run 90 0
+platforms 20 40
+platforms 30 37
+expect_lines 20 40 E B2>West|B3>South
+expect_lines 20 40 W B1>Bay
+expect_lines 30 37 - B1>Street
+
+# a typed number wins, and numbers survive save and load
+platformnumber 33 21 - 4a
+platformnumber 20 40 E A
+expect_platform 33 21 - 4a
+save platforms_basic.sve
+load platforms_basic.sve
+expect_platform 33 19 - 1
+expect_platform 33 21 - 4a
+expect_platform 20 40 E A
+expect_platform 20 40 W -
+expect_lines 20 40 E B2>West|B3>South

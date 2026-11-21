@@ -276,6 +276,9 @@ public:
 	/// show error/info tooltips over the vehicles
 	static uint8 show_vehicle_states;
 
+	/// fork, platforms: platform cards on the map: 0 off, 1 chosen stops (default), 2 all stops (simuconf platform_cards, not saved)
+	static uint8 platform_cards;
+
 	/// show station coverage indicators
 	static uint8 station_coverage_show;
 

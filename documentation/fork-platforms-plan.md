@@ -1,6 +1,6 @@
 # Platforms: what leaves from where (plan)
 
-Status: design, nothing implemented. Mockups on the owner's Hranice na Moravě:
+Status: phases 1-3 implemented (2026-11-21, see CLAUDE.md "Platforms"); phase 4 (display and sign objects) not yet. Mockups on the owner's Hranice na Moravě:
 https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i (made with `tools/mockups`, see its README).
 
 ## 1. Why
@@ -22,13 +22,14 @@ under the mouse.
 A platform is where one vehicle stands to take passengers.
 - **Track** (rail, monorail, maglev, narrow gauge): a row of the stop's tiles on one track, as
   `rail_vehicle_t::get_station_tracks` finds them (tram and road stops of the halt are skipped).
-- **Stand** (road, tram): the stop tiles in a row along one way, in one travel direction. A through tile
-  has two stands, one per kerb; a dead-end tile or bay has one. Layover tiles are never stands.
+- **Stand** (road, tram): one stop tile, in one travel direction. A through tile has two stands, one per kerb; a
+  dead-end tile or bay has one. Per tile, not per row: the owner numbers the tiles of a bus station row as separate
+  stands (Hranice 14 and 15). Layover tiles are never stands.
 - Ships and aircraft: one platform per stop tile row, listed in the tab and on the board, no cards.
 
-Stand direction of a schedule entry: the heading on arrival. Worked out once when a schedule is set (a
-route search in `step`, for the line's first convoy) and confirmed by every vehicle that calls
-(`simline_t`, 2 bits per entry, saved). A schedule entry keeps naming a tile, as now.
+Stand direction of a schedule entry: the heading on arrival, learned from every vehicle that calls (and the way
+out from every departure), saved per line entry; until then a guess from the stops before and after it (no route
+search: the vehicles teach it within a game hour). A schedule entry keeps naming a tile, as now.
 
 Number: one text of up to 7 characters. Tracks get the next free number across the station when they
 appear and keep it (stored, so adding a track never renumbers the others). Stands have none until one is

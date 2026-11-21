@@ -41,6 +41,8 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `lt_entry_main_3`, `lt_entry_main_4` | A single-track stub between two station boundaries entered through a plain signal (Vršovice from Eden and ONJ, 2026-10-30): the signal acts as a platform signal, so no train waits on the stub for a track at the station. Fail before the fix. |
 | `lt_entry_p_3` | The same stub entered through a P: the layout way to the same result, passes on older builds too. |
 | `station_tracks_tram` | A tram stop in a train station's halt is no track of the station for the train rules (`expect_tracks`). Fails before the fix. |
+| `platforms_basic` | Platforms: a station's tracks numbered across, the lines on each by next stop, stands per travel direction (one bus learned the other way than the guess), a bay, typed numbers kept through save and load. |
+| `platforms_changed` | Platforms: a train standing on its track is confirmed there; one the choose signal sends elsewhere shows changed, as on the board. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |
@@ -107,6 +109,14 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
 - `expect_state PATTERN STATE` (e.g. `LOADING`, `CAN_START`) and `expect_wait PATTERN TEXT...` (part of
   the wait text the convoy window shows): some matching convoy, now.
 - `expect_tracks X Y OP N`: the tracks the single-track and keep-a-track rules count at the halt on that tile.
+- `platforms X Y` lists the platforms of the stop on that tile (kind, number, tiles, travel direction, lines by next
+  stop with destinations and the arrow); `platformnumber X Y D TEXT` gives the platform with tile X,Y (a stand: travel
+  direction D, N/E/S/W; `-` for a track) a number (`-`: none); `cardview 0|1|2` sets the card view (off, chosen
+  stops, all stops) for `snap`; `haltname X Y NAME...` renames the stop on that tile.
+- `expect_platform X Y D NUMBER` (`-`: no number) and `expect_lines X Y D TEXT` (`Ex1,RJ>Olomouc|S3>Bělotín`,
+  arrivals as `arr:79`): the platform with that tile and travel direction.
+- `expect_platform_state PATTERN STATE NUMBER`: some matching convoy leaves its current stop from that platform
+  (`*` any) as the boards show it: `planned`, `confirmed` or `changed`.
 
 Vehicles and signals must exist in the owner's pak128.cs. Diesel trains need no catenary: e.g.
 `VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843` (3-car

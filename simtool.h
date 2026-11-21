@@ -283,6 +283,20 @@ public:
 	static bool is_working_for( halthandle_t halt );
 };
 
+// fork, platforms: click a track or stand of the stop (default_param: its id) to type its number in the stop window
+class tool_number_platform_t : public tool_t {
+public:
+	tool_number_platform_t() : tool_t(TOOL_NUMBER_PLATFORM | GENERAL_TOOL) {}
+	char const* get_tooltip(player_t const*) const OVERRIDE;
+	bool init(player_t*) OVERRIDE;
+	char const* work(player_t*, koord3d) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return true; }
+	bool is_work_network_safe() const OVERRIDE { return true; }
+
+	halthandle_t get_target_halt() const;
+	static bool is_working_for( halthandle_t halt );
+};
+
 class tool_plant_tree_t : public kartenboden_tool_t {
 public:
 	tool_plant_tree_t() : kartenboden_tool_t(TOOL_PLANT_TREE | GENERAL_TOOL) {}
@@ -1163,6 +1177,25 @@ public:
 	tool_rename_t() : tool_t(TOOL_RENAME | SIMPLE_TOOL) {}
 	bool init(player_t*) OVERRIDE;
 	bool is_init_network_safe() const OVERRIDE { return false; }
+};
+
+// fork, internal tool: platform numbers and card settings of a stop (simplatform.h). default_param:
+// f,HALT,FLAGS (the stop's card settings), n,HALT,X,Y,Z,DIR,TEXT (the number of the platform with that tile and
+// travel direction), a,HALT (number the tracks 1, 2, 3 ... across the station)
+class tool_change_platforms_t : public tool_t {
+public:
+	tool_change_platforms_t() : tool_t(TOOL_CHANGE_PLATFORMS | SIMPLE_TOOL) {}
+	bool init(player_t*) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return false; }
+};
+
+// fork: switches the platform card view (off, chosen stops, all stops); default_param: one of them, else the next
+class tool_platform_cards_t : public tool_t {
+public:
+	tool_platform_cards_t() : tool_t(TOOL_PLATFORM_CARDS | SIMPLE_TOOL) {}
+	char const* get_tooltip(player_t const*) const OVERRIDE;
+	bool init(player_t*) OVERRIDE;
+	bool is_init_network_safe() const OVERRIDE { return true; }
 };
 
 // internal tool: send message

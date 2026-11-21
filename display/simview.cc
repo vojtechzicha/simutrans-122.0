@@ -7,6 +7,7 @@
 
 #include "../simworld.h"
 #include "simview.h"
+#include "../gui/platform_cards.h"
 #include "simgraph.h"
 #include "viewport.h"
 
@@ -279,6 +280,9 @@ void main_view_t::display(bool force_dirty)
 			}
 		}
 	}
+
+	// fork, platforms: the cards of the shown stops, over the stop names
+	platform_cards_t::display();
 
 	obj_t *zeiger = welt->get_zeiger();
 	DBG_DEBUG4("main_view_t::display", "display pointer");

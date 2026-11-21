@@ -42,10 +42,13 @@ public:
 	virtual bool action_triggered( gui_action_creator_t *comp, value_t v ) OVERRIDE;
 };
 
-class station_settings_t : public gui_aligned_container_t
+class station_settings_t : public gui_aligned_container_t, public action_listener_t
 {
+	gui_combobox_t platform_cards;   ///< fork, platforms: off, chosen stops, all stops
 public:
 	station_settings_t();
+	bool action_triggered(gui_action_creator_t*, value_t) OVERRIDE;
+	void draw(scr_coord offset) OVERRIDE;
 };
 
 class transparency_settings_t : public gui_aligned_container_t, public action_listener_t

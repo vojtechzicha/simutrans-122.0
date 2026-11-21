@@ -125,6 +125,7 @@ tool_t *create_general_tool(int toolnr)
 		case TOOL_REASSIGN_CITY:               tool = new tool_reassign_city_t();       break;
 		case TOOL_LANDSCAPE:                   tool = new tool_landscape_t();           break;
 		case TOOL_MOVE_HALT_NAME:              tool = new tool_move_halt_name_t();      break;
+		case TOOL_NUMBER_PLATFORM:             tool = new tool_number_platform_t();     break;
 		default:
 			dbg->error("create_general_tool()","cannot satisfy request for general_tool[%i]!",toolnr);
 			return NULL;
@@ -175,6 +176,8 @@ tool_t *create_simple_tool(int toolnr)
 		case TOOL_TOGGLE_RESERVATION:   tool = new tool_toggle_reservation_t();   break;
 		case TOOL_VIEW_OWNER:           tool = new tool_view_owner_t();           break;
 		case TOOL_HIDE_UNDER_CURSOR:    tool = new tool_hide_under_cursor_t();    break;
+		case TOOL_CHANGE_PLATFORMS:     tool = new tool_change_platforms_t();     break;
+		case TOOL_PLATFORM_CARDS:       tool = new tool_platform_cards_t();       break;
 		case UNUSED_WKZ_PWDHASH_TOOL:
 			dbg->warning("create_simple_tool()","deprecated tool [%i] requested", toolnr);
 			return NULL;
@@ -794,6 +797,18 @@ void tool_t::read_menu(const std::string &objfilename)
 		}
 	}
 	add_landscape_tools();
+	// fork, platforms: the card view switches with N unless menuconf gives it a key or N is taken
+	{
+		tool_t *cards = simple_tool[TOOL_PLATFORM_CARDS & 0xFFF];
+		bool taken = cards->command_key != 0;
+		FOR( vector_tpl<tool_t *>, const t, char_to_tool ) {
+			taken |= t->command_key == 'N';
+		}
+		if(  !taken  ) {
+			cards->command_key = 'N';
+			char_to_tool.append( cards );
+		}
+	}
 	toolbar_tool.append( toolbar_last_used_t::last_used_tools );
 
 	// sort characters
@@ -1055,7 +1070,7 @@ void toolbar_last_used_t::clear()
 // currently only needed for last used tools
 void toolbar_last_used_t::append( tool_t *t, player_t *sp )
 {
-	static int exclude_from_adding[8]={
+	static int exclude_from_adding[9]={
 		TOOL_SCHEDULE_ADD|GENERAL_TOOL,
 		TOOL_SCHEDULE_INS|GENERAL_TOOL,
 		TOOL_CHANGE_CONVOI|SIMPLE_TOOL,
@@ -1063,7 +1078,8 @@ void toolbar_last_used_t::append( tool_t *t, player_t *sp )
 		TOOL_CHANGE_DEPOT|SIMPLE_TOOL,
 		UNUSED_WKZ_PWDHASH_TOOL|SIMPLE_TOOL,
 		TOOL_CHANGE_PLAYER|SIMPLE_TOOL,
-		TOOL_RENAME|SIMPLE_TOOL
+		TOOL_RENAME|SIMPLE_TOOL,
+		TOOL_CHANGE_PLATFORMS|SIMPLE_TOOL
 	};
 
 	if(  !sp  ||  t->get_icon(sp)==IMG_EMPTY  ) {

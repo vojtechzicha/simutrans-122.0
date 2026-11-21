@@ -5,6 +5,7 @@
 
 #include "simtypes.h"
 #include "simline.h"
+#include "simplatform.h"
 #include "simhalt.h"
 #include "simworld.h"
 
@@ -125,7 +126,12 @@ void simline_t::set_schedule(schedule_t* schedule)
 	else {
 		last_departure_slot.clear();
 		missed_couplings.clear();
+		if(  schedule != this->schedule  ) {
+			entry_ways.clear();
+		}
 	}
+	// fork, platforms: the stops of the old schedule show other lines now
+	platforms_t::names_changed();
 	// fork, departure board: running times belong to the old stops (board texts change nothing there)
 	bool same_stops = this->schedule  &&  schedule  &&  this->schedule->get_count() == schedule->get_count();
 	for(  uint8 i = 0;  same_stops  &&  i < schedule->get_count();  i++  ) {
@@ -214,6 +220,28 @@ void simline_t::keep_slots_across_edit(const schedule_t *old_schedule, const sch
 	}
 	#undef LEN
 	delete [] len;
+
+	// fork, platforms: the ways in and out stay where the entry and its neighbour that way stayed
+	vector_tpl<uint8> ways( m );
+	for(  uint32 j=0;  j<m;  j++  ) {
+		const sint16 i = from[j];
+		uint8 w = 0;
+		if(  i >= 0  &&  (uint32)i < entry_ways.get_count()  &&  n > 0  ) {
+			const sint16 prev_old = from[(j + m - 1) % m];
+			const sint16 next_old = from[(j + 1) % m];
+			if(  prev_old >= 0  &&  (uint32)prev_old == (i + n - 1) % n  ) {
+				w |= entry_ways[i] & 0x0F;
+			}
+			if(  next_old >= 0  &&  (uint32)next_old == (i + 1) % n  ) {
+				w |= entry_ways[i] & 0xF0;
+			}
+		}
+		ways.append( w );
+	}
+	entry_ways.clear();
+	FOR( vector_tpl<uint8>, const w, ways ) {
+		entry_ways.append( w );
+	}
 
 	// a new line (its first schedule, or no train left anywhere since it was made): edited entries start
 	// fresh as well, so their first train never leaves late either
@@ -783,6 +811,10 @@ void simline_t::add_convoy(convoihandle_t cnv)
 			}
 		}
 	}
+	// fork, platforms: a line with convoys shows on the platforms of its stops
+	if(  line_managed_convoys.empty()  ) {
+		platforms_t::names_changed();
+	}
 	// only add convoy if not already member of line
 	line_managed_convoys.append_unique(cnv);
 
@@ -818,6 +850,48 @@ void simline_t::remove_convoy(convoihandle_t cnv)
 	}
 	if(line_managed_convoys.empty()) {
 		unregister_stops();
+		// fork, platforms: no longer on the platforms of its stops
+		platforms_t::names_changed();
+	}
+}
+
+
+void simline_t::set_name(const char *str)
+{
+	name = str;
+	// fork, platforms: the line chips show the line number from the name
+	platforms_t::names_changed();
+}
+
+
+void simline_t::learn_entry_way(uint8 entry, ribi_t::ribi arrival, ribi_t::ribi departure)
+{
+	if(  schedule == NULL  ||  entry >= schedule->get_count()  ) {
+		return;
+	}
+	// one direction each, else nothing to learn (a vehicle on a curve or a turning tile)
+	if(  !ribi_t::is_single( arrival )  ) {
+		arrival = 0;
+	}
+	if(  !ribi_t::is_single( departure )  ) {
+		departure = 0;
+	}
+	while(  entry_ways.get_count() < schedule->get_count()  ) {
+		entry_ways.append( 0 );
+	}
+	uint8 w = entry_ways[entry];
+	if(  arrival  ) {
+		w = (w & 0xF0) | arrival;
+	}
+	if(  departure  ) {
+		w = (w & 0x0F) | (departure << 4);
+	}
+	if(  w != entry_ways[entry]  ) {
+		entry_ways[entry] = w;
+		halthandle_t halt = haltestelle_t::get_halt( schedule->entries[entry].pos, player );
+		if(  halt.is_bound()  ) {
+			halt->platforms_changed();
+		}
 	}
 }
 
@@ -976,6 +1050,22 @@ void simline_t::rdwr(loadsave_t *file)
 			file->rdwr_long(r.minutes16);
 			if(  file->is_loading()  ) {
 				run_times.append( r );
+			}
+		}
+	}
+
+	if(  file->is_version_atleast(122, 18)  ) {
+		// fork, platforms: the ways the vehicles come in and leave
+		uint8 count = (uint8)min( entry_ways.get_count(), 255 );
+		file->rdwr_byte( count );
+		if(  file->is_loading()  ) {
+			entry_ways.clear();
+		}
+		for(  uint8 i=0;  i<count;  i++  ) {
+			uint8 w = file->is_saving() ? entry_ways[i] : 0;
+			file->rdwr_byte( w );
+			if(  file->is_loading()  ) {
+				entry_ways.append( w );
 			}
 		}
 	}

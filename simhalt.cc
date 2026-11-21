@@ -51,6 +51,7 @@
 
 #include "utils/simrandom.h"
 #include "utils/simstring.h"
+#include "utils/plainstring.h"
 
 #include "tpl/binary_heap_tpl.h"
 
@@ -443,6 +444,9 @@ haltestelle_t::haltestelle_t(loadsave_t* file)
 
 	enables = NOT_ENABLED;
 	reach_served = 0;
+	platform_flags = 0;
+	platform_stamp = 0;
+	platform_cache = NULL;
 
 	sortierung = freight_list_sorter_t::by_name;
 	resort_freight_info = true;
@@ -470,6 +474,9 @@ haltestelle_t::haltestelle_t(koord k, player_t* player)
 
 	enables = NOT_ENABLED;
 	reach_served = 0;
+	platform_flags = 0;
+	platform_stamp = 0;
+	platform_cache = NULL;
 	// force total re-routing
 	reconnect_counter = welt->get_schedule_counter()-1;
 	last_catg_index = 255;
@@ -502,6 +509,10 @@ haltestelle_t::~haltestelle_t()
 
 	// free name
 	set_name(NULL);
+
+	// fork, platforms
+	delete platform_cache;
+	platform_cache = NULL;
 
 	// remove from ground and planquadrat (tile) haltlists
 	koord ul(32767,32767);
@@ -606,6 +617,8 @@ const char* haltestelle_t::get_name() const
  */
 void haltestelle_t::set_name(const char *new_name)
 {
+	// fork, platforms: next stops and destinations show stop names
+	platforms_t::names_changed();
 	grund_t *gr = welt->lookup(get_basis_pos3d());
 	if(gr) {
 		if(gr->get_flag(grund_t::has_text)) {
@@ -1193,6 +1206,9 @@ void haltestelle_t::remove_fabriken(fabrik_t *fab)
 #define WEIGHT_MIN (WEIGHT_WAIT+WEIGHT_HALT)
 sint32 haltestelle_t::rebuild_connections()
 {
+	// fork, platforms: the lines here may have changed
+	platforms_changed();
+
 	// halts which either immediately precede or succeed self halt in serving schedules
 	static vector_tpl<halthandle_t> consecutive_halts[256];
 	// halts which either immediately precede or succeed self halt in currently processed schedule
@@ -3020,6 +3036,30 @@ void haltestelle_t::rdwr(loadsave_t *file)
 			financial_history[k][HALT_WALKED] = 0;
 		}
 	}
+
+	if(  file->is_version_atleast(122, 18)  ) {
+		// fork, platforms: the numbers and the card settings
+		file->rdwr_byte( platform_flags );
+		uint16 count = (uint16)platform_labels.get_count();
+		file->rdwr_short( count );
+		if(  file->is_loading()  ) {
+			platform_labels.clear();
+		}
+		for(  uint16 i = 0;  i < count;  i++  ) {
+			platform_label_t l;
+			if(  file->is_saving()  ) {
+				l = platform_labels[i];
+			}
+			l.anchor.rdwr( file );
+			file->rdwr_byte( l.dir );
+			plainstring text = l.text;
+			file->rdwr_str( text );
+			if(  file->is_loading()  ) {
+				tstrncpy( l.text, text ? text.c_str() : "", lengthof(l.text) );
+				platform_labels.append( l );
+			}
+		}
+	}
 }
 
 
@@ -3289,6 +3329,9 @@ void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
 
 bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 {
+	// fork, platforms: the rows of tiles change
+	platforms_changed();
+
 	assert(gr!=NULL);
 
 	// new halt?
@@ -3400,6 +3443,9 @@ bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 
 bool haltestelle_t::rem_grund(grund_t *gr)
 {
+	// fork, platforms: the rows of tiles change
+	platforms_changed();
+
 	// namen merken
 	if(!gr) {
 		return false;
@@ -3677,4 +3723,45 @@ bool haltestelle_t::is_halt_covered(const halthandle_t &halt) const
 		}
 	}
 	return false;
+}
+
+
+// fork, platforms
+const vector_tpl<platform_t *> &haltestelle_t::get_platforms()
+{
+	if(  platform_cache == NULL  ) {
+		platform_cache = new halt_platforms_t();
+	}
+	if(  platform_cache->stamp != platform_stamp  ||  platform_cache->epoch != platforms_t::epoch  ) {
+		platforms_t::build( this, *platform_cache );
+		platform_cache->stamp = platform_stamp;
+		platform_cache->epoch = platforms_t::epoch;
+	}
+	return platform_cache->list;
+}
+
+
+bool haltestelle_t::set_platform_number(koord3d anchor, uint8 dir, const char *text)
+{
+	const vector_tpl<platform_t *> &list = get_platforms();
+	const sint32 i = platforms_t::find( list, anchor, dir );
+	if(  i < 0  ) {
+		return false;
+	}
+	const platform_t *p = list[i];
+	// the label of that platform goes, then the new one comes first (it wins over any other on the platform)
+	for(  uint32 k = platform_labels.get_count();  k-- > 0;  ) {
+		const platform_label_t &l = platform_labels[k];
+		if(  p->contains( l.anchor )  &&  (p->kind != platform_t::STAND  ||  l.dir == p->dir)  ) {
+			platform_labels.remove_at( k );
+		}
+	}
+	platform_label_t l;
+	l.anchor = p->get_anchor();
+	l.dir = p->kind == platform_t::STAND ? p->dir : 0;
+	tstrncpy( l.text, text ? text : "", lengthof(l.text) );
+	// an empty label keeps a track without a number (else it would get the next free one again)
+	platform_labels.insert_at( 0, l );
+	platforms_changed();
+	return true;
 }

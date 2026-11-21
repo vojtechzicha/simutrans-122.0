@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "halt_info.h"
+#include "platform_cards.h"
 #include "components/gui_button_to_chart.h"
 
 #include "../simworld.h"
@@ -294,6 +295,7 @@ halt_info_t::halt_info_t(halthandle_t halt) :
 		scrolly_freight(&container_freight, true, true),
 		scrolly_departure(&board_view, true, true),
 		scrolly_details(halt_detail, true, true),
+		scrolly_platforms(&platforms_tab, true, true),
 		scrolly_freight_departure(departure_board, true, true),
 		view(koord3d::invalid, scr_size(max(64, get_base_tile_raster_width()), max(56, get_base_tile_raster_width() * 7 / 8)))
 {
@@ -419,6 +421,11 @@ void halt_info_t::init(halthandle_t halt)
 	departure_board->update_departures(halt);
 	departure_board->set_size( departure_board->get_min_size() );
 
+	// fork, platforms: tracks and stands with their numbers and lines
+	platforms_tab.set_halt( halt );
+	switch_mode.add_tab( &scrolly_platforms, translator::translate( "Platforms" ) );
+	platform_cards_t::window_opened( halt );
+
 	// connection info
 	switch_mode.add_tab(&scrolly_details, translator::translate("Connections"));
 	halt_detail->update_connections(halt);
@@ -464,6 +471,10 @@ halt_info_t::~halt_info_t()
 		welt->set_tool( tool, halt->get_owner() );
 		// since init always returns false, it is safe to delete immediately
 		delete tool;
+	}
+	// fork, platforms
+	if(  halt.is_bound()  ) {
+		platform_cards_t::window_closed( halt );
 	}
 	delete departure_board;
 	delete halt_detail;
@@ -1183,4 +1194,27 @@ void halt_info_t::rdwr(loadsave_t *file)
 	if (!halt.is_bound()) {
 		destroy_win( this );
 	}
+}
+
+
+void halt_info_t::focus_platform(halthandle_t halt, koord3d anchor, uint8 dir)
+{
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	halt_info_t *info = dynamic_cast<halt_info_t *>( win_get_magic( magic_halt_info + halt.get_id() ) );
+	if(  info == NULL  ) {
+		halt->open_info_window();
+		info = dynamic_cast<halt_info_t *>( win_get_magic( magic_halt_info + halt.get_id() ) );
+	}
+	if(  info == NULL  ) {
+		return;
+	}
+	top_win( info );
+	info->switch_mode.set_active_tab_index( 2 );
+	value_t v;
+	v.i = 2;
+	info->action_triggered( &info->switch_mode, v );
+	info->platforms_tab.focus_platform( anchor, dir );
+	info->set_focus( &info->switch_mode );
 }

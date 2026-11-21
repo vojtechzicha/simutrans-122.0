@@ -25,6 +25,7 @@
 
 #include "tpl/slist_tpl.h"
 #include "tpl/vector_tpl.h"
+#include "simplatform.h"
 
 
 #define RECONNECTING (1)
@@ -795,6 +796,33 @@ public:
 	 * check if it is in the station coverage
 	 */
 	bool is_halt_covered (const halthandle_t &halt) const;
+
+	// fork: platforms (simplatform.h, documentation/fork-platforms-plan.md)
+public:
+	enum {
+		PLATFORMS_CHOSEN = 1,           ///< cards on the map in the "chosen stops" view
+		PLATFORMS_TRACKS_COMPACT = 2,   ///< track cards show the next stop only (else next stop and destination)
+		PLATFORMS_STANDS_DEST = 4       ///< stand cards show the destination too (else the next stop only)
+	};
+private:
+	vector_tpl<platform_label_t> platform_labels;   ///< saved, savegame 122.18
+	uint8 platform_flags;                           ///< saved, savegame 122.18
+	uint32 platform_stamp;                          ///< bumped when the platforms must be worked out again
+	halt_platforms_t *platform_cache;
+public:
+	/// the platforms of the stop, worked out again when lines, tiles or names changed
+	const vector_tpl<platform_t *> &get_platforms();
+
+	/// the platforms must be worked out again (lines, tiles or numbers changed)
+	void platforms_changed() { platform_stamp++; }
+
+	uint8 get_platform_flags() const { return platform_flags; }
+	void set_platform_flags(uint8 f) { platform_flags = f; }
+
+	vector_tpl<platform_label_t> &access_platform_labels() { return platform_labels; }
+
+	/// sets the number of the platform with that anchor and direction (empty: none); false if there is no such platform
+	bool set_platform_number(koord3d anchor, uint8 dir, const char *text);
 };
 
 ENUM_BITSET(haltestelle_t::stationtyp)

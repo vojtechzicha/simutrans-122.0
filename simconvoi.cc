@@ -12,6 +12,7 @@
 #include "player/finance.h" // convert_money
 #include "player/simplay.h"
 #include "simconvoi.h"
+#include "simplatform.h"
 #include "simhalt.h"
 #include "simdepot.h"
 #include "gui/simwin.h"
@@ -207,6 +208,7 @@ void convoi_t::init(player_t *player)
 	departure_pending = false;
 	departure_standing = 0;
 	departing_entry = 255;
+	platform_learn_entry = 255;
 	anchor_entry = 255;
 	anchor_slot = -1;
 	anchor_ready = -1;
@@ -2409,6 +2411,7 @@ void convoi_t::step()
 					// can reserve new block => drive on
 					state = (steps_driven>=0) ? LEAVING_DEPOT : DRIVING;
 					clear_passing_hold();
+					learn_departure_way();
 					if(haltestelle_t::get_halt(v->get_pos(),owner).is_bound()) {
 						play_start_sound();
 					}
@@ -2756,6 +2759,24 @@ void convoi_t::start()
 /* called, when at a destination
  * can be waypoint, depot or a stop
  * called from the first vehicle_t of a convoi */
+// fork, platforms: the first step of our way out of the stop we stood at tells the line which way it leaves
+void convoi_t::learn_departure_way()
+{
+	const uint8 entry = platform_learn_entry;
+	platform_learn_entry = 255;
+	if(  entry == 255  ||  !line.is_bound()  ||  is_coupled()  ||  route.get_count() < 2  ) {
+		return;
+	}
+	const koord3d start = route.at( 0 );
+	for(  uint32 i = 1;  i < route.get_count();  i++  ) {
+		if(  route.at( i ).get_2d() != start.get_2d()  ) {
+			line->learn_entry_way( entry, 0, ribi_type( start, route.at( i ) ) );
+			return;
+		}
+	}
+}
+
+
 void convoi_t::ziel_erreicht()
 {
 	const vehicle_t* v = fahr[0];
@@ -2804,6 +2825,12 @@ void convoi_t::ziel_erreicht()
 			arrived_time = welt->get_ticks();
 			// fork, bus layover: into the bay
 			layover_arrived();
+			// fork, platforms: which way the line's vehicles come in here
+			platform_learn_entry = 255;
+			if(  line.is_bound()  &&  !is_coupled()  ) {
+				line->learn_entry_way( schedule->get_current_stop(), v->get_direction(), 0 );
+				platform_learn_entry = schedule->get_current_stop();
+			}
 			couple_wait_since = 0;
 			couple_hold_slot = -1;
 			// fork: who boarded at the last stop rides on as anybody else (joined train included)
@@ -3362,6 +3389,7 @@ void convoi_t::vorfahren()
 					play_start_sound();
 				}
 				state = DRIVING;
+				learn_departure_way();
 				if(  leaving_halt.is_bound()  ) {
 					// fork: we leave first, those who boarded later trains here may change to us
 					take_boarded_passengers();
@@ -5243,6 +5271,21 @@ bool convoi_t::append_departure_text(cbuffer_t &buf) const
 	const uint32 ahead = line.is_bound()  &&  schedule->get_current_entry().has_timetable() ? line->count_earlier_waiting( self ) : 0;
 	if(  ahead > 0  ) {
 		buf.printf( translator::translate(", %d ahead"), (int)ahead );
+	}
+	// fork, platforms: the track or stand it leaves from ("track 3 instead of 7" when sent elsewhere)
+	halthandle_t halt = haltestelle_t::get_halt( schedule->get_current_entry().pos, get_owner() );
+	if(  halt.is_bound()  ) {
+		sint32 planned = -1, now_at = -1;
+		platforms_t::get_platforms_of( halt, schedule, schedule->get_current_stop(), line, this, planned, now_at );
+		const vector_tpl<platform_t *> &list = halt->get_platforms();
+		const sint32 at = now_at >= 0 ? now_at : planned;
+		if(  at >= 0  &&  list[at]->number[0]  ) {
+			buf.append( ", " );
+			platforms_t::get_platform_text( buf, list[at] );
+			if(  now_at >= 0  &&  planned >= 0  &&  now_at != planned  &&  list[planned]->number[0]  &&  strcmp( list[planned]->number, list[now_at]->number )  ) {
+				buf.printf( translator::translate( " instead of %s" ), list[planned]->number );
+			}
+		}
 	}
 	return true;
 }

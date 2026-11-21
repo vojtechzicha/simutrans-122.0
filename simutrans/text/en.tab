@@ -1871,3 +1871,85 @@ Gentle slopes
 , steep edges
 , gentle edges (Shift: steep)
 , gentle edges (Shift: steep)
+
+# fork: platforms
+Track
+Track
+Stand
+Stand
+Gate
+Gate
+Berth
+Berth
+track %s
+track %s
+stand %s
+stand %s
+berth %s
+berth %s
+arr.
+arr.
+This platform is gone.
+This platform is gone.
+Show on the map
+Show on the map
+Stop window
+Stop window
+Lines boarding here
+Lines boarding here
+No line boards here.
+No line boards here.
+no line boards here
+no line boards here
+Map labels: this stop
+Map labels: this stop
+Show this stop's platform cards on the map in the view of chosen stops
+Show this stop's platform cards on the map in the view of chosen stops
+Tracks: next stop + destination
+Tracks: next stop + destination
+Tracks: next stop
+Tracks: next stop
+Stands: next stop + destination
+Stands: next stop + destination
+Stands: next stop
+Stands: next stop
+What the track cards on the map show (Shift+click a card switches it too)
+What the track cards on the map show (Shift+click a card switches it too)
+What the stand cards on the map show (Shift+click a card switches it too)
+What the stand cards on the map show (Shift+click a card switches it too)
+Number tracks across
+Number tracks across
+Give the tracks the numbers 1, 2, 3 ... across the station
+Give the tracks the numbers 1, 2, 3 ... across the station
+Number on the map
+Number on the map
+Click a track or stand of this stop on the map to type its number here
+Click a track or stand of this stop on the map to type its number here
+No.
+No.
+Kind
+Kind
+Lines boarding here, by next stop
+Lines boarding here, by next stop
+Platforms
+Platforms
+Click a track or stand of %s to type its number
+Click a track or stand of %s to type its number
+This is no track or stand of the stop.
+This is no track or stand of the stop.
+Platform cards: off
+Platform cards: off
+Platform cards: chosen stops
+Platform cards: chosen stops
+Platform cards: all stops
+Platform cards: all stops
+Platform cards
+Platform cards
+chosen stops
+chosen stops
+all stops
+all stops
+ instead of %s
+ instead of %s
+off
+off

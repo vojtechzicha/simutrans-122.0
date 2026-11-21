@@ -14,6 +14,7 @@
 
 #include "tpl/minivec_tpl.h"
 #include "tpl/vector_tpl.h"
+#include "dataobj/ribi.h"
 #include "utils/plainstring.h"
 
 #define MAX_MONTHS     12 // Max history
@@ -107,6 +108,14 @@ private:
 		sint32 minutes16;
 	};
 	vector_tpl<run_time_t> run_times;
+
+	/**
+	 * fork, platforms: per schedule entry the way its vehicles were seen to come in (low nibble) and to leave
+	 * (high nibble), one ribi direction each, 0 = not seen yet. It tells which stand of a stop a line uses and
+	 * which way the arrow on a platform card points. Saved (122.18); a schedule edit keeps it for entries whose
+	 * neighbours stayed.
+	 */
+	vector_tpl<uint8> entry_ways;
 
 	/**
 	 * a list of all catg_index, which can be transported by this line.
@@ -253,7 +262,14 @@ public:
 	 * get name of line
 	 */
 	char const* get_name() const { return name; }
-	void set_name(const char *str) { name = str; }
+	void set_name(const char *str);
+
+	/// fork, platforms: the way vehicles come to entry (arrival) and leave it (departure), 0 = not seen yet
+	ribi_t::ribi get_entry_arrival(uint8 entry) const { return entry < entry_ways.get_count() ? entry_ways[entry] & 15 : 0; }
+	ribi_t::ribi get_entry_departure(uint8 entry) const { return entry < entry_ways.get_count() ? entry_ways[entry] >> 4 : 0; }
+
+	/// fork, platforms: a vehicle of the line came in (arrival) or left (departure) at entry that way (0: not seen)
+	void learn_entry_way(uint8 entry, ribi_t::ribi arrival, ribi_t::ribi departure);
 
 	/*
 	 * load or save the line

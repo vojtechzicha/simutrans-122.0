@@ -26,6 +26,7 @@
 #include "../simworld.h"
 #include "../simconvoi.h"
 #include "../simhalt.h"
+#include "../simplatform.h"
 #include "../simline.h"
 #include "../simevent.h"
 #include "../simintr.h"
@@ -590,7 +591,8 @@ gui_departure_board_view_t::gui_departure_board_view_t() :
 	header_h(0),
 	now(0)
 {
-	for(  int i = 0;  i < 5;  i++  ) {
+	has_platforms = false;
+	for(  int i = 0;  i < 6;  i++  ) {
 		col_w[i] = 0;
 	}
 }
@@ -799,6 +801,36 @@ static bool find_destination(const schedule_t *schedule, uint8 e, const player_t
 		return false;
 	}
 	dest = last;
+	return true;
+}
+
+
+bool gui_departure_board_view_t::get_departure_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, halthandle_t here, cbuffer_t &line_number, cbuffer_t &category, cbuffer_t &destination, halthandle_t &dest_halt)
+{
+	if(  schedule == NULL  ||  entry >= schedule->get_count()  ||  !here.is_bound()  ) {
+		return false;
+	}
+	const waytype_t wt = schedule->get_waytype();
+	const bool train = wt == track_wt  ||  wt == monorail_wt  ||  wt == maglev_wt  ||  wt == narrowgauge_wt;
+	vector_tpl<halthandle_t> on_the_way;
+	if(  !find_destination( schedule, entry, owner, here, train, dest_halt, on_the_way )  ) {
+		return false;
+	}
+	if(  line.is_bound()  ) {
+		board_names_t::get_line_number( line_number, line->get_name() );
+		board_names_t::get_line_category( category, line->get_name() );
+	}
+	cbuffer_t town;
+	board_names_t::get_stop_town( town, here->get_name(), train );
+	board_names_t::get_stop_name( destination, dest_halt->get_name(), train, town );
+	if(  const char *t = schedule->get_board_text( entry, schedule_entry_t::BOARD_LINE )  ) {
+		line_number.clear();
+		line_number.append( t );
+	}
+	if(  const char *t = schedule->get_board_text( entry, schedule_entry_t::BOARD_DESTINATION )  ) {
+		destination.clear();
+		destination.append( t );
+	}
 	return true;
 }
 
@@ -1474,7 +1506,137 @@ void gui_departure_board_view_t::rebuild()
 	}
 
 	merge_coupled_rows();
+
+	// fork, platforms: where each departure leaves from
+	has_platforms = false;
+	FOR( vector_tpl<row_t>, &r, rows ) {
+		set_row_platforms( r );
+		has_platforms |= r.platform_number[0] != 0;
+	}
+	FOR( vector_tpl<row_t>, &r, alt_rows ) {
+		set_row_platforms( r );
+	}
 	layout();
+}
+
+
+bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, const platform_t *p, platform_departure_t &dep)
+{
+	if(  !halt.is_bound()  ||  p == NULL  ) {
+		return false;
+	}
+	// the boards of the stop once a game minute (the platform window asks every frame), for a few stops at a time
+	struct cache_t {
+		halthandle_t halt;
+		sint64 stamp;
+		uint32 epoch;
+		uint32 used;
+		vector_tpl<platform_departure_t> deps;
+		vector_tpl<sint16> platforms;
+		cache_t() : stamp(-1), epoch(0), used(0) {}
+	};
+	static cache_t caches[4];
+	static uint32 use_counter = 0;
+	const sint64 stamp = welt->has_calendar() ? welt->get_calendar_minutes() : (sint64)(welt->get_ticks() >> (welt->ticks_per_world_month_shift - 10));
+	cache_t *c = NULL;
+	for(  int i = 0;  i < 4  &&  c == NULL;  i++  ) {
+		if(  caches[i].halt == halt  ) {
+			c = &caches[i];
+		}
+	}
+	if(  c == NULL  ) {
+		c = &caches[0];
+		for(  int i = 1;  i < 4;  i++  ) {
+			if(  caches[i].used < c->used  ) {
+				c = &caches[i];
+			}
+		}
+		c->halt = halt;
+		c->stamp = -1;
+	}
+	c->used = ++use_counter;
+	vector_tpl<platform_departure_t> &cached = c->deps;
+	vector_tpl<sint16> &cached_platform = c->platforms;
+	if(  c->stamp != stamp  ||  c->epoch != platforms_t::epoch  ) {
+		c->stamp = stamp;
+		c->epoch = platforms_t::epoch;
+		cached.clear();
+		cached_platform.clear();
+		const uint8 kinds = get_kinds_at( halt );
+		for(  int k = KIND_TRAINS;  k <= KIND_OTHERS;  k++  ) {
+			if(  !(kinds & (1 << k))  ) {
+				continue;
+			}
+			gui_departure_board_view_t board;
+			board.kind = (kind_t)k;
+			board.halt = halt;
+			board.update( true );
+			// in the order the board lists them: the first row of each platform
+			FOR( vector_tpl<row_t>, const &r, board.rows ) {
+				if(  r.platform < 0  ||  cached_platform.is_contained( r.platform )  ) {
+					continue;
+				}
+				const stream_t &st = board.streams[r.stream];
+				platform_departure_t d;
+				cbuffer_t buf;
+				board.format_time( buf, r );
+				tstrncpy( d.time, buf, lengthof(d.time) );
+				tstrncpy( d.train, r.train, lengthof(d.train) );
+				tstrncpy( d.line_number, st.line_number[0] ? st.line_number : st.category, lengthof(d.line_number) );
+				tstrncpy( d.destination, st.destination, lengthof(d.destination) );
+				if(  st.via[0]  ) {
+					buf.clear();
+					buf.printf( translator::translate( "via %s" ), st.via );
+					tstrncpy( d.via, buf, lengthof(d.via) );
+				}
+				buf.clear();
+				if(  r.delay > 0  ) {
+					buf.printf( translator::translate( "+%d min" ), (int)r.delay );
+					d.late = true;
+				}
+				else if(  r.delay == 0  ) {
+					buf.append( translator::translate( "On time" ) );
+				}
+				tstrncpy( d.status, buf, lengthof(d.status) );
+				d.wt = st.line.is_bound() ? st.line->get_schedule()->get_waytype() : (st.cnv.is_bound() ? st.cnv->get_schedule()->get_waytype() : invalid_wt);
+				cached.append( d );
+				cached_platform.append( r.platform );
+			}
+		}
+	}
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	for(  uint32 i = 0;  i < cached_platform.get_count();  i++  ) {
+		const sint16 pi = cached_platform[i];
+		if(  pi >= 0  &&  (uint32)pi < list.get_count()  &&  list[pi] == p  ) {
+			dep = cached[i];
+			return true;
+		}
+	}
+	return false;
+}
+
+
+void gui_departure_board_view_t::set_row_platforms(row_t &r)
+{
+	const stream_t &s = streams[r.stream];
+	const schedule_t *schedule = s.line.is_bound() ? s.line->get_schedule() : (s.cnv.is_bound() ? s.cnv->get_schedule() : NULL);
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	sint32 planned = -1, now_at = -1;
+	platforms_t::get_platforms_of( halt, schedule, s.entry, s.line, r.cnv.is_bound() ? r.cnv.get_rep() : NULL, planned, now_at );
+	r.planned_platform = planned;
+	r.platform = now_at >= 0 ? now_at : planned;
+	r.pstate = PLATFORM_PLANNED;
+	r.platform_number[0] = 0;
+	r.planned_number[0] = 0;
+	if(  planned >= 0  ) {
+		tstrncpy( r.planned_number, list[planned]->number, lengthof(r.planned_number) );
+	}
+	if(  r.platform >= 0  ) {
+		tstrncpy( r.platform_number, list[r.platform]->number, lengthof(r.platform_number) );
+	}
+	if(  now_at >= 0  ) {
+		r.pstate = (planned >= 0  &&  now_at != planned  &&  strcmp( r.platform_number, r.planned_number ) != 0) ? PLATFORM_CHANGED : PLATFORM_CONFIRMED;
+	}
 }
 
 
@@ -1577,6 +1739,12 @@ static uint32 badge_color(waytype_t wt)
 }
 
 
+uint32 gui_departure_board_view_t::get_badge_color(waytype_t wt)
+{
+	return badge_color( wt );
+}
+
+
 void gui_departure_board_view_t::format_time(cbuffer_t &buf, const row_t &row) const
 {
 	const sint64 t = is_train_board() ? row_time( row.scheduled, row.expected ) : row.expected;
@@ -1615,6 +1783,7 @@ void gui_departure_board_view_t::measure_row(const row_t &r, bool &any_via)
 	const scr_coord_val dw = proportional_string_width( buf );
 	const scr_coord_val lw = s.line_number[0] ? proportional_string_width( s.line_number ) + 2*pad : 0;
 	const scr_coord_val destw = proportional_string_width( s.destination );
+	const scr_coord_val pw = r.platform_number[0] ? proportional_string_width( r.platform_number ) + 2*pad : 0;
 	any_via |= s.via[0] != 0;
 	if(  train  ) {
 		const char *tr = r.train[0] ? r.train : s.category;
@@ -1624,13 +1793,19 @@ void gui_departure_board_view_t::measure_row(const row_t &r, bool &any_via)
 		col_w[1] = max( col_w[1], proportional_string_width( tr ) + pair_w );
 		col_w[2] = max( col_w[2], lw );
 		col_w[3] = max( col_w[3], destw );
-		col_w[4] = max( col_w[4], dw );
+		if(  has_platforms  ) {
+			col_w[4] = max( col_w[4], pw );
+		}
+		col_w[5] = max( col_w[5], dw );
 	}
 	else {
 		col_w[0] = max( col_w[0], lw );
 		col_w[1] = max( col_w[1], destw );
-		col_w[2] = max( col_w[2], tw );
-		col_w[3] = max( col_w[3], dw );
+		if(  has_platforms  ) {
+			col_w[2] = max( col_w[2], pw );
+		}
+		col_w[3] = max( col_w[3], tw );
+		col_w[4] = max( col_w[4], dw );
 	}
 }
 
@@ -1640,18 +1815,19 @@ void gui_departure_board_view_t::layout()
 	const bool train = is_train_board();
 	const scr_coord_val pad = D_H_SPACE;
 
-	for(  int i = 0;  i < 5;  i++  ) {
+	for(  int i = 0;  i < 6;  i++  ) {
 		col_w[i] = 0;
 	}
-	// trains: departure, train, line, destination, delay; others: line, destination, departure, delay
-	const char *head[5];
+	// trains: departure, train, line, destination, track, delay; others: line, destination, stand, departure, delay
+	// (fork, platforms: the track or stand column only where the stop has numbers)
+	const char *head[6];
 	if(  train  ) {
-		head[0] = "Departure"; head[1] = "Train"; head[2] = "Line"; head[3] = "Board destination"; head[4] = "Delay";
+		head[0] = "Departure"; head[1] = "Train"; head[2] = "Line"; head[3] = "Board destination"; head[4] = has_platforms ? "Track" : NULL; head[5] = "Delay";
 	}
 	else {
-		head[0] = "Line"; head[1] = "Board destination"; head[2] = "Departure"; head[3] = "Delay"; head[4] = NULL;
+		head[0] = "Line"; head[1] = "Board destination"; head[2] = has_platforms ? "Stand" : NULL; head[3] = "Departure"; head[4] = "Delay"; head[5] = NULL;
 	}
-	for(  int i = 0;  i < 5;  i++  ) {
+	for(  int i = 0;  i < 6;  i++  ) {
 		if(  head[i]  ) {
 			col_w[i] = proportional_string_width( translator::translate( head[i] ) );
 		}
@@ -1676,7 +1852,7 @@ void gui_departure_board_view_t::layout()
 	row_h = (train  &&  any_via ? 2*LINESPACE : LINESPACE) + D_V_SPACE;
 
 	scr_coord_val w = pad;
-	for(  int i = 0;  i < 5;  i++  ) {
+	for(  int i = 0;  i < 6;  i++  ) {
 		if(  col_w[i] > 0  ) {
 			w += col_w[i] + 2*pad;
 		}
@@ -1751,15 +1927,15 @@ void gui_departure_board_view_t::draw(scr_coord offset)
 	// column positions; the destination column gets the room left over
 	const int dest_col = train ? 3 : 1;
 	scr_coord_val fixed = pad;
-	for(  int i = 0;  i < 5;  i++  ) {
+	for(  int i = 0;  i < 6;  i++  ) {
 		if(  col_w[i] > 0  &&  i != dest_col  ) {
 			fixed += col_w[i] + 2*pad;
 		}
 	}
-	scr_coord_val cw[5];
-	scr_coord_val cx[5];
+	scr_coord_val cw[6];
+	scr_coord_val cx[6];
 	scr_coord_val x = p.x + pad;
-	for(  int i = 0;  i < 5;  i++  ) {
+	for(  int i = 0;  i < 6;  i++  ) {
 		cw[i] = i == dest_col ? max( col_w[i], w - fixed - 2*pad ) : col_w[i];
 		cx[i] = x + pad;
 		if(  col_w[i] > 0  ) {
@@ -1774,12 +1950,18 @@ void gui_departure_board_view_t::draw(scr_coord offset)
 		display_proportional_clip_rgb( cx[1], hy, translator::translate("Train"), ALIGN_LEFT, head_col, true );
 		display_proportional_clip_rgb( cx[2], hy, translator::translate("Line"), ALIGN_LEFT, head_col, true );
 		display_proportional_clip_rgb( cx[3], hy, translator::translate("Board destination"), ALIGN_LEFT, head_col, true );
-		display_proportional_clip_rgb( cx[4] + cw[4], hy, translator::translate("Delay"), ALIGN_RIGHT, head_col, true );
+		if(  has_platforms  ) {
+			display_proportional_clip_rgb( cx[4] + cw[4] / 2, hy, translator::translate("Track"), ALIGN_CENTER_H, head_col, true );
+		}
+		display_proportional_clip_rgb( cx[5] + cw[5], hy, translator::translate("Delay"), ALIGN_RIGHT, head_col, true );
 	}
 	else {
 		display_proportional_clip_rgb( cx[0], hy, translator::translate("Line"), ALIGN_LEFT, head_col, true );
 		display_proportional_clip_rgb( cx[1], hy, translator::translate("Board destination"), ALIGN_LEFT, head_col, true );
-		display_proportional_clip_rgb( cx[2] + cw[2], hy, translator::translate("Departure"), ALIGN_RIGHT, head_col, true );
+		if(  has_platforms  ) {
+			display_proportional_clip_rgb( cx[2] + cw[2] / 2, hy, translator::translate("Stand"), ALIGN_CENTER_H, head_col, true );
+		}
+		display_proportional_clip_rgb( cx[3] + cw[3], hy, translator::translate("Departure"), ALIGN_RIGHT, head_col, true );
 	}
 
 	if(  rows.empty()  ) {
@@ -1807,13 +1989,13 @@ void gui_departure_board_view_t::draw(scr_coord offset)
 
 		buf.clear();
 		format_time( buf, r );
-		const scr_coord_val time_x = train ? cx[0] : cx[2] + cw[2];
+		const scr_coord_val time_x = train ? cx[0] : cx[3] + cw[3];
 		display_proportional_clip_rgb( time_x, ty, buf, (train ? ALIGN_LEFT : ALIGN_RIGHT), text_col, true );
 
 		buf.clear();
 		if(  r.delay > 0  ) {
 			buf.printf( translator::translate(train ? "+%d min" : "+%d"), (int)r.delay );
-			const int dc = train ? 4 : 3;
+			const int dc = train ? 5 : 4;
 			display_proportional_clip_rgb( cx[dc] + cw[dc], ty, buf, ALIGN_RIGHT, delay_col, true );
 		}
 
@@ -1835,6 +2017,34 @@ void gui_departure_board_view_t::draw(scr_coord offset)
 			if(  rows[i].alt >= 0  ) {
 				// a coupled pair: which of the two is shown
 				display_proportional_clip_rgb( cx[1] + tw + pad, ty, second ? "2/2" : "1/2", ALIGN_LEFT, via_col, true );
+			}
+		}
+
+		// fork, platforms: the track or stand, and how sure the board is about it
+		if(  has_platforms  &&  r.platform_number[0]  ) {
+			const int pc = train ? 4 : 2;
+			const scr_coord_val pw = proportional_string_width( r.platform_number );
+			const scr_coord_val px = cx[pc] + (cw[pc] - pw) / 2;
+			const bool blink = (dr_time() / PAIR_PERIOD) & 1;
+			if(  r.pstate == PLATFORM_CHANGED  ) {
+				const PIXVAL box = rgb( train ? TRAIN_DELAY : OTHER_TEXT );
+				if(  !blink  ) {
+					display_fillbox_wh_clip_rgb( px - pad, ty - 1, pw + 2*pad, LINESPACE + 2, box, true );
+					display_proportional_clip_rgb( px, ty, r.platform_number, ALIGN_LEFT, bg, true );
+				}
+				else {
+					display_proportional_clip_rgb( px, ty, r.platform_number, ALIGN_LEFT, box, true );
+				}
+				if(  r.planned_number[0]  &&  row_h >= 2*LINESPACE  ) {
+					// the planned one, crossed out
+					const scr_coord_val qw = proportional_string_width( r.planned_number );
+					const scr_coord_val qx = cx[pc] + (cw[pc] - qw) / 2;
+					display_proportional_clip_rgb( qx, ty + LINESPACE, r.planned_number, ALIGN_LEFT, via_col, true );
+					display_fillbox_wh_clip_rgb( qx - 1, ty + LINESPACE + LINESPACE / 2, qw + 2, 1, via_col, true );
+				}
+			}
+			else {
+				display_proportional_clip_rgb( px, ty, r.platform_number, ALIGN_LEFT, r.pstate == PLATFORM_CONFIRMED ? text_col : via_col, true );
 			}
 		}
 
@@ -1954,6 +2164,30 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 		tstrncpy( line_number, t, lengthof(line_number) );
 	}
 
+	// fork, platforms: the track or stand of the stop it stands at or goes to
+	platform[0] = 0;
+	planned_platform[0] = 0;
+	pstate = gui_departure_board_view_t::PLATFORM_PLANNED;
+	{
+		const convoi_t *c = cnv.get_rep();
+		halthandle_t at = haltestelle_t::get_halt( schedule->get_current_entry().pos, owner );
+		if(  at.is_bound()  ) {
+			sint32 planned = -1, now_at = -1;
+			platforms_t::get_platforms_of( at, schedule, cur, c->get_line(), c, planned, now_at );
+			const vector_tpl<platform_t *> &list = at->get_platforms();
+			if(  planned >= 0  ) {
+				tstrncpy( planned_platform, list[planned]->number, lengthof(planned_platform) );
+			}
+			const sint32 shown = now_at >= 0 ? now_at : planned;
+			if(  shown >= 0  ) {
+				tstrncpy( platform, list[shown]->number, lengthof(platform) );
+			}
+			if(  now_at >= 0  ) {
+				pstate = (planned >= 0  &&  strcmp( platform, planned_platform ) != 0) ? gui_departure_board_view_t::PLATFORM_CHANGED : gui_departure_board_view_t::PLATFORM_CONFIRMED;
+			}
+		}
+	}
+
 	cache[next_slot].cnv = cnv;
 	cache[next_slot].stamp = stamp;
 	cache[next_slot].cur = cur;
@@ -1994,6 +2228,9 @@ scr_coord_val convoy_sign_t::draw_row(scr_coord_val x, scr_coord_val y, bool dra
 	const scr_coord_val train_w = train[0] ? proportional_string_width( train ) : 0;
 	const scr_coord_val dest_w = proportional_string_width( dest );
 	scr_coord_val w = pad + dest_w + pad;
+	if(  platform[0]  ) {
+		w += draw_platform_number( 0, 0, 0, false ) + pad;
+	}
 	if(  train_w  ) {
 		w += train_w + pad;
 	}
@@ -2018,6 +2255,35 @@ scr_coord_val convoy_sign_t::draw_row(scr_coord_val x, scr_coord_val y, bool dra
 		cx += badge_w + pad;
 	}
 	display_proportional_clip_rgb( cx, ty, dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
+	if(  platform[0]  ) {
+		draw_platform_number( x + w - 1, y, h, true );
+	}
+	return w;
+}
+
+
+scr_coord_val convoy_sign_t::draw_platform_number(scr_coord_val right, scr_coord_val y, scr_coord_val h, bool draw) const
+{
+	// fork, platforms: a divider, then the number: plain, dim while only planned, a yellow box when sent elsewhere
+	const scr_coord_val pad = D_H_SPACE;
+	const scr_coord_val nw = proportional_string_width( platform );
+	const scr_coord_val w = nw + 2*pad + 1;
+	if(  draw  ) {
+		const PIXVAL border = rgb( train_style ? TRAIN_HEAD_BG : OTHER_HEAD_BG );
+		const PIXVAL text_col = rgb( train_style ? TRAIN_TEXT : OTHER_TEXT );
+		const PIXVAL dim_col = rgb( train_style ? TRAIN_VIA : OTHER_VIA );
+		const PIXVAL bg = rgb( train_style ? TRAIN_BG : OTHER_BG );
+		const scr_coord_val x = right - w;
+		const scr_coord_val ty = y + (h - LINESPACE) / 2;
+		display_fillbox_wh_clip_rgb( x, y + 1, 1, h - 2, border, true );
+		if(  pstate == gui_departure_board_view_t::PLATFORM_CHANGED  ) {
+			display_fillbox_wh_clip_rgb( x + 2, ty - 1, w - 3, LINESPACE + 2, rgb( train_style ? TRAIN_DELAY : OTHER_TEXT ), true );
+			display_proportional_clip_rgb( x + 1 + pad, ty, platform, ALIGN_LEFT, bg, true );
+		}
+		else {
+			display_proportional_clip_rgb( x + 1 + pad, ty, platform, ALIGN_LEFT, pstate == gui_departure_board_view_t::PLATFORM_CONFIRMED ? text_col : dim_col, true );
+		}
+	}
 	return w;
 }
 
@@ -2033,12 +2299,16 @@ void convoy_sign_t::draw_sign(scr_rect area) const
 	display_fillbox_wh_clip_rgb( area.x, area.y, area.w, area.h, border, true );
 	display_fillbox_wh_clip_rgb( area.x + 1, area.y + 1, area.w - 2, area.h - 2, bg, true );
 
-	// one line, as on the vehicle: the line badge, then where it goes
+	// one line, as on the vehicle: the line badge, then where it goes; fork, platforms: the track or stand at the end
 	const scr_coord_val ty = area.y + (area.h - LINESPACE) / 2;
 	const scr_coord_val badge_w = draw_line_badge( area.x + pad, ty, line_number, train_style, waytype, true );
 	const scr_coord_val tx = area.x + pad + (badge_w ? badge_w + pad : 0);
 	const char *dest = destination[0] ? destination : translator::translate("Not in service");
-	display_proportional_ellipsis_rgb( scr_rect( tx, ty, area.x + area.w - pad - tx, LINESPACE ), dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
+	scr_coord_val right = area.x + area.w - pad;
+	if(  platform[0]  ) {
+		right -= draw_platform_number( right, area.y, area.h, true ) + pad;
+	}
+	display_proportional_ellipsis_rgb( scr_rect( tx, ty, right - tx, LINESPACE ), dest, ALIGN_LEFT, destination[0] ? text_col : dim_col, true );
 }
 
 

@@ -14,6 +14,7 @@
 #include "../simdebug.h"
 #include "../simfab.h"
 #include "../simhalt.h"
+#include "../simplatform.h"
 #include "../simline.h"
 #include "../simunits.h"
 #include "../simlinemgmt.h"
@@ -305,7 +306,7 @@ static const char *export_line_state_name( karte_t *welt, linehandle_t line )
 }
 
 
-static void export_schedule( json_writer_t &w, const schedule_t *schedule, player_t *owner )
+static void export_schedule( json_writer_t &w, const schedule_t *schedule, player_t *owner, linehandle_t line = linehandle_t() )
 {
 	if(  schedule == NULL  ) {
 		w.value_null();
@@ -365,6 +366,23 @@ static void export_schedule( json_writer_t &w, const schedule_t *schedule, playe
 			w.kv_null( "couple_line_id" );
 		}
 		w.kv_int( "couple_max_wait", entry.couple_max_wait );
+		// fork, platforms: the number of the track or stand it stops at (null: none, or the platform has no number)
+		{
+			const char *number = NULL;
+			if(  halt.is_bound()  ) {
+				const vector_tpl<platform_t *> &list = halt->get_platforms();
+				const sint32 pi = platforms_t::find_schedule_platform( list, schedule, entry_nr, line );
+				if(  pi >= 0  &&  list[pi]->number[0]  ) {
+					number = list[pi]->number;
+				}
+			}
+			if(  number  ) {
+				w.kv_string( "platform", number );
+			}
+			else {
+				w.kv_null( "platform" );
+			}
+		}
 		// fork: departure board texts, what this stop sets and what departures from it show
 		static const char *const board_keys[schedule_entry_t::MAX_BOARD_TEXTS] = { "line", "destination" };
 		w.object_key( "board" );
@@ -708,7 +726,7 @@ static void export_lines( json_writer_t &w, karte_t *welt )
 			w.end_array();
 
 			w.key( "schedule" );
-			export_schedule( w, line->get_schedule(), player );
+			export_schedule( w, line->get_schedule(), player, line );
 
 			w.object_key( "stats" );
 			static const char *const line_stat_key[MAX_LINE_COST] = {
@@ -904,6 +922,68 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 		}
 		w.end_array();
 
+		// fork, platforms: tracks and stands with their numbers and the lines that board there by next stop
+		static const char *const kind_names[] = { "track", "stand", "other" };
+		static const char *const dir_names[] = { "", "N", "E", "", "S", "", "", "", "W" };
+		w.kv_int( "platform_flags", halt->get_platform_flags() );
+		w.array_key( "platforms" );
+		FOR( vector_tpl<platform_t *>, const p, halt->get_platforms() ) {
+			w.start_object();
+			w.kv_string( "kind", kind_names[p->kind] );
+			if(  p->number[0]  ) {
+				w.kv_string( "number", p->number );
+			}
+			else {
+				w.kv_null( "number" );
+			}
+			if(  p->dir  ) {
+				w.kv_string( "direction", dir_names[p->dir] );
+			}
+			else {
+				w.kv_null( "direction" );
+			}
+			w.kv_bool( "dead_end", p->dead_end );
+			w.array_key( "tiles" );
+			FOR( vector_tpl<koord3d>, const &k, p->tiles ) {
+				w.start_object();
+				w.kv_int( "x", k.x );
+				w.kv_int( "y", k.y );
+				w.kv_int( "z", k.z );
+				w.end_object();
+			}
+			w.end_array();
+			w.array_key( "groups" );
+			FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+				w.start_object();
+				w.kv_int( "next_halt_id", g->next.is_bound() ? g->next.get_id() : 0 );
+				w.kv_string( "next_name", g->next_name );
+				w.kv_string( "out", g->out ? dir_names[g->out] : "" );
+				w.kv_bool( "name_shown", g->name_shown );
+				w.array_key( "lines" );
+				FOR( vector_tpl<platform_member_t>, const &m, g->members ) {
+					w.start_object();
+					w.kv_int( "line_id", m.line.is_bound() ? m.line.get_id() : 0 );
+					w.kv_int( "entry", m.entry );
+					w.kv_string( "number", m.number );
+					w.kv_string( "destination", m.destination );
+					w.end_object();
+				}
+				w.end_array();
+				w.end_object();
+			}
+			w.end_array();
+			w.array_key( "arrivals" );
+			FOR( vector_tpl<platform_member_t>, const &m, p->arrivals ) {
+				w.start_object();
+				w.kv_int( "line_id", m.line.is_bound() ? m.line.get_id() : 0 );
+				w.kv_string( "number", m.number );
+				w.end_object();
+			}
+			w.end_array();
+			w.end_object();
+		}
+		w.end_array();
+
 		w.array_key( "convoy_ids" );
 		FOR( vector_tpl<convoihandle_t>, const cnv, halt->registered_convoys ) {
 			if(  cnv.is_bound()  ) {
@@ -1086,6 +1166,25 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			w.kv_null( "coupled_with" );
 		}
 		w.kv_bool( "running_late", cnv->is_running_late() );
+		// fork, platforms: where it leaves its current stop from, as the boards say
+		{
+			const schedule_t *sch = cnv->get_schedule();
+			const halthandle_t at = sch  &&  !sch->empty() ? haltestelle_t::get_halt( sch->get_current_entry().pos, cnv->get_owner() ) : halthandle_t();
+			sint32 planned = -1, now_at = -1;
+			if(  at.is_bound()  ) {
+				platforms_t::get_platforms_of( at, sch, sch->get_current_stop(), cnv->get_line(), cnv.get_rep(), planned, now_at );
+			}
+			const vector_tpl<platform_t *> *list = at.is_bound() ? &at->get_platforms() : NULL;
+			const sint32 shown = now_at >= 0 ? now_at : planned;
+			if(  list  &&  shown >= 0  &&  (*list)[shown]->number[0]  ) {
+				w.kv_string( "platform", (*list)[shown]->number );
+				w.kv_string( "platform_state", now_at < 0 ? "planned" : (planned >= 0  &&  strcmp( (*list)[now_at]->number, (*list)[planned]->number ) ? "changed" : "confirmed") );
+			}
+			else {
+				w.kv_null( "platform" );
+				w.kv_null( "platform_state" );
+			}
+		}
 		// fork, timetable: minutes late at the last stop with a timetable it left
 		if(  cnv->get_departure_delay() != convoi_t::NO_DEPARTURE_DELAY  ) {
 			w.kv_int( "departure_delay", cnv->get_departure_delay() );
@@ -1232,7 +1331,7 @@ static void export_convoys( json_writer_t &w, karte_t *welt )
 			w.value_null();
 		}
 		else {
-			export_schedule( w, cnv->get_schedule(), cnv->get_owner() );
+			export_schedule( w, cnv->get_schedule(), cnv->get_owner(), cnv->get_line() );
 		}
 
 		w.end_object();

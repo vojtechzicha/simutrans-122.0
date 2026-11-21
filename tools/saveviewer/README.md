@@ -115,6 +115,15 @@ year: higher spreads passengers over the map, lower keeps them near home) and `l
 `passenger_factor_exact` (the factor the towns use, in steps of 1/16, e.g. 1.5) and
 `station_name_on_first_tile` (stop names stay where they are when a stop grows instead of moving to its centre).
 
+Platforms (fork, savegame 122.18): every stop has `platform_flags` (1: cards in the "chosen stops" view, 2: track
+cards show the next stop only, 4: stand cards show destinations) and `platforms`, one per station track or stand:
+`kind` (`track`, `stand`, `other`), `number` (null: none), `direction` (a stand's travel direction N/E/S/W, null for
+tracks), `dead_end`, `tiles`, `groups` (lines boarding there by next stop: `next_halt_id`, `next_name`, `out` the
+way they leave, `name_shown`, `lines` with `line_id`, `entry`, `number` as the line chip says and `destination`) and
+`arrivals` (lines that only let passengers off there). Schedule entries have `platform`, the number of the track or
+stand they stop at; convoys `platform` and `platform_state` (`planned`, `confirmed`, `changed`) for the stop they
+are at or go to, null without a number.
+
 Every table is filtered and sorted in the browser and rows are added in chunks, so a save with
 thousands of stops still scrolls. Links between lines, stops and convoys go through the URL hash
 (`#line/17`, `#stop/5`, `#convoy/3`), so the back button works.

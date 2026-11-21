@@ -68,6 +68,7 @@
 #include "dataobj/savegame_export.h"
 #include "dataobj/savegame_rename.h"
 #include "dataobj/savegame_strip_parking.h"
+#include "dataobj/savegame_platform_markers.h"
 #include "tests/fork_test_harness.h"
 #include "dataobj/tabfile.h"
 #include "dataobj/settings.h"
@@ -471,6 +472,9 @@ int simu_main(int argc, char** argv)
 			"                     near=T or any; -strip-keep FILE, -strip-mail, -strip-free,\n"
 			"                     -strip-report FILE; see dataobj/savegame_strip_parking.h), only\n"
 			"                     with -saveas, else a dry run\n"
+			" -platform-markers M moves the markers at stops to platforms: numbers (N3/7:, 14 -),\n"
+			"                     strip (line lists the cards show) or both; -platform-keep FILE,\n"
+			"                     -platform-report FILE; only with -saveas, else a dry run\n"
 			" -forktest SCRIPT    runs the test script (on -load NAME or a world it builds), log in\n"
 			"                     SCRIPT.log, quits with exit code 1 on a failure (tests/README.md)\n"
 			" -freeplay           play with endless money\n"
@@ -527,8 +531,9 @@ int simu_main(int argc, char** argv)
 	const char *saveas_filename = gimme_arg(argc, argv, "-saveas", 1);
 	const char *rename_filename = gimme_arg(argc, argv, "-rename", 1);
 	const char *strip_parking_mode = gimme_arg(argc, argv, "-strip-parking", 1);
+	const char *platform_markers_mode = gimme_arg(argc, argv, "-platform-markers", 1);
 	const char *forktest_filename = gimme_arg(argc, argv, "-forktest", 1);
-	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL  ||  strip_parking_mode != NULL  ||  forktest_filename != NULL;
+	const bool batch_mode = export_filename != NULL  ||  saveas_filename != NULL  ||  rename_filename != NULL  ||  strip_parking_mode != NULL  ||  platform_markers_mode != NULL  ||  forktest_filename != NULL;
 	int exit_code = 0;
 
 #ifdef __BEOS__
@@ -1437,6 +1442,11 @@ DBG_MESSAGE("simmain","loadgame file found at %s",path.c_str());
 				may_save = savegame_strip_parking_t::apply( welt, strip_parking_mode, gimme_arg(argc, argv, "-strip-keep", 1),
 					gimme_arg(argc, argv, "-strip-mail", 0) != NULL, gimme_arg(argc, argv, "-strip-free", 0) != NULL,
 					saveas_filename == NULL, report ? report : "strip-parking.tsv" );
+			}
+			if(  platform_markers_mode  ) {
+				// fork, platforms: without -saveas this is a dry run: the report tells what would be done
+				const char *report = gimme_arg(argc, argv, "-platform-report", 1);
+				may_save &= savegame_platform_markers_t::apply( welt, platform_markers_mode, gimme_arg(argc, argv, "-platform-keep", 1), report ? report : "platform-markers.tsv" );
 			}
 			if(  export_filename  ) {
 				const char *save_name = gimme_arg(argc, argv, "-load", 1);

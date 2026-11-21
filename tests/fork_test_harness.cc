@@ -28,6 +28,7 @@
 #include "../simline.h"
 #include "../simlinemgmt.h"
 #include "../simhalt.h"
+#include "../simplatform.h"
 #include "../simdepot.h"
 #include "../player/simplay.h"
 #include "../bauer/wegbauer.h"
@@ -2035,6 +2036,174 @@ static void cmd_expect_tracks(int x, int y, const char *op, int limit)
 	}
 }
 
+// ---- platforms (simplatform.h) ----
+
+// the lines of a platform as one text: "Ex1,RJ>Olomouc hl.n.|S3>Bělotín" (+arr:79), next stop names as the board shows them
+static std::string platform_lines_text(const platform_t *p)
+{
+	std::string t;
+	vector_tpl<platform_run_t> runs;
+	FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+		if(  !t.empty()  ) t += "|";
+		platforms_t::get_runs( g->members, false, runs );
+		for(  uint32 k = 0;  k < runs[0].chips.get_count();  k++  ) {
+			if(  k  ) t += ",";
+			t += runs[0].chips[k]->number;
+		}
+		t += ">";
+		t += g->next_name;
+	}
+	if(  !p->arrivals.empty()  ) {
+		if(  !t.empty()  ) t += "|";
+		t += "arr:";
+		platforms_t::get_runs( p->arrivals, false, runs );
+		for(  uint32 k = 0;  k < runs[0].chips.get_count();  k++  ) {
+			if(  k  ) t += ",";
+			t += runs[0].chips[k]->number;
+		}
+	}
+	return t;
+}
+
+static halthandle_t halt_at(int x, int y)
+{
+	grund_t *gr = W->lookup_kartenboden( koord(x, y) );
+	if(  gr  &&  gr->get_halt().is_bound()  ) {
+		return gr->get_halt();
+	}
+	if(  const planquadrat_t *pl = W->access( x, y )  ) {
+		for(  uint8 i = 0;  i < pl->get_boden_count();  i++  ) {
+			if(  pl->get_boden_bei(i)->get_halt().is_bound()  ) {
+				return pl->get_boden_bei(i)->get_halt();
+			}
+		}
+	}
+	return halthandle_t();
+}
+
+// the platform of a stop with tile x,y (a stand: the one of travel direction d, N/E/S/W, "-" any)
+static const platform_t *platform_at(int x, int y, const char *d, halthandle_t &halt)
+{
+	halt = halt_at( x, y );
+	if(  !halt.is_bound()  ) {
+		return NULL;
+	}
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	for(  uint32 i = 0;  i < list.get_count();  i++  ) {
+		const platform_t *p = list[i];
+		bool here = false;
+		FOR( vector_tpl<koord3d>, const &k, p->tiles ) {
+			here |= k.x == x  &&  k.y == y;
+		}
+		if(  here  &&  (d == NULL  ||  d[0] == '-'  ||  p->kind != platform_t::STAND  ||  p->dir == dir_of( d ))  ) {
+			return p;
+		}
+	}
+	return NULL;
+}
+
+// platforms X Y: every platform of the stop with that tile, its number, tiles and lines
+static void cmd_platforms(int x, int y)
+{
+	const halthandle_t halt = halt_at( x, y );
+	if(  !halt.is_bound()  ) {
+		logf("ERROR platforms: no stop at %d,%d\n", x, y);
+		failures++;
+		return;
+	}
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	logf("platforms of %s: %d\n", halt->get_name(), (int)list.get_count());
+	FOR( vector_tpl<platform_t *>, const p, list ) {
+		char ax[8];
+		ll_dirs( p->axis, ax );
+		logf("  %-5s %-4s %d,%d..%d,%d axis %s dir %s%s: %s\n", p->kind == platform_t::TRACK ? "track" : p->kind == platform_t::STAND ? "stand" : "other",
+			p->number, p->tiles[0].x, p->tiles[0].y, p->tiles.back().x, p->tiles.back().y, ax, p->dir ? ll_dir( p->dir ) : "-", p->dead_end ? " dead end" : "",
+			platform_lines_text( p ).c_str());
+		FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+			logf("      > %s%s out %s:", g->next_name, g->name_shown ? "" : " (not named)", g->out ? ll_dir( g->out ) : "?");
+			vector_tpl<platform_run_t> runs;
+			platforms_t::get_runs( g->members, true, runs );
+			FOR( vector_tpl<platform_run_t>, const &r, runs ) {
+				logf(" [");
+				for(  uint32 k = 0;  k < r.chips.get_count();  k++  ) logf("%s%s", k ? "," : "", r.chips[k]->number);
+				logf(" %s]", r.destination);
+			}
+			logf("\n");
+		}
+	}
+}
+
+// expect_platform X Y D NUMBER: the platform with tile X,Y (stand: travel direction D, "-" for tracks) has that number ("-" none)
+static void cmd_expect_platform(int x, int y, const char *d, const char *number)
+{
+	halthandle_t halt;
+	const platform_t *p = platform_at( x, y, d, halt );
+	const char *want = number  &&  strcmp( number, "-" ) ? number : "";
+	if(  p  &&  !strcmp( p->number, want )  ) {
+		logf("ok   expect_platform %d,%d %s %s\n", x, y, d, number);
+	}
+	else {
+		logf("FAIL expect_platform %d,%d %s %s: %s\n", x, y, d, number, p ? p->number : "no platform");
+		failures++;
+	}
+}
+
+// expect_lines X Y D TEXT...: the lines of that platform as platform_lines_text gives them
+static void cmd_expect_lines(int x, int y, const char *d, const std::string &want)
+{
+	halthandle_t halt;
+	const platform_t *p = platform_at( x, y, d, halt );
+	const std::string have = p ? platform_lines_text( p ) : std::string("no platform");
+	if(  have == want  ) {
+		logf("ok   expect_lines %d,%d %s %s\n", x, y, d, want.c_str());
+	}
+	else {
+		logf("FAIL expect_lines %d,%d %s: want '%s', have '%s'\n", x, y, d, want.c_str(), have.c_str());
+		failures++;
+	}
+}
+
+// expect_platform_state PAT STATE NUMBER: some convoy matching PAT leaves its current stop from the platform with that
+// number (* any), as the boards show it: planned (the schedule's track), confirmed (standing there or reserved into it) or
+// changed (confirmed, not the planned one)
+static void cmd_expect_platform_state(const char *pat, const char *state, const char *number)
+{
+	std::string seen;
+	FOR(vector_tpl<convoihandle_t>, const cnv, W->convoys()) {
+		if(  cnv->get_vehicle_count()==0  ||  !cnv_matches( cnv, pat )  ||  cnv->get_schedule()==NULL  ) continue;
+		const schedule_t *sch = cnv->get_schedule();
+		halthandle_t halt = haltestelle_t::get_halt( sch->get_current_entry().pos, cnv->get_owner() );
+		if(  !halt.is_bound()  ) continue;
+		sint32 planned = -1, now = -1;
+		platforms_t::get_platforms_of( halt, sch, sch->get_current_stop(), cnv->get_line(), cnv.get_rep(), planned, now );
+		const vector_tpl<platform_t *> &list = halt->get_platforms();
+		const sint32 at = now >= 0 ? now : planned;
+		const char *st = now < 0 ? "planned" : (planned >= 0  &&  strcmp( list[now]->number, list[planned]->number ) ? "changed" : "confirmed");
+		const char *num = at >= 0 ? list[at]->number : "-";
+		seen += std::string(" ") + cnv->get_name() + ":" + st + "/" + num;
+		if(  !strcmp( st, state )  &&  (!strcmp( num, number )  ||  !strcmp( number, "*" ))  ) {
+			logf("ok   expect_platform_state %s %s %s\n", pat, state, number);
+			return;
+		}
+	}
+	logf("FAIL expect_platform_state %s %s %s:%s\n", pat, state, number, seen.c_str());
+	failures++;
+}
+
+// platformnumber X Y D TEXT: give the platform that number ("-": none), as the Platforms tab does
+static void cmd_platform_number(int x, int y, const char *d, const char *text)
+{
+	halthandle_t halt;
+	const platform_t *p = platform_at( x, y, d, halt );
+	if(  p == NULL  ) {
+		logf("ERROR platformnumber: no platform at %d,%d %s\n", x, y, d);
+		failures++;
+		return;
+	}
+	halt->set_platform_number( p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0, strcmp( text, "-" ) ? text : "" );
+	logf("platformnumber %d,%d %s %s\n", x, y, d, text);
+}
+
 // expect_state PAT STATE: some convoy matching PAT is in that state now (state_name)
 // expect_wait PAT TEXT...: the wait text of some convoy matching PAT (convoy window) contains TEXT
 static void cmd_expect_now(const char *pat, const std::string &what, bool wait_text)
@@ -2084,6 +2253,16 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="expect_stuck"  ) cmd_expect_stuck( S(1), I(2) );
 	else if(  c=="expect_parkedat"  ) cmd_expect_parkedat( S(1), I(2), I(3), S(4), I(5) );
 	else if(  c=="expect_tracks"  ) cmd_expect_tracks( I(1), I(2), S(3), I(4) );
+	else if(  c=="platforms"  ) cmd_platforms( I(1), I(2) );
+	else if(  c=="cardview"  ) { env_t::platform_cards = (uint8)I(1); logf("cardview %d\n", I(1)); }   // platform cards: 0 off, 1 chosen stops, 2 all stops
+	else if(  c=="expect_platform"  ) cmd_expect_platform( I(1), I(2), S(3), S(4) );
+	else if(  c=="platformnumber"  ) cmd_platform_number( I(1), I(2), S(3), S(4) );
+	else if(  c=="expect_platform_state"  ) cmd_expect_platform_state( S(1), S(2), S(3) );
+	else if(  c=="expect_lines"  ) {
+		std::string what;
+		for(  size_t i=4;  i<a.size();  i++  ) what += std::string(i>4 ? " " : "") + a[i];
+		cmd_expect_lines( I(1), I(2), S(3), what );
+	}
 	else if(  c=="expect_state"  ||  c=="expect_wait"  ) {
 		std::string what;
 		for(  size_t i=2;  i<a.size();  i++  ) what += std::string(i>2 ? " " : "") + a[i];
@@ -2152,6 +2331,7 @@ static void run_command(std::vector<char *> &a)
 		for(  int y=I(2);  y<=I(4);  y++  ) { for(  int x=I(1);  x<=I(3);  x++  ) { grund_t *gr = W->lookup_kartenboden(koord(x, y)); logf("%c", gr->get_grund_hang() ? '/' : '0'+gr->get_hoehe()%10); } logf("\n"); }
 	}
 	else if(  c=="snap"  ) cmd_snap( I(1), I(2), I(3), S(4) );
+	else if(  c=="haltname"  ) {   /* haltname X Y NAME...: rename the stop on that tile */ std::string n; for(size_t i=3;i<a.size();i++) n += std::string(i>3?" ":"")+a[i]; halthandle_t h = haltestelle_t::get_halt( ground(I(1),I(2))->get_pos(), PL ); if(h.is_bound()) h->set_name(n.c_str()); logf("haltname %s\n", n.c_str()); }
 	else if(  c=="run_until_aspect"  ) cmd_run_until_aspect( I(1), I(2), I(3), I(4) );
 	else if(  c=="pax"  ) cmd_pax( I(1), I(2), I(3), I(4), I(5) );
 	else if(  c=="loads"  ) cmd_loads( S(1) );

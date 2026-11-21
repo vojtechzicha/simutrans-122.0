@@ -239,6 +239,9 @@ clipping_info_t clips;
 
 static font_t default_font;
 
+// fork: the font, for text drawn larger (gui/platform_info.cc)
+const font_t *display_get_default_font() { return &default_font; }
+
 // needed for resizing gui
 int default_font_ascent = 0;
 int default_font_linespace = 0;

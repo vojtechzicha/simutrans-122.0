@@ -1357,18 +1357,65 @@ tile's freed text (stock showed garbage there after an extension). Same rights a
 game, the owner in network games. With `station_name_on_first_tile` the moved name stays; without it the next change
 of the stop centres it again.
 
-## Platforms (planned fork feature, design only)
+## Platforms (fork feature, savegame 122.18)
 
-Plan: `documentation/fork-platforms-plan.md`; nothing is implemented. The owner writes about 14,200 map markers
-by hand that list the lines at a stop ("N3/7: Praha hlavní nádraží (Ex1…)", "6: 532 Radíkov", "1,7,8,13 směr
-aut.st."); the feature generates them. A platform is a station track or a stand (the stop tiles of a road or
-tram stop in one travel direction); each gets a card on the map with its number, the lines that board there and
-an arrow for the way they leave. Tracks show next stop and destination together, stands the next stop (a stop's
-stands can be switched to next stop + destination). The same numbers go on the departure boards (Track and
-Stand columns: planned, confirmed, changed), the convoy window and optional display and sign objects. Order of
-work, save format 122.18 and the marker import and strip tools are in the plan. The pixel mockups (the owner's
-Hranice na Moravě) come from `tools/mockups` (README there; screenshots and results in OneDrive's
-`Games/Simutrans/docs/platforms-mockups`), published at https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i.
+Plan and design: `documentation/fork-platforms-plan.md`; mockups on the owner's Hranice na Moravě:
+https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i (`tools/mockups`). Replaces the ~14,200 hand-written markers that
+list lines at stops. Phases 1-3 of the plan are in (cards, numbers, boards); the display and sign objects (phase 4)
+are not.
+- Model (`simplatform.*`): a platform is a station track (a row of the stop's tiles on one track,
+  `stop_waytype` from the building) or a stand (one road or tram stop tile in one travel direction: a through tile has
+  two, a dead end one; per tile because the owner numbers the tiles of a bus station row separately); ships and
+  aircraft get one per tile, no card. `platforms_t::build` works them out with the lines that board there (passenger
+  lines with convoys; a loading entry not followed by another entry of the same stop), grouped by the next stop where
+  passengers may get off, with the departure board's line number and destination
+  (`gui_departure_board_view_t::get_departure_texts`), lines that only let people off as arrivals, rule 4 (a group
+  names its next stop only when the platform has several groups or a line of it leaves another platform for another
+  stop), order by letters then number. Cached per stop (`haltestelle_t::get_platforms`, `platform_stamp` bumped in
+  `rebuild_connections`, `add_grund`/`rem_grund` and on numbers; `platforms_t::epoch` on stop and line renames, schedule
+  changes and a line's first or last convoy). Never per frame unless something changed.
+- Directions: `simline_t::entry_ways` (saved 122.18, kept for entries whose neighbours stayed across a schedule edit):
+  per entry the travel direction on arrival (`ziel_erreicht`, the front vehicle) and the first step of the way out
+  (`convoi_t::learn_departure_way` when it starts driving from that stop). Until a vehicle was seen, a guess from where
+  it comes from and goes to. The arrival picks the stand of a through tile; the departure is the arrow.
+- Numbers: `haltestelle_t::platform_labels` (anchor tile, stand direction, text up to 7 characters, saved 122.18 with
+  `platform_flags`). A label belongs to the platform with its tile (a removed tile: the platform next to it; two on
+  one platform: the older wins); tracks without one get the next free number across the station, highest level first
+  (a metro under a station after it), and keep it. Stands get none until typed. Typed through the simple tool
+  `TOOL_CHANGE_PLATFORMS` (`f,HALT,FLAGS`, `n,HALT,X,Y,Z,DIR,TEXT`, `a,HALT` renumber tracks), so network safe.
+- Cards (`gui/platform_cards.*`, drawn by `main_view_t::display` after the overlays): number box, then per group the
+  chips (train navy, bus blue, tram red, six to a row, "+N" after three rows, four cells at most), the arrow and the
+  next stop. Tracks default to the table (a row per next stop, every line with where it ends), `PLATFORMS_TRACKS_COMPACT`
+  the compact form; stands default to next stop, `PLATFORMS_STANDS_DEST` adds destinations. A track's card at its end
+  further left on the screen, a stand's beside its kerb right of the travel direction with a leader. Cards and name
+  tags of all shown stops avoid each other. One zoom step out chips and arrows only, further out none. View
+  `env_t::platform_cards` (simuconf `platform_cards`, not saved; key N unless menuconf binds `TOOL_PLATFORM_CARDS` or N;
+  Display settings > Stations): off, chosen stops (`PLATFORMS_CHOSEN`, default), all stops; the stop under the mouse and
+  stops with an open window always. The card under the mouse draws in full; with the query tool a click opens the
+  platform window, Shift+click switches the stop's form for that kind (`siminteraction.cc`).
+- Windows (`gui/platform_info.*`): the stop window's Platforms tab (number inputs, kind, lines by next stop; pointing at
+  a row marks its tiles; buttons: map labels, the two forms, number tracks across, "Number on the map" =
+  `TOOL_NUMBER_PLATFORM`, click a platform to type its number); the platform window (the next departure with the number
+  and destination at double size, then the full table).
+- Boards: train board Track column, the other board Stand column, only when a row has a number
+  (`gui_departure_board_view_t::set_row_platforms`, `platforms_t::get_platforms_of`): planned (the schedule tile's
+  platform, via colour), confirmed (standing there; rail: route end reserved by the convoy or a claimed track; road: a
+  choose sign sent it to another tile), changed (yellow box blinking every 3 s, planned number crossed out). Convoy
+  window departure row ", track 3" / " instead of 7", the destination sign and the hover sign end with the number,
+  the schedule editor appends ", track 7".
+- Markers: `-platform-markers numbers|strip|both [-platform-keep FILE] [-platform-report FILE]`
+  (`dataobj/savegame_platform_markers.*`, with -saveas, else a dry run; `steam-fork.sh platform-markers[-dry]`). Numbers
+  from `N3/7:`, `K2:`, `14 -`, `14:`, `J -` within one tile of a stop (the track the marker is on, else the nearest
+  platforms in tiers, without those other parts of the marker took, the one whose lines the text names most); stops
+  whose stand markers name destinations get `PLATFORMS_STANDS_DEST`. Strip removes a marker whose every line token
+  (`Ex1/1,2` = Ex1/1, Ex1/2; `RJ1/1-7`; `<..>` left out) is a chip or the code of a line whose schedule stops there.
+  On the owner's save of 2026-11-08: 1,707 numbers (Hranice: tracks 7, 6, 3, 2, 1 and 13 of its 15 stands as on the
+  markers), 130 stops with destinations, 15,407 markers removed, 18,802 kept (road signs, names, line variants that
+  exist on no line).
+- Export: stops `platform_flags`, `platforms`; schedule entries `platform`; convoys `platform`, `platform_state`.
+- Tests: `platforms_basic`, `platforms_changed` (harness `platforms`, `expect_platform`, `expect_lines`,
+  `expect_platform_state`, `platformnumber`, `cardview`). Seen on the owner's save through the harness screenshots:
+  cards at Hranice (station, bus station, streets), the tab, the platform window, both boards.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)
 

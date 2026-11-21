@@ -74,6 +74,11 @@ bool display_load_font(const char*, bool)
 	return true;
 }
 
+const font_t *display_get_default_font()
+{
+	return NULL;
+}
+
 sint16 display_get_width()
 {
 	return 0;

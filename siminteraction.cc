@@ -4,6 +4,7 @@
  */
 
 #include "siminteraction.h"
+#include "gui/platform_cards.h"
 
 #include "simversion.h"
 #include "dataobj/environment.h"
@@ -232,6 +233,10 @@ void interaction_t::interactive_event( const event_t &ev )
 			bool suspended = false; // true if execution was suspended, i.e. sent to server
 			tool_t *tool = world->get_tool(world->get_active_player_nr());
 			player_t *player = world->get_active_player();
+			// fork, platforms: a click on a platform card (with the query tool) opens the platform window
+			if(  tool == tool_t::general_tool[TOOL_QUERY]  &&  platform_cards_t::click( ev.mx, ev.my, (event_get_last_control_shift() & 1) != 0 )  ) {
+				return;
+			}
 			// first check for visibility etc
 			const char *err = tool->check_pos( player, pos );
 			if (err==NULL) {

@@ -375,6 +375,12 @@ private:
 	 */
 	uint8 departing_entry;
 
+	/// fork, platforms: the schedule entry of the stop we stand at, to learn which way the line leaves it (255: none; not saved)
+	uint8 platform_learn_entry;
+
+	/// fork, platforms: we left the stop of platform_learn_entry; tells the line which way
+	void learn_departure_way();
+
 	/// Fork, coupling: UNCOUPLING since this tick; warned once that the platform stays taken. Not saved.
 	uint32 uncouple_since;
 	bool uncouple_warned;

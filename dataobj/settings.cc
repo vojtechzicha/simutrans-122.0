@@ -1013,6 +1013,7 @@ void settings_t::parse_simuconf( tabfile_t& simuconf, sint16& disp_width, sint16
 	env_t::simple_drawing_fast_forward = contents.get_int( "simple_drawing_fast_forward", env_t::simple_drawing_fast_forward );
 	env_t::visualize_schedule = contents.get_int( "visualize_schedule", env_t::visualize_schedule ) != 0;
 	env_t::show_vehicle_states = contents.get_int( "show_vehicle_states", env_t::show_vehicle_states );
+	env_t::platform_cards = (uint8)min( 2, max( 0, contents.get_int( "platform_cards", env_t::platform_cards ) ) );
 	env_t::follow_convoi_underground = contents.get_int( "follow_convoi_underground", env_t::follow_convoi_underground );
 
 	env_t::hide_rail_return_ticket = contents.get_int( "hide_rail_return_ticket", env_t::hide_rail_return_ticket ) != 0;

@@ -28,6 +28,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)simintr.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simio.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simline.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)simplatform.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simlinemgmt.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simloadingscreen.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)simmain.cc" />
@@ -86,6 +87,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_export.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_rename.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_strip_parking.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\savegame_platform_markers.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\scenario.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\schedule.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)dataobj\settings.cc" />
@@ -151,6 +153,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\curiositylist_frame_t.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\curiositylist_stats_t.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\departure_board.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)gui\platform_info.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)gui\platform_cards.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\depot_frame.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\depotlist_frame.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)gui\display_settings.cc" />
@@ -357,6 +361,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)simintr.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simio.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simline.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)simplatform.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simlinemgmt.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simloadingscreen.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)simmain.h" />
@@ -418,6 +423,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_export.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_rename.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_strip_parking.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\savegame_platform_markers.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\scenario.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)dataobj\schedule_entry.h" />
@@ -505,6 +511,8 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\curiositylist_frame_t.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\curiositylist_stats_t.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\departure_board.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)gui\platform_info.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)gui\platform_cards.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\depot_frame.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\depotlist_frame.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)gui\display_settings.h" />

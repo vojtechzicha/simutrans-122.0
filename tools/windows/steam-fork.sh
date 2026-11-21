@@ -37,6 +37,16 @@
 #                                                  result as NAME-noparking-DATE.sve, report next to it
 #   tools/windows/steam-fork.sh strip-parking-dry NAME|latest [MODE] [KEEP.txt]
 #                                                  only the report, save/NAME-noparking-dry.tsv
+#   tools/windows/steam-fork.sh platform-markers NAME|latest [MODE] [KEEP.txt] [OUT.sve]
+#                                                  copy the save to save/backup/, move the markers at
+#                                                  stops to the platforms (MODE numbers: N3/7:, 14 -
+#                                                  give tracks and stands their numbers; strip: remove
+#                                                  line lists the platform cards show; both, the
+#                                                  default; KEEP.txt: stops whose markers stay; see
+#                                                  dataobj/savegame_platform_markers.h) and write
+#                                                  NAME-platforms-DATE.sve, report next to it
+#   tools/windows/steam-fork.sh platform-markers-dry NAME|latest [MODE] [KEEP.txt]
+#                                                  only the report, save/NAME-platforms-dry.tsv
 #   tools/windows/steam-fork.sh signals FILE.dat [SIZE]
 #                                                  build the fork's makeobj and compile FILE.dat (the
 #                                                  platform signal and station boundary, see
@@ -370,6 +380,50 @@ do_strip() {
 	echo "done: $out ($(du -h "$out" | cut -f1))"
 }
 
+platform_summary() {
+	local report="$1"
+	[ -f "$report" ] || die "no report $report written"
+	echo "report: $report"
+	cut -f4 "$report" | tail -n +2 | sort | uniq -c | sort -rn
+}
+
+do_platform_markers() {
+	local dry="$1"; shift
+	local name="${1:-}" mode="${2:-both}" keep="${3:-}"
+	[ -n "$name" ] || die "usage: $0 platform-markers NAME|latest [MODE] [KEEP.txt] [OUT.sve]"
+	local keep_args=()
+	if [ -n "$keep" ]; then
+		[ -f "$keep" ] || die "no keep list $keep"
+		keep_args=(-platform-keep "$(cd "$(dirname "$keep")" && pwd)/$(basename "$keep")")
+	fi
+	name="$(save_name "$name")"
+	local src="$SIM_USER_DIR/save/$name.sve"
+	if tasklist 2>/dev/null | grep -qi '^simutrans'; then
+		echo "warning: Simutrans is running; the copy has the state of $src as saved at $(date -r "$src" '+%Y-%m-%d %H:%M')"
+	fi
+	echo "save: $src ($(date -r "$src" '+%Y-%m-%d %H:%M:%S')), mode $mode"
+	if [ "$dry" = 1 ]; then
+		local report="$SIM_USER_DIR/save/$name-platforms-dry.tsv"
+		rm -f "$report"
+		run_batch -load "$name" -platform-markers "$mode" ${keep_args[@]+"${keep_args[@]}"} -platform-report "$report" | grep -i 'platform markers\|error\|WRONGSAVE' || true
+		platform_summary "$report"
+		return
+	fi
+	local out="${4:-$SIM_USER_DIR/save/$name-platforms-$(date '+%Y%m%d-%H%M%S').sve}"
+	[ ! -e "$out" ] || die "$out exists, not overwriting it"
+	mkdir -p "$SIM_USER_DIR/save/backup"
+	local bak; bak="$SIM_USER_DIR/save/backup/$name-$(date -r "$src" '+%Y%m%d-%H%M%S').sve"
+	[ -f "$bak" ] || cp -p "$src" "$bak"
+	cmp -s "$src" "$bak" || die "backup $bak differs from $src"
+	echo "backup: $bak"
+	local report="${out%.sve}.tsv"
+	run_batch -load "$name" -platform-markers "$mode" ${keep_args[@]+"${keep_args[@]}"} -platform-report "$report" -saveas "$out" | grep -i 'platform markers\|saving game\|error\|WRONGSAVE' || true
+	platform_summary "$report"
+	[ -f "$out" ] || die "no output file written"
+	cmp -s "$src" "$bak" || die "the save changed meanwhile, backup kept at $bak"
+	echo "done: $out ($(du -h "$out" | cut -f1))"
+}
+
 # the fork's makeobj knows is_platformsignal and station_boundary; the objects go into the pakset
 # folder as an add-on, the rest of the pakset stays as Steam installed it
 build_makeobj() {
@@ -410,6 +464,8 @@ case "${1:-}" in
 	rename-dry) shift; do_rename 1 "$@" ;;
 	strip-parking) shift; do_strip 0 "$@" ;;
 	strip-parking-dry) shift; do_strip 1 "$@" ;;
+	platform-markers) shift; do_platform_markers 0 "$@" ;;
+	platform-markers-dry) shift; do_platform_markers 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
 	landscape) do_landscape ;;
 	*)         sed -n '2,/^# Override/p' "$0"; exit 1 ;;

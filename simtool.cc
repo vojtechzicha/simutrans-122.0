@@ -90,6 +90,8 @@
 #include "utils/simstring.h"
 
 #include "simtool.h"
+#include "gui/halt_info.h"
+#include "simplatform.h"
 #include "player/finance.h"
 
 #define is_scenario()  welt->get_scenario()->is_scripted()
@@ -2226,6 +2228,140 @@ const char *tool_move_halt_name_t::work( player_t *player, koord3d pos )
 		welt->set_tool( tool_t::general_tool[TOOL_QUERY], player );
 	}
 	return NULL;
+}
+
+
+// fork, platforms
+halthandle_t tool_number_platform_t::get_target_halt() const
+{
+	halthandle_t halt;
+	if(  default_param  &&  *default_param >= '0'  &&  *default_param <= '9'  ) {
+		halt.set_id( (uint16)atoi( default_param ) );
+	}
+	return halt;
+}
+
+
+bool tool_number_platform_t::is_working_for( halthandle_t halt )
+{
+	const tool_number_platform_t *tool = static_cast<const tool_number_platform_t *>( tool_t::general_tool[TOOL_NUMBER_PLATFORM] );
+	return halt.is_bound()  &&  welt->get_tool( welt->get_active_player_nr() ) == tool  &&  tool->get_target_halt() == halt;
+}
+
+
+const char *tool_number_platform_t::get_tooltip( const player_t * ) const
+{
+	const halthandle_t halt = get_target_halt();
+	sprintf( toolstr, translator::translate( "Click a track or stand of %s to type its number" ), halt.is_bound() ? halt->get_name() : "-" );
+	return toolstr;
+}
+
+
+bool tool_number_platform_t::init( player_t *player )
+{
+	cursor = tool_t::general_tool[TOOL_QUERY]->cursor;
+	const halthandle_t halt = get_target_halt();
+	return halt.is_bound()  &&  (!env_t::networkmode  ||  player_t::check_owner( halt->get_owner(), player ));
+}
+
+
+const char *tool_number_platform_t::work( player_t *player, koord3d pos )
+{
+	const halthandle_t halt = get_target_halt();
+	if(  !halt.is_bound()  ||  !can_use_gui()  ||  player != welt->get_active_player()  ) {
+		return "";
+	}
+	// the platforms with a tile on that square (a through stop tile has two stands: each click the next one)
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	vector_tpl<sint32> here;
+	for(  uint32 i = 0;  i < list.get_count();  i++  ) {
+		FOR( vector_tpl<koord3d>, const &k, list[i]->tiles ) {
+			if(  k.get_2d() == pos.get_2d()  ) {
+				here.append( i );
+				break;
+			}
+		}
+	}
+	if(  here.empty()  ) {
+		return "This is no track or stand of the stop.";
+	}
+	static koord3d last_pos = koord3d::invalid;
+	static uint32 turn = 0;
+	turn = (last_pos == pos) ? turn + 1 : 0;
+	last_pos = pos;
+	const platform_t *p = list[here[turn % here.get_count()]];
+	halt_info_t::focus_platform( halt, p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 );
+	return NULL;
+}
+
+
+bool tool_change_platforms_t::init( player_t *player )
+{
+	const char *p = default_param;
+	if(  p == NULL  ||  !*p  ) {
+		return false;
+	}
+	const char what = *p++;
+	if(  *p == ','  ) {
+		p++;
+	}
+	halthandle_t halt;
+	halt.set_id( (uint16)atoi( p ) );
+	if(  !halt.is_bound()  ||  (env_t::networkmode  &&  !player_t::check_owner( halt->get_owner(), player ))  ) {
+		return false;
+	}
+	while(  *p  &&  *p != ','  ) {
+		p++;
+	}
+	if(  *p == ','  ) {
+		p++;
+	}
+	switch(  what  ) {
+		case 'f':
+			halt->set_platform_flags( (uint8)atoi( p ) );
+			break;
+		case 'n': {
+			int x = 0, y = 0, z = 0, dir = 0, used = 0;
+			if(  sscanf( p, "%d,%d,%d,%d,%n", &x, &y, &z, &dir, &used ) >= 4  &&  used > 0  ) {
+				halt->set_platform_number( koord3d( x, y, z ), (uint8)dir, p + used );
+			}
+			break;
+		}
+		case 'a': {
+			// the tracks lose their numbers and get 1, 2, 3 ... across again
+			vector_tpl<platform_label_t> &labels = halt->access_platform_labels();
+			const vector_tpl<platform_t *> &list = halt->get_platforms();
+			for(  uint32 k = labels.get_count();  k-- > 0;  ) {
+				const sint32 i = platforms_t::find( list, labels[k].anchor, 0 );
+				if(  i >= 0  &&  list[i]->kind == platform_t::TRACK  ) {
+					labels.remove_at( k );
+				}
+			}
+			halt->platforms_changed();
+			break;
+		}
+	}
+	return false;
+}
+
+
+const char *tool_platform_cards_t::get_tooltip( const player_t * ) const
+{
+	static const char *names[] = { "Platform cards: off", "Platform cards: chosen stops", "Platform cards: all stops" };
+	return translator::translate( names[(env_t::platform_cards + 1) % 3] );
+}
+
+
+bool tool_platform_cards_t::init( player_t * )
+{
+	if(  default_param  &&  *default_param >= '0'  &&  *default_param <= '2'  ) {
+		env_t::platform_cards = *default_param - '0';
+	}
+	else {
+		env_t::platform_cards = (env_t::platform_cards + 1) % 3;
+	}
+	welt->set_dirty();
+	return false;
 }
 
 

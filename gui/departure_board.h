@@ -18,6 +18,7 @@
 
 
 class cbuffer_t;
+class platform_t;
 class schedule_t;
 class player_t;
 
@@ -80,7 +81,35 @@ public:
 	/// line (empty without one) and the destination (empty: not in service)
 	static void get_auto_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, cbuffer_t &line_number, cbuffer_t &destination);
 
+	/**
+	 * Fork, platforms: what the board shows for departures from entry at here: the line number (the schedule's
+	 * board text included; empty without one), the line's category and the destination with its halt. False if
+	 * nobody can ride it (a run to a siding).
+	 */
+	static bool get_departure_texts(const schedule_t *schedule, uint8 entry, const player_t *owner, linehandle_t line, halthandle_t here, cbuffer_t &line_number, cbuffer_t &category, cbuffer_t &destination, halthandle_t &dest_halt);
+
+	/// fork: the colour of a line badge of a vehicle type on the other board (0xRRGGBB)
+	static uint32 get_badge_color(waytype_t wt);
+
 public:
+	enum { PLATFORM_PLANNED = 0, PLATFORM_CONFIRMED = 1, PLATFORM_CHANGED = 2 };
+
+	/// fork, platforms: the next departure from a platform, as the platform window shows it
+	struct platform_departure_t {
+		char time[16];
+		char train[48];
+		char line_number[32];
+		char destination[128];
+		char via[256];
+		char status[32];     ///< "+4 min", "On time", "in 7 min"
+		bool late;
+		waytype_t wt;
+		platform_departure_t() : late(false), wt(invalid_wt) { time[0] = train[0] = line_number[0] = destination[0] = via[0] = status[0] = 0; }
+	};
+
+	/// fork, platforms: the next departure from platform p of halt (kept a game minute); false if none
+	static bool get_next_platform_departure(halthandle_t halt, const platform_t *p, platform_departure_t &dep);
+
 	struct row_t {
 		convoihandle_t cnv;  ///< unbound: a timetable slot no train is known for yet
 		linehandle_t line;
@@ -92,8 +121,14 @@ public:
 		sint32 delay;        ///< minutes after the slot, 0 = on time; -1 without a timetable
 		bool booked;         ///< it finished loading and booked its slot, but still stands there
 		char train[48];
+		// fork, platforms: where it leaves from (indices into the halt's platforms, -1 none)
+		sint16 planned_platform;  ///< the platform of the schedule's stop tile
+		sint16 platform;          ///< where it will leave: confirmed, else the planned one
+		uint8 pstate;             ///< PLATFORM_PLANNED, _CONFIRMED or _CHANGED
+		char platform_number[8];
+		char planned_number[8];
 
-		row_t() : stream(0), group(0), alt(-1), scheduled(-1), expected(0), delay(-1), booked(false) { train[0] = 0; }
+		row_t() : stream(0), group(0), alt(-1), scheduled(-1), expected(0), delay(-1), booked(false), planned_platform(-1), platform(-1), pstate(0) { train[0] = 0; platform_number[0] = 0; planned_number[0] = 0; }
 	};
 
 private:
@@ -120,7 +155,9 @@ private:
 	uint32 last_line_count, last_convoy_count;
 
 	// column widths and row height, set by layout()
-	scr_coord_val col_w[5];
+	scr_coord_val col_w[6];
+	bool has_platforms;   ///< fork: some row has a platform number (the Track/Stand column)
+	void set_row_platforms(row_t &r);
 	scr_coord_val row_h, header_h;
 	scr_size min_size;
 
@@ -176,6 +213,9 @@ struct convoy_sign_t
 	halthandle_t dest_halt;
 	bool train_style;        ///< rail: the blue train board look, else the amber stop look
 	waytype_t waytype;
+	char platform[8];        ///< fork, platforms: the track or stand it leaves from at its stop (empty: none or no number)
+	char planned_platform[8];
+	uint8 pstate;            ///< gui_departure_board_view_t::PLATFORM_*
 
 	/// fills the sign (kept for a game minute); false without a schedule
 	bool update(convoihandle_t cnv);
@@ -186,6 +226,9 @@ struct convoy_sign_t
 
 	/// the sign in one line filling area: line badge, then the destination
 	void draw_sign(scr_rect area) const;
+
+	/// fork, platforms: the track or stand at the right end of a sign ending at right; returns its width
+	scr_coord_val draw_platform_number(scr_coord_val right, scr_coord_val y, scr_coord_val h, bool draw) const;
 };
 
 

@@ -159,6 +159,10 @@ void mark_rect_dirty_wc(KOORD_VAL x1, KOORD_VAL y1, KOORD_VAL x2, KOORD_VAL y2);
 void mark_rect_dirty_clip(KOORD_VAL x1, KOORD_VAL y1, KOORD_VAL x2, KOORD_VAL y2  CLIP_NUM_DEF); // clips to clip_rect
 void mark_screen_dirty();
 
+class font_t;
+/// fork: the font in use
+const font_t *display_get_default_font();
+
 KOORD_VAL display_get_width();
 KOORD_VAL display_get_height();
 void      display_set_height(KOORD_VAL);

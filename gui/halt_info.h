@@ -21,6 +21,7 @@
 #include "components/gui_image.h"
 #include "components/gui_colorbox.h"
 #include "departure_board.h"
+#include "platform_info.h"
 
 #include "../utils/cbuffer_t.h"
 #include "../simhalt.h"
@@ -87,6 +88,10 @@ private:
 	// halt connections plane
 	gui_halt_detail_t *halt_detail;
 
+	// fork, platforms: the Platforms tab
+	gui_platforms_tab_t platforms_tab;
+	gui_scrollpane_t scrolly_platforms;
+
 	// other UI definitions
 	gui_aligned_container_t container_freight, container_chart;
 	gui_textarea_t text_freight;
@@ -119,6 +124,9 @@ private:
 
 public:
 	halt_info_t(halthandle_t halt = halthandle_t());
+
+	/// fork, platforms: opens the stop's window on the Platforms tab with the cursor in that platform's number
+	static void focus_platform(halthandle_t halt, koord3d anchor, uint8 dir);
 
 	virtual ~halt_info_t();
 

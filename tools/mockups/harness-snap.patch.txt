@@ -1,11 +1,11 @@
-diff --git a/tests/fork_test_harness.cc b/tests/fork_test_harness.cc
-index b83dd44..b9931f3 100644
---- a/tests/fork_test_harness.cc
-+++ b/tests/fork_test_harness.cc
-@@ -1268,6 +1268,90 @@ static void cmd_snap(int x, int y, int z, const char *file)
+--- a/tests/fork_test_harness.cc	2026-11-21 07:37:38
++++ b/tests/fork_test_harness.cc	2026-11-21 07:37:33
+@@ -1267,8 +1267,115 @@
+ 	dr_screenshot( file, 0, 0, display_get_width(), display_get_height() );
+ 	const scr_coord sc = W->get_viewport()->get_screen_coord( gr ? gr->get_pos() : koord3d(x, y, 0) );
  	logf("snap %d,%d zoom %d -> %s (%dx%d) tile at %d,%d width %d\n", x, y, z, file, display_get_width(), display_get_height(), sc.x, sc.y, get_tile_raster_width());
- }
- 
++}
++
 +// THROWAWAY (platform mockups): open a window and screenshot the whole display
 +#define private public
 +#define protected public
@@ -17,6 +17,8 @@ index b83dd44..b9931f3 100644
 +#undef protected
 +#include "../gui/simwin.h"
 +#include "../simintr.h"
++static halthandle_t halt_at(int x, int y);
++#include "../gui/platform_info.h"
 +struct frame_hack_t : public gui_frame_t { using gui_frame_t::set_windowsize; };
 +static void cmd_winsnap(const char *what, int x, int y, int wx, int wy, const char *file, int kind, int ww, int wh)
 +{
@@ -35,6 +37,27 @@ index b83dd44..b9931f3 100644
 +			hi->action_triggered( &hi->board_tabs, v );
 +		}
 +		win = hi;
++	}
++	else if(  !strcmp(what, "haltp")  ) {
++		halthandle_t h = haltestelle_t::get_halt( ground(x,y)->get_pos(), PL );
++		halt_info_t *hi = new halt_info_t( h );
++		create_win( wx, wy, hi, w_info, magic_halt_info + h.get_id() );
++		hi->switch_mode.set_active_tab_index( 2 );
++		value_t v; v.i = 2;
++		hi->action_triggered( &hi->switch_mode, v );
++		win = hi;
++	}
++	else if(  !strcmp(what, "platform")  ) {
++		halthandle_t h = halt_at( x, y );
++		const vector_tpl<platform_t *> &list = h->get_platforms();
++		for(  uint32 i = 0;  i < list.get_count();  i++  ) {
++			if(  list[i]->contains( ground(x,y)->get_pos() )  &&  list[i]->has_lines()  ) {
++				platform_info_t::open( h, list[i]->get_anchor(), list[i]->kind == platform_t::STAND ? list[i]->dir : 0 );
++				win = win_get_top();
++				if(  win  ) win_set_pos( win, wx, wy );
++				break;
++			}
++		}
 +	}
 +	else {
 +		convoihandle_t c;
@@ -78,8 +101,8 @@ index b83dd44..b9931f3 100644
 +		}
 +	}
 +	logf("labels: %d\n", n);
-+}
-+
+ }
+ 
 +static void cmd_cnvbox(int x0, int y0, int x1, int y1)
 +{
 +	FOR(vector_tpl<convoihandle_t>, cv, W->convoys()) {
@@ -93,10 +116,11 @@ index b83dd44..b9931f3 100644
  // --- script ------------------------------------------------------------------------------------
  
  // ---- linelayout NAME: the layout along every leg of a line's schedule ----
-@@ -2152,6 +2236,12 @@ static void run_command(std::vector<char *> &a)
+@@ -2331,7 +2438,12 @@
  		for(  int y=I(2);  y<=I(4);  y++  ) { for(  int x=I(1);  x<=I(3);  x++  ) { grund_t *gr = W->lookup_kartenboden(koord(x, y)); logf("%c", gr->get_grund_hang() ? '/' : '0'+gr->get_hoehe()%10); } logf("\n"); }
  	}
  	else if(  c=="snap"  ) cmd_snap( I(1), I(2), I(3), S(4) );
+-	else if(  c=="haltname"  ) {   /* haltname X Y NAME...: rename the stop on that tile */ std::string n; for(size_t i=3;i<a.size();i++) n += std::string(i>3?" ":"")+a[i]; halthandle_t h = haltestelle_t::get_halt( ground(I(1),I(2))->get_pos(), PL ); if(h.is_bound()) h->set_name(n.c_str()); logf("haltname %s\n", n.c_str()); }
 +	else if(  c=="winsnap"  ) cmd_winsnap( S(1), I(2), I(3), I(4), I(5), S(6), a.size()>7 ? I(7) : 0, a.size()>9 ? I(8) : 0, a.size()>9 ? I(9) : 0 );
 +	else if(  c=="labels"  ) cmd_labels( I(1), I(2), I(3), I(4), a.size()>5 );
 +	else if(  c=="cnvfind"  ) { FOR(vector_tpl<convoihandle_t>, cv, W->convoys()) { if(  strstr(cv->get_name(), S(1))  ) logf("cnvfind id %d '%s' state %d pos %d,%d\n", (int)cv.get_id(), cv->get_name(), cv->get_state(), cv->get_pos().x, cv->get_pos().y); } }

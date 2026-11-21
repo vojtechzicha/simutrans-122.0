@@ -145,6 +145,7 @@ PIXVAL env_t::background_color;
 bool env_t::draw_earth_border;
 bool env_t::draw_outside_tile;
 uint8 env_t::show_vehicle_states;
+uint8 env_t::platform_cards = 1;
 bool env_t::visualize_schedule;
 sint8 env_t::daynight_level;
 bool env_t::left_to_right_graphs;
