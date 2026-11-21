@@ -112,7 +112,9 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
 - `platforms X Y` lists the platforms of the stop on that tile (kind, number, tiles, travel direction, lines by next
   stop with destinations and the arrow); `platformnumber X Y D TEXT` gives the platform with tile X,Y (a stand: travel
   direction D, N/E/S/W; `-` for a track) a number (`-`: none); `cardview 0|1|2` sets the card view (off, chosen
-  stops, all stops) for `snap`; `haltname X Y NAME...` renames the stop on that tile.
+  stops, all stops) for `snap`; `haltname X Y NAME...` renames the stop on that tile; `platformsign NAME X Y DIRS
+  [ctrl]` puts a platform display or track/stand sign (tools/fork-platforms; needs its pak as an add-on and
+  `-addons`) on a stop tile, turned to DIRS (E, W, EW, ...), or with `ctrl` on every track or stand of the stop.
 - `expect_platform X Y D NUMBER` (`-`: no number) and `expect_lines X Y D TEXT` (`Ex1,RJ>Olomouc|S3>Bělotín`,
   arrivals as `arr:79`): the platform with that tile and travel direction.
 - `expect_platform_state PATTERN STATE NUMBER`: some matching convoy leaves its current stop from that platform

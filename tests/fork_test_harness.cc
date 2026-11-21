@@ -2190,6 +2190,47 @@ static void cmd_expect_platform_state(const char *pat, const char *state, const 
 	failures++;
 }
 
+// platformsign NAME X Y DIRS [ctrl]: a platform display or track sign (pak object) on that stop tile, turned until it
+// serves DIRS (e.g. E, W or EW for both kerbs; - leaves it as built); with ctrl: Ctrl+click, one on every track or
+// stand of the stop
+static void cmd_platform_sign(const char *name, int x, int y, const char *d, bool ctrl)
+{
+	grund_t *gr = ground( x, y );
+	if(  gr == NULL  ) {
+		return;
+	}
+	ribi_t::ribi want = 0;
+	for(  const char *c = d;  c  &&  *c;  c++  ) {
+		want |= dir_of( c );
+	}
+	for(  int click = 0;  click < 4;  click++  ) {
+		const roadsign_t *rs = gr->find<roadsign_t>();
+		if(  rs  &&  !ctrl  &&  (want == 0  ||  rs->get_dir() == want)  ) {
+			logf("platformsign %s %d,%d dir %d\n", name, x, y, (int)rs->get_dir());
+			return;
+		}
+		tool_t *t = tool_t::general_tool[TOOL_BUILD_ROADSIGN];
+		t->set_default_param( keepstr(name) );
+		t->flags = 0;
+		t->init( PL );
+		t->flags = ctrl ? tool_t::WFL_CTRL : 0;
+		const char *err = t->work( PL, gr->get_pos() );
+		t->exit( PL );
+		t->flags = 0;
+		if(  err  &&  *err  ) {
+			logf("ERROR platformsign %s at %d,%d: %s\n", name, x, y, translator::translate(err));
+			failures++;
+			return;
+		}
+		if(  ctrl  ) {
+			logf("platformsign %s %d,%d on every platform\n", name, x, y);
+			return;
+		}
+	}
+	logf("ERROR platformsign %s at %d,%d could not be turned to %s\n", name, x, y, d);
+	failures++;
+}
+
 // platformnumber X Y D TEXT: give the platform that number ("-": none), as the Platforms tab does
 static void cmd_platform_number(int x, int y, const char *d, const char *text)
 {
@@ -2257,6 +2298,7 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="cardview"  ) { env_t::platform_cards = (uint8)I(1); logf("cardview %d\n", I(1)); }   // platform cards: 0 off, 1 chosen stops, 2 all stops
 	else if(  c=="expect_platform"  ) cmd_expect_platform( I(1), I(2), S(3), S(4) );
 	else if(  c=="platformnumber"  ) cmd_platform_number( I(1), I(2), S(3), S(4) );
+	else if(  c=="platformsign"  ) cmd_platform_sign( S(1), I(2), I(3), S(4), a.size()>5  &&  !strcmp( S(5), "ctrl" ) );
 	else if(  c=="expect_platform_state"  ) cmd_expect_platform_state( S(1), S(2), S(3) );
 	else if(  c=="expect_lines"  ) {
 		std::string what;

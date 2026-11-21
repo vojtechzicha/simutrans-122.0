@@ -5383,6 +5383,10 @@ uint8 tool_build_roadsign_t::is_valid_pos( player_t *player, const koord3d &pos,
 	// first click
 	if (start==koord3d::invalid) {
 		error = check_pos_intern(player, pos);
+		if(  error == NULL  &&  desc  &&  desc->is_platform_object()  ) {
+			// fork, platforms: one click places or turns it (Ctrl: on every platform of the stop), no dragging
+			return 1;
+		}
 		return (error==NULL ? 3 : 0);
 	}
 	// second click
@@ -5508,6 +5512,52 @@ const char *tool_build_roadsign_t::do_work( player_t *player, const koord3d &sta
 	// read data from string
 	desc = roadsign_t::find_desc(default_param);
 	// single click ->place signal
+	if(  (end == koord3d::invalid  ||  start == end)  &&  desc->is_platform_object()  &&  is_ctrl_pressed()  ) {
+		// fork, platforms: Ctrl+click puts one on every track (or stand) of the stop
+		grund_t *gr = welt->lookup( start );
+		if(  gr == NULL  ||  !gr->get_halt().is_bound()  ) {
+			return "Only on a track or stand of a stop.";
+		}
+		const halthandle_t halt = gr->get_halt();
+		const bool rail = desc->get_wtyp() == track_wt  ||  desc->get_wtyp() == monorail_wt  ||  desc->get_wtyp() == maglev_wt  ||  desc->get_wtyp() == narrowgauge_wt;
+		vector_tpl<koord3d> tiles;
+		vector_tpl<ribi_t::ribi> dirs;
+		FOR( vector_tpl<platform_t *>, const p, halt->get_platforms() ) {
+			if(  p->kind != (rail ? platform_t::TRACK : platform_t::STAND)  ) {
+				continue;
+			}
+			const koord3d t = p->tiles[p->tiles.get_count() / 2];
+			const ribi_t::ribi d = p->kind == platform_t::STAND  &&  p->dir ? p->dir : (p->axis & (ribi_t::east | ribi_t::south));
+			if(  tiles.is_contained( t )  ) {
+				dirs[tiles.index_of( t )] |= d;
+			}
+			else {
+				tiles.append( t );
+				dirs.append( d );
+			}
+		}
+		const char *error = NULL;
+		for(  uint32 i = 0;  i < tiles.get_count();  i++  ) {
+			grund_t *g = welt->lookup( tiles[i] );
+			weg_t *w = g ? g->get_weg( desc->get_wtyp() != tram_wt ? desc->get_wtyp() : track_wt ) : NULL;
+			if(  w == NULL  ) {
+				continue;
+			}
+			roadsign_t *rs = g->find<roadsign_t>();
+			if(  rs  &&  rs->get_desc() != desc  ) {
+				continue;
+			}
+			if(  rs == NULL  ) {
+				error = place_sign_intern( player, g );
+				rs = g->find<roadsign_t>();
+			}
+			const ribi_t::ribi d = dirs[i] & w->get_ribi_unmasked();
+			if(  rs  &&  rs->get_desc() == desc  &&  d  ) {
+				rs->set_dir( d );
+			}
+		}
+		return error;
+	}
 	if( end == koord3d::invalid  ||  start == end ) {
 		grund_t *gr = welt->lookup(start);
 		const char *error = place_sign_intern( player, gr );
@@ -5667,6 +5717,30 @@ const char *tool_build_roadsign_t::place_sign_intern( player_t *player, grund_t*
 			else {
 				// if there is already a sign, we might need to inverse the direction
 				rs = gr->find<roadsign_t>();
+				if(  desc->is_platform_object()  ) {
+					// fork, platforms: displays and track signs only on a track or stand of a stop; clicking again turns
+					// them: one direction, the other one, both (a stand sign for both kerbs of a through stop)
+					if(  !gr->is_halt()  ) {
+						return "Only on a track or stand of a stop.";
+					}
+					const ribi_t::ribi all = weg->get_ribi_unmasked();
+					ribi_t::ribi first = ribi_t::none;
+					for(  int i = 0;  i < 4  &&  first == ribi_t::none;  i++  ) {
+						if(  all & ribi_t::nsew[i]  ) {
+							first = ribi_t::nsew[i];
+						}
+					}
+					if(  rs  ) {
+						if(  !player_t::check_owner( rs->get_owner(), player )  ) {
+							return "Das Feld gehoert\neinem anderen Spieler\n";
+						}
+						const ribi_t::ribi old = rs->get_dir();
+						rs->set_dir( old == first ? ((all & ribi_t::backward( first )) ? ribi_t::backward( first ) : first) : old == ribi_t::backward( first ) ? all : first );
+						return NULL;
+					}
+					rs = new roadsign_t( player, gr->get_pos(), first, desc );
+					goto built_sign;
+				}
 				if (rs) {
 					if(  !player_t::check_owner( rs->get_owner(), player )  ) {
 						return "Das Feld gehoert\neinem anderen Spieler\n";

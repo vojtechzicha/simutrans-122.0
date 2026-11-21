@@ -1525,7 +1525,7 @@ bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, 
 	if(  !halt.is_bound()  ||  p == NULL  ) {
 		return false;
 	}
-	// the boards of the stop once a game minute (the platform window asks every frame), for a few stops at a time
+	// the boards of the stop once a game minute (the platform window asks every frame), for up to 16 stops at a time (displays on the map ask too)
 	struct cache_t {
 		halthandle_t halt;
 		sint64 stamp;
@@ -1535,18 +1535,18 @@ bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, 
 		vector_tpl<sint16> platforms;
 		cache_t() : stamp(-1), epoch(0), used(0) {}
 	};
-	static cache_t caches[4];
+	static cache_t caches[16];
 	static uint32 use_counter = 0;
 	const sint64 stamp = welt->has_calendar() ? welt->get_calendar_minutes() : (sint64)(welt->get_ticks() >> (welt->ticks_per_world_month_shift - 10));
 	cache_t *c = NULL;
-	for(  int i = 0;  i < 4  &&  c == NULL;  i++  ) {
+	for(  int i = 0;  i < 16  &&  c == NULL;  i++  ) {
 		if(  caches[i].halt == halt  ) {
 			c = &caches[i];
 		}
 	}
 	if(  c == NULL  ) {
 		c = &caches[0];
-		for(  int i = 1;  i < 4;  i++  ) {
+		for(  int i = 1;  i < 16;  i++  ) {
 			if(  caches[i].used < c->used  ) {
 				c = &caches[i];
 			}
@@ -1584,11 +1584,8 @@ bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, 
 				tstrncpy( d.train, r.train, lengthof(d.train) );
 				tstrncpy( d.line_number, st.line_number[0] ? st.line_number : st.category, lengthof(d.line_number) );
 				tstrncpy( d.destination, st.destination, lengthof(d.destination) );
-				if(  st.via[0]  ) {
-					buf.clear();
-					buf.printf( translator::translate( "via %s" ), st.via );
-					tstrncpy( d.via, buf, lengthof(d.via) );
-				}
+				// the board's vias already start with "via"
+				tstrncpy( d.via, st.via, lengthof(d.via) );
 				buf.clear();
 				if(  r.delay > 0  ) {
 					buf.printf( translator::translate( "+%d min" ), (int)r.delay );

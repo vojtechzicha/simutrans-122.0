@@ -1,5 +1,5 @@
---- a/tests/fork_test_harness.cc	2026-11-21 07:37:38
-+++ b/tests/fork_test_harness.cc	2026-11-21 07:37:33
+--- a/tests/fork_test_harness.cc	2026-11-21 07:52:26
++++ b/tests/fork_test_harness.cc	2026-11-21 07:52:26
 @@ -1267,8 +1267,115 @@
  	dr_screenshot( file, 0, 0, display_get_width(), display_get_height() );
  	const scr_coord sc = W->get_viewport()->get_screen_coord( gr ? gr->get_pos() : koord3d(x, y, 0) );
@@ -116,7 +116,7 @@
  // --- script ------------------------------------------------------------------------------------
  
  // ---- linelayout NAME: the layout along every leg of a line's schedule ----
-@@ -2331,7 +2438,12 @@
+@@ -2373,7 +2480,12 @@
  		for(  int y=I(2);  y<=I(4);  y++  ) { for(  int x=I(1);  x<=I(3);  x++  ) { grund_t *gr = W->lookup_kartenboden(koord(x, y)); logf("%c", gr->get_grund_hang() ? '/' : '0'+gr->get_hoehe()%10); } logf("\n"); }
  	}
  	else if(  c=="snap"  ) cmd_snap( I(1), I(2), I(3), S(4) );

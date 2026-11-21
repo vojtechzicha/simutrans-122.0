@@ -1,6 +1,6 @@
 # Platforms: what leaves from where (plan)
 
-Status: phases 1-3 implemented (2026-11-21, see CLAUDE.md "Platforms"); phase 4 (display and sign objects) not yet. Mockups on the owner's Hranice na Moravě:
+Status: implemented, all four phases (2026-11-21, see CLAUDE.md "Platforms"; objects with placeholder art, tools/fork-platforms). Mockups on the owner's Hranice na Moravě:
 https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i (made with `tools/mockups`, see its README).
 
 ## 1. Why
@@ -106,8 +106,8 @@ four cells end in "+N". One step zoomed out: chips and arrows only. Further out:
 Optional decoration. Road sign flags `PLATFORM_DISPLAY` (bit 13, makeobj `is_platformdisplay=1`) and
 `TRACK_SIGN` (bit 14, `is_tracksign=1`), for track, tram and road way types; no direction mask, never a
 stop point, ignored by every search. One sign per tile as now; on a road tile it serves one kerb or both
-(cycled like a signal), Ctrl+click builds on every stand of the stop. The art leaves the screen and plate
-empty; the game draws a 3x5 LED font with Czech accents, stepping one pixel down per two along (mirrored
+(cycled like a signal), Ctrl+click builds on every stand of the stop. The game draws the panel, the plate, the
+posts and the text, so the art is only a foot on the ground; a 3x5 LED font with Czech accents, stepping one pixel down per two along (mirrored
 for the other axis), at the normal zoom and closer. A display shows the next departure of the platforms
 next to its tile, one row each, alternating destination and "VIA …" every 3 s; rows come from the board's
 streams, cached a calendar minute. A track sign shows the number and up to three line chips.

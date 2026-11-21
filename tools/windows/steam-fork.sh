@@ -51,6 +51,9 @@
 #                                                  build the fork's makeobj and compile FILE.dat (the
 #                                                  platform signal and station boundary, see
 #                                                  tools/fork-signals) into the pakset folder; SIZE 128
+#   tools/windows/steam-fork.sh platforms           build the platform display and track/stand sign
+#                                                  (tools/fork-platforms, placeholder art) into the
+#                                                  pakset folder as fork-platform-objects.pak
 #   tools/windows/steam-fork.sh landscape            build the toolbar icons of the landscaping tools
 #                                                  (tools/fork-landscape) into the pakset folder as
 #                                                  fork-landscape-icons.pak; without it the tools stay
@@ -452,6 +455,15 @@ do_landscape() {
 	echo "done: $out"
 }
 
+# the platform display and track/stand sign (tools/fork-platforms); the game draws their text
+do_platforms() {
+	build_makeobj
+	local out="$STEAM_DIR/$PAKSET/fork-platform-objects.pak"
+	(cd "$REPO/tools/fork-platforms" && PATH="/c/msys64/mingw64/bin:$PATH" "$MAKEOBJ" pak128 "$out" platform_objects.dat)
+	[ -f "$out" ] || die "makeobj wrote no $out"
+	echo "done: $out"
+}
+
 case "${1:-}" in
 	build)     do_build ;;
 	install)   do_install ;;
@@ -468,5 +480,6 @@ case "${1:-}" in
 	platform-markers-dry) shift; do_platform_markers 1 "$@" ;;
 	signals)   shift; do_signals "$@" ;;
 	landscape) do_landscape ;;
+	platforms) do_platforms ;;
 	*)         sed -n '2,/^# Override/p' "$0"; exit 1 ;;
 esac

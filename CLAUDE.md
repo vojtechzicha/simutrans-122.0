@@ -1361,8 +1361,7 @@ of the stop centres it again.
 
 Plan and design: `documentation/fork-platforms-plan.md`; mockups on the owner's Hranice na Moravě:
 https://claude.ai/artifact/8tUv6ZQECFpcEDw28TJi7i (`tools/mockups`). Replaces the ~14,200 hand-written markers that
-list lines at stops. Phases 1-3 of the plan are in (cards, numbers, boards); the display and sign objects (phase 4)
-are not.
+list lines at stops. All four phases of the plan are in (cards, numbers, boards, display and sign objects).
 - Model (`simplatform.*`): a platform is a station track (a row of the stop's tiles on one track,
   `stop_waytype` from the building) or a stand (one road or tram stop tile in one travel direction: a through tile has
   two, a dead end one; per tile because the owner numbers the tiles of a bus station row separately); ships and
@@ -1412,9 +1411,21 @@ are not.
   On the owner's save of 2026-11-08: 1,707 numbers (Hranice: tracks 7, 6, 3, 2, 1 and 13 of its 15 stands as on the
   markers), 130 stops with destinations, 15,407 markers removed, 18,802 kept (road signs, names, line variants that
   exist on no line).
+- Objects (phase 4, `tools/fork-platforms`, README there): road sign flags `PLATFORM_DISPLAY` (bit 13, makeobj
+  `is_platformdisplay=1`) and `TRACK_SIGN` (bit 14, `is_tracksign=1`) for track, road and tram; no vehicle reads them
+  (every sign check tests other flags). Only on stop tiles; one click places or turns them (one direction, the other,
+  both: the kerbs a stand object serves), no dragging (`is_valid_pos` returns 1), Ctrl+click one on every track or
+  stand of the stop. The game draws the whole panel or plate and the text (`display_objects` in
+  `gui/platform_cards.cc`, overlay pass, normal zoom and closer, every stop on the screen in any card view): a 3x5
+  LED font with Czech, Polish and German accents, stepping a pixel down per two along (up on north-south platforms);
+  the display a row per platform of its tile (number, time, line, destination or vias in turn every 3 s, the delay
+  when late; `get_next_platform_departure`, cached a minute for 16 stops), the sign its number and three lines.
+  Placeholder art: `steam-fork.sh platforms` builds `fork-platform-objects.pak` into the pakset folder. Seen at
+  Hranice (owner's save) and on the test layout with the placeholder pak as an add-on (`-addons`, harness
+  `platformsign NAME X Y DIRS [ctrl]`).
 - Export: stops `platform_flags`, `platforms`; schedule entries `platform`; convoys `platform`, `platform_state`.
 - Tests: `platforms_basic`, `platforms_changed` (harness `platforms`, `expect_platform`, `expect_lines`,
-  `expect_platform_state`, `platformnumber`, `cardview`). Seen on the owner's save through the harness screenshots:
+  `expect_platform_state`, `platformnumber`, `cardview`, `platformsign`). Seen on the owner's save through the harness screenshots:
   cards at Hranice (station, bus station, streets), the tab, the platform window, both boards.
 
 ## Windows: the fork is the Steam game (since 2026-09-12)

@@ -60,7 +60,9 @@ void roadsign_writer_t::write_obj(FILE* fp, obj_node_t& parent, tabfileobj_t& ob
 			(obj.get_int("is_private",         0) > 0 ? roadsign_desc_t::PRIVATE_ROAD          : roadsign_desc_t::NONE) |
 			(obj.get_int("no_foreground",      0) > 0 ? roadsign_desc_t::ONLY_BACKIMAGE        : roadsign_desc_t::NONE) |
 			(obj.get_int("end_of_choose",      0) > 0 ? roadsign_desc_t::END_OF_CHOOSE_AREA    : roadsign_desc_t::NONE) |
-			(obj.get_int("station_boundary",   0) > 0 ? roadsign_desc_t::STATION_BOUNDARY      : roadsign_desc_t::NONE);
+			(obj.get_int("station_boundary",   0) > 0 ? roadsign_desc_t::STATION_BOUNDARY      : roadsign_desc_t::NONE) |
+			(obj.get_int("is_platformdisplay", 0) > 0 ? roadsign_desc_t::PLATFORM_DISPLAY      : roadsign_desc_t::NONE) |
+			(obj.get_int("is_tracksign",       0) > 0 ? roadsign_desc_t::TRACK_SIGN            : roadsign_desc_t::NONE);
 	}
 	// this causes unused entries to give a warning that they are ignored
 

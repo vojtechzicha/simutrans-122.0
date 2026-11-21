@@ -10,6 +10,10 @@
 #include <string.h>
 
 #include "platform_cards.h"
+#include <ctype.h>
+#include "../unicode.h"
+#include "../descriptor/roadsign_desc.h"
+#include "../obj/roadsign.h"
 #include "platform_info.h"
 #include "simwin.h"
 
@@ -50,6 +54,8 @@ static karte_ptr_t welt;
 static PIXVAL rgb(uint32 c) { return get_system_color( c >> 16, (c >> 8) & 0xFF, c & 0xFF ); }
 
 static scr_coord_val row_h() { return LINESPACE + 2; }
+
+static void display_objects(halthandle_t halt);
 
 
 // ---------------------------------------------------------------------------------------------
@@ -600,6 +606,18 @@ void platform_cards_t::display()
 	}
 	const bool full_zoom = R >= base;
 
+	// the displays and signs (physical objects: in every view), at the normal zoom and closer
+	if(  full_zoom  ) {
+		const viewport_t *vpo = welt->get_viewport();
+		const scr_coord_val dw = display_get_width(), dh = display_get_height();
+		FOR( vector_tpl<halthandle_t>, const halt, haltestelle_t::get_alle_haltestellen() ) {
+			const scr_coord s = vpo->get_screen_coord( halt->get_basis_pos3d() );
+			if(  s.x > -R * 8  &&  s.x < dw + R * 8  &&  s.y > -R * 8  &&  s.y < dh + R * 8  ) {
+				display_objects( halt );
+			}
+		}
+	}
+
 	vector_tpl<halthandle_t> shown;
 	const viewport_t *vp = welt->get_viewport();
 	const scr_coord_val w = display_get_width(), h = display_get_height();
@@ -683,6 +701,335 @@ bool platform_cards_t::click(scr_coord_val mx, scr_coord_val my, bool shift)
 		return true;
 	}
 	return false;
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// displays and track signs on the platforms (pak objects with the flags PLATFORM_DISPLAY and TRACK_SIGN): the game
+// draws the panel and its text, a 3x5 LED font with Czech accents, every letter a pixel lower for every two pixels
+// along (the slope of the tile edge), rising instead for platforms running north-south
+
+struct led_glyph_t
+{
+	char c;
+	const char *rows[5];
+};
+
+static const led_glyph_t led_glyphs[] = {
+	{'A', {".#.", "#.#", "###", "#.#", "#.#"}}, {'B', {"##.", "#.#", "##.", "#.#", "##."}},
+	{'C', {".##", "#..", "#..", "#..", ".##"}}, {'D', {"##.", "#.#", "#.#", "#.#", "##."}},
+	{'E', {"###", "#..", "##.", "#..", "###"}}, {'F', {"###", "#..", "##.", "#..", "#.."}},
+	{'G', {".##", "#..", "#.#", "#.#", ".##"}}, {'H', {"#.#", "#.#", "###", "#.#", "#.#"}},
+	{'I', {"#", "#", "#", "#", "#"}},           {'J', {"..#", "..#", "..#", "#.#", ".#."}},
+	{'K', {"#.#", "#.#", "##.", "#.#", "#.#"}}, {'L', {"#..", "#..", "#..", "#..", "###"}},
+	{'M', {"#...#", "##.##", "#.#.#", "#...#", "#...#"}}, {'N', {"#..#", "##.#", "#.##", "#..#", "#..#"}},
+	{'O', {".#.", "#.#", "#.#", "#.#", ".#."}}, {'P', {"##.", "#.#", "##.", "#..", "#.."}},
+	{'Q', {".#.", "#.#", "#.#", ".#.", "..#"}}, {'R', {"##.", "#.#", "##.", "#.#", "#.#"}},
+	{'S', {".##", "#..", ".#.", "..#", "##."}}, {'T', {"###", ".#.", ".#.", ".#.", ".#."}},
+	{'U', {"#.#", "#.#", "#.#", "#.#", "###"}}, {'V', {"#.#", "#.#", "#.#", "#.#", ".#."}},
+	{'W', {"#...#", "#...#", "#.#.#", "##.##", "#...#"}}, {'X', {"#.#", "#.#", ".#.", "#.#", "#.#"}},
+	{'Y', {"#.#", "#.#", ".#.", ".#.", ".#."}}, {'Z', {"###", "..#", ".#.", "#..", "###"}},
+	{'0', {"###", "#.#", "#.#", "#.#", "###"}}, {'1', {".#", "##", ".#", ".#", ".#"}},
+	{'2', {"##.", "..#", ".#.", "#..", "###"}}, {'3', {"##.", "..#", ".#.", "..#", "##."}},
+	{'4', {"#.#", "#.#", "###", "..#", "..#"}}, {'5', {"###", "#..", "##.", "..#", "##."}},
+	{'6', {".##", "#..", "###", "#.#", "###"}}, {'7', {"###", "..#", ".#.", ".#.", ".#."}},
+	{'8', {"###", "#.#", "###", "#.#", "###"}}, {'9', {"###", "#.#", "###", "..#", "##."}},
+	{':', {".", "#", ".", "#", "."}},           {'.', {".", ".", ".", ".", "#"}},
+	{',', {".", ".", ".", "#", "#"}},           {'+', {"...", ".#.", "###", ".#.", "..."}},
+	{'-', {"..", "..", "##", "..", ".."}},      {'/', {"..#", "..#", ".#.", "#..", "#.."}},
+	{'(', {".#", "#.", "#.", "#.", ".#"}},      {')', {"#.", ".#", ".#", ".#", "#."}},
+	{'?', {"##.", "..#", ".#.", "...", ".#."}},
+};
+
+enum { ACC_NONE, ACC_ACUTE, ACC_CARON, ACC_RING, ACC_DOTS };
+
+// a character as an LED glyph: the capital letter and its accent
+static const led_glyph_t *led_find(utf32 c, uint8 &accent)
+{
+	accent = ACC_NONE;
+	struct map_t { utf32 c; char base; uint8 acc; };
+	static const map_t letters[] = {
+		{0xE1,'A',ACC_ACUTE}, {0xC1,'A',ACC_ACUTE}, {0x10D,'C',ACC_CARON}, {0x10C,'C',ACC_CARON}, {0x10F,'D',ACC_CARON}, {0x10E,'D',ACC_CARON},
+		{0xE9,'E',ACC_ACUTE}, {0xC9,'E',ACC_ACUTE}, {0x11B,'E',ACC_CARON}, {0x11A,'E',ACC_CARON}, {0xED,'I',ACC_ACUTE}, {0xCD,'I',ACC_ACUTE},
+		{0x148,'N',ACC_CARON}, {0x147,'N',ACC_CARON}, {0xF3,'O',ACC_ACUTE}, {0xD3,'O',ACC_ACUTE}, {0x159,'R',ACC_CARON}, {0x158,'R',ACC_CARON},
+		{0x161,'S',ACC_CARON}, {0x160,'S',ACC_CARON}, {0x165,'T',ACC_CARON}, {0x164,'T',ACC_CARON}, {0xFA,'U',ACC_ACUTE}, {0xDA,'U',ACC_ACUTE},
+		{0x16F,'U',ACC_RING}, {0x16E,'U',ACC_RING}, {0xFD,'Y',ACC_ACUTE}, {0xDD,'Y',ACC_ACUTE}, {0x17E,'Z',ACC_CARON}, {0x17D,'Z',ACC_CARON},
+		{0xE4,'A',ACC_DOTS}, {0xC4,'A',ACC_DOTS}, {0xF6,'O',ACC_DOTS}, {0xD6,'O',ACC_DOTS}, {0xFC,'U',ACC_DOTS}, {0xDC,'U',ACC_DOTS},
+		{0x105,'A',ACC_NONE}, {0x107,'C',ACC_ACUTE}, {0x119,'E',ACC_NONE}, {0x142,'L',ACC_NONE}, {0x141,'L',ACC_NONE}, {0x144,'N',ACC_ACUTE},
+		{0x15B,'S',ACC_ACUTE}, {0x15A,'S',ACC_ACUTE}, {0x17A,'Z',ACC_ACUTE}, {0x17C,'Z',ACC_ACUTE}, {0x17B,'Z',ACC_ACUTE}, {0x151,'O',ACC_DOTS},
+		{0x171,'U',ACC_DOTS}, {0x13A,'L',ACC_ACUTE}, {0x13E,'L',ACC_CARON}, {0xF4,'O',ACC_NONE}, {0xDF,'S',ACC_NONE},
+	};
+	char base = 0;
+	if(  c < 128  ) {
+		base = (char)toupper( (int)c );
+	}
+	else {
+		for(  uint32 i = 0;  i < lengthof(letters);  i++  ) {
+			if(  letters[i].c == c  ) {
+				base = letters[i].base;
+				accent = letters[i].acc;
+				break;
+			}
+		}
+	}
+	for(  uint32 i = 0;  i < lengthof(led_glyphs);  i++  ) {
+		if(  led_glyphs[i].c == base  ) {
+			return &led_glyphs[i];
+		}
+	}
+	return NULL;
+}
+
+
+static scr_coord_val led_advance(const led_glyph_t *g)
+{
+	return g ? (scr_coord_val)strlen( g->rows[0] ) + 1 : 2;
+}
+
+
+static scr_coord_val led_width(const char *text)
+{
+	scr_coord_val w = 0;
+	const utf8 *p = (const utf8 *)text;
+	while(  *p  ) {
+		uint8 acc;
+		w += led_advance( led_find( utf8_decoder_t::decode( p ), acc ) );
+	}
+	return w > 0 ? w - 1 : 0;
+}
+
+
+// how much lower column c of a panel starting at x0 is: half a pixel per pixel along, up for north-south platforms
+static inline scr_coord_val slope_off(scr_coord_val c, sint8 slope)
+{
+	return slope > 0 ? c / 2 : -(c / 2);
+}
+
+
+// LED text from x on a panel whose first column is x0; y is the top of the capitals at x0; returns the x after it
+static scr_coord_val led_draw(scr_coord_val x, scr_coord_val y, scr_coord_val x0, sint8 slope, const char *text, PIXVAL col, scr_coord_val max_x)
+{
+	const utf8 *p = (const utf8 *)text;
+	while(  *p  ) {
+		uint8 acc;
+		const led_glyph_t *g = led_find( utf8_decoder_t::decode( p ), acc );
+		const scr_coord_val adv = led_advance( g );
+		if(  x + adv - 1 > max_x  ) {
+			break;
+		}
+		if(  g  ) {
+			const scr_coord_val dy = y + slope_off( x - x0, slope );
+			const int w = strlen( g->rows[0] );
+			for(  int r = 0;  r < 5;  r++  ) {
+				for(  int c = 0;  c < w;  c++  ) {
+					if(  g->rows[r][c] == '#'  ) {
+						display_fillbox_wh_clip_rgb( x + c, dy + r, 1, 1, col, true );
+					}
+				}
+			}
+			const int m = w / 2;
+			switch(  acc  ) {
+				case ACC_ACUTE:
+					display_fillbox_wh_clip_rgb( x + min( w - 1, m + 1 ), dy - 2, 1, 1, col, true );
+					display_fillbox_wh_clip_rgb( x + m, dy - 1, 1, 1, col, true );
+					break;
+				case ACC_CARON:
+					display_fillbox_wh_clip_rgb( x + max( 0, m - 1 ), dy - 2, 1, 1, col, true );
+					display_fillbox_wh_clip_rgb( x + min( w - 1, m + 1 ), dy - 2, 1, 1, col, true );
+					display_fillbox_wh_clip_rgb( x + m, dy - 1, 1, 1, col, true );
+					break;
+				case ACC_RING:
+					display_fillbox_wh_clip_rgb( x + m, dy - 2, 1, 1, col, true );
+					break;
+				case ACC_DOTS:
+					display_fillbox_wh_clip_rgb( x, dy - 2, 1, 1, col, true );
+					display_fillbox_wh_clip_rgb( x + w - 1, dy - 2, 1, 1, col, true );
+					break;
+			}
+		}
+		x += adv;
+	}
+	return x;
+}
+
+
+// a parallelogram along the slope
+static void slope_box(scr_coord_val x, scr_coord_val y, scr_coord_val w, scr_coord_val h, sint8 slope, PIXVAL col)
+{
+	for(  scr_coord_val c = 0;  c < w;  c++  ) {
+		display_fillbox_wh_clip_rgb( x + c, y + slope_off( c, slope ), 1, h, col, true );
+	}
+}
+
+
+// an inverted box (number or line) of LED text at x, the text's capitals at y; returns its width
+static scr_coord_val led_box(scr_coord_val x, scr_coord_val y, scr_coord_val x0, sint8 slope, const char *text, PIXVAL box, PIXVAL col)
+{
+	const scr_coord_val w = led_width( text ) + 2;
+	for(  scr_coord_val c = 0;  c < w;  c++  ) {
+		display_fillbox_wh_clip_rgb( x + c, y - 1 + slope_off( x + c - x0, slope ), 1, 7, box, true );
+	}
+	led_draw( x + 1, y, x0, slope, text, col, x + w );
+	return w;
+}
+
+
+static void post(scr_coord_val x, scr_coord_val top, scr_coord_val bottom)
+{
+	if(  bottom > top  ) {
+		display_fillbox_wh_clip_rgb( x, top, 1, bottom - top, rgb( 0x9A9A9A ), true );
+		display_fillbox_wh_clip_rgb( x + 1, top, 1, bottom - top, rgb( 0x5A5A5A ), true );
+	}
+}
+
+
+/**
+ * A display at x, y (the ground point it stands on) for the platforms of its tile: a row each with the number, the
+ * time, the line and (every 3 s in turn) the destination or "VIA" and the stops on the way.
+ */
+static void draw_display(scr_coord_val gx, scr_coord_val gy, sint8 slope, halthandle_t halt, const vector_tpl<const platform_t *> &platforms)
+{
+	if(  platforms.empty()  ) {
+		return;
+	}
+	const bool rail = platforms[0]->kind == platform_t::TRACK;
+	const PIXVAL bg = rgb( rail ? 0x0B1F4B : 0x121212 );
+	const PIXVAL text = rgb( rail ? 0xFFFFFF : 0xFFB41E );
+	const PIXVAL dim = rgb( rail ? 0x9FB8E0 : 0xA77C2E );
+	const PIXVAL late = rgb( rail ? 0xFFD030 : 0xFF5A3C );
+	const PIXVAL frame = rgb( 0x2A2A2A );
+	const PIXVAL edge = rgb( 0x4A4A4A );
+	const bool via_turn = (dr_time() / 3000) & 1;
+	const scr_coord_val w = 96;
+	const scr_coord_val n = platforms.get_count();
+	const scr_coord_val h = 3 + 8 * n;
+	const scr_coord_val x0 = gx - w / 2;
+	const scr_coord_val y0 = gy - 26 - h - slope_off( w / 2, slope );
+	post( x0 + 2, y0 + h, gy - slope_off( w / 2, slope ) );
+	post( x0 + w - 4, y0 + h + slope_off( w - 4, slope ), gy + slope_off( w / 2 - 4, slope ) );
+	slope_box( x0, y0, w, h, slope, frame );
+	slope_box( x0 + 1, y0 + 1 + slope_off( 1, slope ), w - 2, h - 2, slope, bg );
+	for(  scr_coord_val c = 0;  c < w;  c++  ) {
+		display_fillbox_wh_clip_rgb( x0 + c, y0 - 1 + slope_off( c, slope ), 1, 1, edge, true );
+	}
+	for(  scr_coord_val i = 0;  i < n;  i++  ) {
+		const platform_t *p = platforms[i];
+		scr_coord_val x = x0 + 3;
+		const scr_coord_val ty = y0 + 3 + 8 * i + 2;
+		const scr_coord_val right = x0 + w - 3;
+		if(  p->number[0]  ) {
+			x += led_box( x, ty, x0, slope, p->number, text, bg ) + 3;
+		}
+		gui_departure_board_view_t::platform_departure_t dep;
+		if(  !gui_departure_board_view_t::get_next_platform_departure( halt, p, dep )  ) {
+			led_draw( x, ty, x0, slope, "-", dim, right );
+			continue;
+		}
+		x = led_draw( x, ty, x0, slope, dep.time, text, right ) + 3;
+		if(  dep.line_number[0]  &&  x + led_width( dep.line_number ) + 2 < right  ) {
+			x += led_box( x, ty, x0, slope, dep.line_number, text, bg ) + 3;
+		}
+		if(  via_turn  &&  dep.via[0]  ) {
+			led_draw( x, ty, x0, slope, dep.via, dim, right );
+		}
+		else if(  dep.late  &&  via_turn  ) {
+			led_draw( x, ty, x0, slope, dep.status, late, right );
+		}
+		else {
+			led_draw( x, ty, x0, slope, dep.destination, text, right );
+		}
+	}
+}
+
+
+/// a track or stand sign at x, y: the number on a plate, then up to three of its lines
+static void draw_track_sign(scr_coord_val gx, scr_coord_val gy, sint8 slope, const platform_t *p)
+{
+	const bool rail = p->kind == platform_t::TRACK;
+	const PIXVAL plate = rgb( rail ? 0x0057A8 : 0x1E64C8 );
+	const PIXVAL white = rgb( 0xFFFFFF );
+	const PIXVAL strip = rgb( 0x2A2A2A );
+	const char *number = p->number[0] ? p->number : "?";
+	const scr_coord_val nw = led_width( number ) + 6;
+	vector_tpl<platform_run_t> runs;
+	vector_tpl<const char *> lines;
+	FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+		platforms_t::get_runs( g->members, false, runs );
+		FOR( vector_tpl<const platform_member_t *>, const c, runs[0].chips ) {
+			bool seen = false;
+			FOR( vector_tpl<const char *>, const l, lines ) {
+				seen |= strcmp( l, c->number ) == 0;
+			}
+			if(  !seen  &&  lines.get_count() < 3  ) {
+				lines.append( c->number );
+			}
+		}
+	}
+	scr_coord_val sw = 0;
+	FOR( vector_tpl<const char *>, const l, lines ) {
+		sw += led_width( l ) + 2 + 3;
+	}
+	sw = sw ? sw + 1 : 0;
+	const scr_coord_val h = 11;
+	const scr_coord_val x0 = gx - (nw + sw) / 2;
+	const scr_coord_val y0 = gy - 20 - h - slope_off( (nw + sw) / 2, slope );
+	post( x0 + 3, y0 + h + slope_off( 3, slope ), gy - slope_off( (nw + sw) / 2 - 3, slope ) );
+	slope_box( x0, y0, nw, h, slope, white );
+	slope_box( x0 + 1, y0 + 1 + slope_off( 1, slope ), nw - 2, h - 2, slope, plate );
+	led_draw( x0 + 3, y0 + 3, x0, slope, number, white, x0 + nw );
+	if(  sw  ) {
+		for(  scr_coord_val c = 0;  c < sw;  c++  ) {
+			display_fillbox_wh_clip_rgb( x0 + nw + c, y0 + 1 + slope_off( nw + c, slope ), 1, h - 2, strip, true );
+		}
+		scr_coord_val x = x0 + nw + 2;
+		FOR( vector_tpl<const char *>, const l, lines ) {
+			x += led_box( x, y0 + 3, x0, slope, l, white, rgb( rail ? 0x0B1F4B : 0x1E64C8 ) ) + 3;
+		}
+	}
+}
+
+
+// the displays and signs at the tiles of a stop on the screen
+static void display_objects(halthandle_t halt)
+{
+	const viewport_t *vp = welt->get_viewport();
+	const scr_coord_val R = get_tile_raster_width();
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
+		const grund_t *gr = t.grund;
+		if(  !gr->is_visible()  ) {
+			continue;
+		}
+		const roadsign_t *rs = gr->find<roadsign_t>();
+		if(  rs == NULL  ||  !rs->get_desc()->is_platform_object()  ) {
+			continue;
+		}
+		const koord3d pos = gr->get_pos();
+		vector_tpl<const platform_t *> here;
+		FOR( vector_tpl<platform_t *>, const p, list ) {
+			if(  p->contains( pos )  &&  (p->kind != platform_t::STAND  ||  p->dead_end  ||  (p->dir & rs->get_dir()))  ) {
+				here.append( p );
+			}
+		}
+		if(  here.empty()  ) {
+			continue;
+		}
+		const scr_coord s = vp->get_screen_coord( pos );
+		if(  s.x < -R  ||  s.x > display_get_width() + R  ||  s.y < -R  ||  s.y > display_get_height() + R  ) {
+			continue;
+		}
+		const sint8 slope = (here[0]->axis == ribi_t::northsouth) ? -1 : 1;
+		const scr_coord_val gx = s.x + R / 2, gy = s.y + R * 3 / 4;
+		if(  rs->get_desc()->is_platform_display()  ) {
+			draw_display( gx, gy, slope, halt, here );
+		}
+		else {
+			// a sign for each platform of the tile, side by side
+			for(  uint32 i = 0;  i < here.get_count();  i++  ) {
+				draw_track_sign( gx + (scr_coord_val)(i * 2 - (here.get_count() - 1)) * R / 8, gy, slope, here[i] );
+			}
+		}
+	}
 }
 
 

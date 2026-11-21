@@ -48,7 +48,9 @@ public:
 		PLATFORM_SIGNAL       = 1U << 9,  // fork: exit signal of a station track (with SIGN_SIGNAL)
 		STATION_BOUNDARY      = 1U << 10, // fork: sign where a single-track line enters a station
 		BLOCK_POST            = 1U << 11, // fork: block signal on a single-track line (with SIGN_SIGNAL)
-		AUTOBLOCK             = 1U << 12  // fork: automatic block signal, red, yellow or green by its block (with SIGN_SIGNAL)
+		AUTOBLOCK             = 1U << 12, // fork: automatic block signal, red, yellow or green by its block (with SIGN_SIGNAL)
+		PLATFORM_DISPLAY      = 1U << 13, // fork: platform display, the game draws the next departure (simplatform.h)
+		TRACK_SIGN            = 1U << 14  // fork: track or stand sign, the game draws the number and the lines
 	};
 
 	image_id get_image_id(ribi_t::dir dir) const
@@ -112,6 +114,11 @@ public:
 
 	// fork: where a single-track line enters a station (lichobeznikova tabulka)
 	bool is_station_boundary() const { return (flags & STATION_BOUNDARY) != 0; }
+
+	// fork, platforms: a display or a track/stand sign at a stop; no effect on vehicles
+	bool is_platform_display() const { return (flags & PLATFORM_DISPLAY) != 0; }
+	bool is_track_sign() const { return (flags & TRACK_SIGN) != 0; }
+	bool is_platform_object() const { return (flags & (PLATFORM_DISPLAY | TRACK_SIGN)) != 0; }
 
 	bool is_signal_type() const
 	{
