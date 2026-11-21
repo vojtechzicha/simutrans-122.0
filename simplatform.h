@@ -146,8 +146,29 @@ public:
 	/// is this the kind of platform a card is drawn for (tracks and stands)
 	static bool has_card(const platform_t *p) { return p->kind != platform_t::OTHER; }
 
-	/// works out the platforms of the stop; also gives its tracks numbers, see plan 2
+	/// works out the platforms of the stop with their numbers and lines; changes nothing of the stop (display code
+	/// calls it at any time, so it must not change game state)
 	static void build(haltestelle_t *halt, halt_platforms_t &out);
+
+	/**
+	 * Brings the stop's numbers up to date with its tiles (plan 2): a number whose tile went moves to the platform
+	 * next to it, the second number of a platform goes, tracks without a number get the next free one. This changes
+	 * game state, so it runs only where every client runs it alike: after loading (haltestelle_t::finish_rd), from
+	 * the world step for stops whose tiles changed (labels_changed), and from the platform tool.
+	 */
+	static void update_labels(haltestelle_t *halt);
+
+	/// the stop's tiles changed: its numbers are brought up to date at the next world step
+	static void labels_changed(halthandle_t halt);
+
+	/// from the world step (haltestelle_t::step_all)
+	static void step();
+
+	/// the stops go (haltestelle_t::destroy_all): their handles must not stay queued
+	static void clear_pending();
+
+	/// the lines of the platforms (part of build)
+	static void add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list);
 
 	/// the platform of the stop a vehicle stands on at pos heading dir (dir 0: the first one with the tile); -1 none
 	static sint32 find(const vector_tpl<platform_t *> &list, koord3d pos, ribi_t::ribi dir);

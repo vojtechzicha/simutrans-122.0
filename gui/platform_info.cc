@@ -52,6 +52,28 @@ static halthandle_t marked_halt;
 static koord3d marked_anchor = koord3d::invalid;
 static uint8 marked_dir = 0;
 static vector_tpl<koord3d> marked_tiles;
+static const void *marked_owner = NULL;
+static uint32 marked_touched = 0;
+
+
+const void *platform_marker_t::get_owner()
+{
+	return marked_owner;
+}
+
+
+void platform_marker_t::touch()
+{
+	marked_touched = dr_time();
+}
+
+
+void platform_marker_t::expire()
+{
+	if(  marked_owner  &&  dr_time() - marked_touched > 300  ) {
+		unmark();
+	}
+}
 
 
 void platform_marker_t::unmark()
@@ -65,15 +87,20 @@ void platform_marker_t::unmark()
 	marked_tiles.clear();
 	marked_halt = halthandle_t();
 	marked_anchor = koord3d::invalid;
+	marked_owner = NULL;
 }
 
 
-void platform_marker_t::mark(halthandle_t halt, koord3d anchor, uint8 dir)
+void platform_marker_t::mark(halthandle_t halt, koord3d anchor, uint8 dir, const void *owner)
 {
 	if(  is_marked( halt, anchor, dir )  ) {
+		marked_owner = owner;
+		marked_touched = dr_time();
 		return;
 	}
 	unmark();
+	marked_owner = owner;
+	marked_touched = dr_time();
 	if(  !halt.is_bound()  ) {
 		return;
 	}
@@ -452,13 +479,18 @@ gui_platforms_tab_t::gui_platforms_tab_t() :
 
 gui_platforms_tab_t::~gui_platforms_tab_t()
 {
+	// the inputs were added, not made by the list: it does not delete them
+	list.remove_all();
 	FOR( vector_tpl<row_t *>, r, rows ) {
+		delete r->input;
 		delete r;
 	}
-	if(  hover_row >= 0  ) {
+	if(  platform_marker_t::get_owner() == this  ) {
 		platform_marker_t::unmark();
 	}
 }
+
+
 
 
 void gui_platforms_tab_t::set_halt(halthandle_t h)
@@ -561,7 +593,7 @@ void gui_platforms_tab_t::focus_platform(koord3d anchor, uint8 dir)
 			if(  i >= 0  &&  i == j  ) {
 				list.set_focus( r->input );
 				set_focus( &list );
-				platform_marker_t::mark( halt, r->anchor, r->dir );
+				platform_marker_t::mark( halt, r->anchor, r->dir, this );
 				return;
 			}
 		}
@@ -597,14 +629,20 @@ void gui_platforms_tab_t::draw(scr_coord offset)
 			over = i;
 		}
 	}
-	if(  over != hover_row  ) {
+	const bool ours = platform_marker_t::get_owner() == this;
+	if(  over != hover_row  ||  (over >= 0  &&  !ours)  ) {
+		// a new row, or the row's mark expired while the tab was hidden
 		if(  over >= 0  ) {
-			platform_marker_t::mark( halt, rows[over]->anchor, rows[over]->dir );
+			platform_marker_t::mark( halt, rows[over]->anchor, rows[over]->dir, this );
 		}
-		else if(  hover_row >= 0  ) {
+		else if(  ours  ) {
 			platform_marker_t::unmark();
 		}
 		hover_row = over;
+	}
+	if(  platform_marker_t::get_owner() == this  ) {
+		// still shown: keep the mark
+		platform_marker_t::touch();
 	}
 }
 

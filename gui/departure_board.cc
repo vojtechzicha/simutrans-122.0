@@ -1525,28 +1525,42 @@ bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, 
 	if(  !halt.is_bound()  ||  p == NULL  ) {
 		return false;
 	}
-	// the boards of the stop once a game minute (the platform window asks every frame), for up to 16 stops at a time (displays on the map ask too)
+	// the boards of the stop once a game minute (the platform window asks every frame), for up to 64 stops at a time (displays on the map ask too)
 	struct cache_t {
 		halthandle_t halt;
 		sint64 stamp;
 		uint32 epoch;
+		uint32 halt_stamp;
 		uint32 used;
 		vector_tpl<platform_departure_t> deps;
 		vector_tpl<sint16> platforms;
-		cache_t() : stamp(-1), epoch(0), used(0) {}
+		cache_t() : stamp(-1), epoch(0), halt_stamp(0), used(0) {}
 	};
-	static cache_t caches[16];
+	enum { CACHED_STOPS = 64 };
+	static cache_t caches[CACHED_STOPS];
 	static uint32 use_counter = 0;
 	const sint64 stamp = welt->has_calendar() ? welt->get_calendar_minutes() : (sint64)(welt->get_ticks() >> (welt->ticks_per_world_month_shift - 10));
 	cache_t *c = NULL;
-	for(  int i = 0;  i < 16  &&  c == NULL;  i++  ) {
+	for(  int i = 0;  i < CACHED_STOPS  &&  c == NULL;  i++  ) {
 		if(  caches[i].halt == halt  ) {
 			c = &caches[i];
 		}
 	}
+	// at most four boards a quarter second: with more displays of other stops on the screen than the cache holds,
+	// those keep what they showed (or show nothing) instead of rebuilding boards every frame
+	static uint32 budget_since = 0, budget_used = 0;
+	const uint32 t_now = dr_time();
+	if(  t_now - budget_since > 250  ) {
+		budget_since = t_now;
+		budget_used = 0;
+	}
+	if(  c == NULL  &&  budget_used >= 4  ) {
+		// no rebuild left this moment: evicting another stop would only make it rebuild next
+		return false;
+	}
 	if(  c == NULL  ) {
 		c = &caches[0];
-		for(  int i = 1;  i < 16;  i++  ) {
+		for(  int i = 1;  i < CACHED_STOPS;  i++  ) {
 			if(  caches[i].used < c->used  ) {
 				c = &caches[i];
 			}
@@ -1557,9 +1571,17 @@ bool gui_departure_board_view_t::get_next_platform_departure(halthandle_t halt, 
 	c->used = ++use_counter;
 	vector_tpl<platform_departure_t> &cached = c->deps;
 	vector_tpl<sint16> &cached_platform = c->platforms;
-	if(  c->stamp != stamp  ||  c->epoch != platforms_t::epoch  ) {
+	// a new minute, or the platforms of the stop changed (a bus learned the other stand, a number, a tile)
+	const bool stale = c->stamp != stamp  ||  c->epoch != platforms_t::epoch  ||  c->halt_stamp != halt->get_platform_stamp();
+	if(  stale  &&  budget_used >= 4  &&  (c->stamp < 0  ||  c->halt_stamp != halt->get_platform_stamp())  ) {
+		// nothing yet, or the stop's platforms changed (the cached rows name platforms by index): nothing until rebuilt
+		return false;
+	}
+	if(  stale  &&  budget_used < 4  ) {
+		budget_used++;
 		c->stamp = stamp;
 		c->epoch = platforms_t::epoch;
+		c->halt_stamp = halt->get_platform_stamp();
 		cached.clear();
 		cached_platform.clear();
 		const uint8 kinds = get_kinds_at( halt );

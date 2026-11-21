@@ -81,6 +81,9 @@ public:
 	/// fork: true once an autoblock was built or loaded; the autoblock walks run only then
 	static bool any_autoblock;
 
+	/// fork, platforms: the pakset has a platform display or track sign (else nothing looks for them on the map)
+	static bool any_platform_object;
+
 	/// fork: a rail signal or station boundary turned red or stopped being red: the autoblocks whose
 	/// block ends here show yellow or green by it
 	void refresh_autoblocks_ending_here();

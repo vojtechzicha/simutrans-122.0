@@ -1380,7 +1380,11 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
 - Numbers: `haltestelle_t::platform_labels` (anchor tile, stand direction, text up to 7 characters, saved 122.18 with
   `platform_flags`). A label belongs to the platform with its tile (a removed tile: the platform next to it; two on
   one platform: the older wins); tracks without one get the next free number across the station, highest level first
-  (a metro under a station after it), and keep it. Stands get none until typed. Typed through the simple tool
+  (a metro under a station after it), and keep it. Stands get none until typed. Numbers change only in
+  `platforms_t::update_labels` (after loading in `haltestelle_t::finish_rd`, at the next world step for stops whose
+  tiles changed, `labels_changed` from `add_grund`/`rem_grund`, and from the tool): `build`, which the display calls,
+  only reads them, so clients that look at different stops stay alike. `rotate90` turns anchors, stand directions and
+  `entry_ways`. `SIM_SERVER_MINOR` is `SIM_SAVE_MINOR`: network resyncs saved at 0.122.0 and lost every fork field. Typed through the simple tool
   `TOOL_CHANGE_PLATFORMS` (`f,HALT,FLAGS`, `n,HALT,X,Y,Z,DIR,TEXT`, `a,HALT` renumber tracks), so network safe.
 - Cards (`gui/platform_cards.*`, drawn by `main_view_t::display` after the overlays): number box, then per group the
   chips (train navy, bus blue, tram red, six to a row, "+N" after three rows, four cells at most), the arrow and the
@@ -1410,7 +1414,7 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   (`Ex1/1,2` = Ex1/1, Ex1/2; `RJ1/1-7`; `<..>` left out) is a chip or the code of a line whose schedule stops there.
   On the owner's save of 2026-11-08: 1,707 numbers (Hranice: tracks 7, 6, 3, 2, 1 and 13 of its 15 stands as on the
   markers), 130 stops with destinations, 15,407 markers removed, 18,802 kept (road signs, names, line variants that
-  exist on no line).
+  exist on no line). A marker whose number no nearby platform took stays, whatever its lines.
 - Objects (phase 4, `tools/fork-platforms`, README there): road sign flags `PLATFORM_DISPLAY` (bit 13, makeobj
   `is_platformdisplay=1`) and `TRACK_SIGN` (bit 14, `is_tracksign=1`) for track, road and tram; no vehicle reads them
   (every sign check tests other flags). Only on stop tiles; one click places or turns them (one direction, the other,
@@ -1419,7 +1423,7 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   `gui/platform_cards.cc`, overlay pass, normal zoom and closer, every stop on the screen in any card view): a 3x5
   LED font with Czech, Polish and German accents, stepping a pixel down per two along (up on north-south platforms);
   the display a row per platform of its tile (number, time, line, destination or vias in turn every 3 s, the delay
-  when late; `get_next_platform_departure`, cached a minute for 16 stops), the sign its number and three lines.
+  when late; `get_next_platform_departure`, cached a minute for 64 stops, rebuilt when the stop's platforms change, at most 4 rebuilds per 250 ms), the sign its number and three lines.
   Placeholder art: `steam-fork.sh platforms` builds `fork-platform-objects.pak` into the pakset folder. Seen at
   Hranice (owner's save) and on the test layout with the placeholder pak as an add-on (`-addons`, harness
   `platformsign NAME X Y DIRS [ctrl]`).

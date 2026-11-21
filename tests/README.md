@@ -41,8 +41,9 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `lt_entry_main_3`, `lt_entry_main_4` | A single-track stub between two station boundaries entered through a plain signal (Vršovice from Eden and ONJ, 2026-10-30): the signal acts as a platform signal, so no train waits on the stub for a track at the station. Fail before the fix. |
 | `lt_entry_p_3` | The same stub entered through a P: the layout way to the same result, passes on older builds too. |
 | `station_tracks_tram` | A tram stop in a train station's halt is no track of the station for the train rules (`expect_tracks`). Fails before the fix. |
-| `platforms_basic` | Platforms: a station's tracks numbered across, the lines on each by next stop, stands per travel direction (one bus learned the other way than the guess), a bay, typed numbers kept through save and load. |
+| `platforms_basic` | Platforms: a station's tracks numbered across, the lines on each by next stop, stands per travel direction (one bus learned the other way than the guess), a bay, typed numbers kept through save and load and turned with the map when it rotates. |
 | `platforms_changed` | Platforms: a train standing on its track is confirmed there; one the choose signal sends elsewhere shows changed, as on the board. |
+| `platforms_road_change` | Platforms: a dead-end stand becomes a through stop when its road goes on (no stop tile added); its number stays on one of the two stands, also after save and load. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |

@@ -664,8 +664,15 @@ bool roadsign_t::successfully_loaded()
 }
 
 
+// fork, platforms
+bool roadsign_t::any_platform_object = false;
+
+
 bool roadsign_t::register_desc(roadsign_desc_t *desc)
 {
+	if(  desc->is_platform_object()  ) {
+		any_platform_object = true;
+	}
 	// avoid duplicates with same name
 	if(const roadsign_desc_t *old_desc = table.remove(desc->get_name())) {
 		dbg->doubled( "roadsign", desc->get_name() );

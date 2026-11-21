@@ -2767,6 +2767,11 @@ void convoi_t::learn_departure_way()
 	if(  entry == 255  ||  !line.is_bound()  ||  is_coupled()  ||  route.get_count() < 2  ) {
 		return;
 	}
+	// the entry must still be that stop of that line (an edit while we stood there may have moved it)
+	if(  line != platform_learn_line  ||  entry >= schedule->get_count()
+		||  haltestelle_t::get_halt( schedule->entries[entry].pos, get_owner() ) != platform_learn_halt  ) {
+		return;
+	}
 	const koord3d start = route.at( 0 );
 	for(  uint32 i = 1;  i < route.get_count();  i++  ) {
 		if(  route.at( i ).get_2d() != start.get_2d()  ) {
@@ -2830,6 +2835,8 @@ void convoi_t::ziel_erreicht()
 			if(  line.is_bound()  &&  !is_coupled()  ) {
 				line->learn_entry_way( schedule->get_current_stop(), v->get_direction(), 0 );
 				platform_learn_entry = schedule->get_current_stop();
+				platform_learn_halt = halt;
+				platform_learn_line = line;
 			}
 			couple_wait_since = 0;
 			couple_hold_slot = -1;

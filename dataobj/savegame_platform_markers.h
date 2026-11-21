@@ -22,7 +22,9 @@ class karte_t;
  *
  * MODE strip: removes a marker within one tile of a stop when it names line numbers and every one of them is a
  * line on the cards of the stops near it (a chip, or the first word of a line name, "Ex1/1,2" and "RJ1/1-7" read as
- * Ex1/1, Ex1/2, RJ1/1 ... RJ1/7; numbers in <> are left out). Markers with anything else stay.
+ * Ex1/1, Ex1/2, RJ1/1 ... RJ1/7; numbers in <> are left out). Markers with anything else stay, and so do markers
+ * whose platform number no platform near them has (the marker is then its only record) and markers naming a reversed
+ * range or one longer than 20.
  *
  * MODE both: numbers first, then strip. keep_path names stops (one name per line) whose markers stay as they are.
  * The report (TSV) lists every marker near a stop: x, y, z, what was done or why not, the stop and the text.

@@ -84,6 +84,9 @@ void haltestelle_t::reset_routing()
 
 void haltestelle_t::step_all()
 {
+	// fork, platforms: numbers of stops whose tiles changed
+	platforms_t::step();
+
 	// tell all stale convois to reroute their goods
 	if(  !stale_convois.empty()  ) {
 		convoihandle_t cnv = stale_convois.pop_back();
@@ -419,6 +422,7 @@ void haltestelle_t::destroy(halthandle_t const halt)
  */
 void haltestelle_t::destroy_all()
 {
+	platforms_t::clear_pending();
 	while (!alle_haltestellen.empty()) {
 		halthandle_t halt = alle_haltestellen.back();
 		destroy(halt);
@@ -570,6 +574,15 @@ haltestelle_t::~haltestelle_t()
 void haltestelle_t::rotate90( const sint16 y_size )
 {
 	init_pos.rotate90( y_size );
+
+	// fork, platforms: the numbers go with their tiles and travel directions
+	FOR( vector_tpl<platform_label_t>, &l, platform_labels ) {
+		if(  l.anchor != koord3d::invalid  ) {
+			l.anchor.rotate90( y_size );
+		}
+		l.dir = ribi_t::rotate90( l.dir );
+	}
+	platforms_changed();
 
 	// rotate cargo (good) destinations
 	// iterate over all different categories
@@ -3068,6 +3081,9 @@ void haltestelle_t::finish_rd()
 {
 	verbinde_fabriken();
 
+	// fork, platforms: numbers for the tracks of an older save, numbers moved with their tiles
+	platforms_t::update_labels( this );
+
 	stale_convois.clear();
 	stale_lines.clear();
 	// fix good destination coordinates
@@ -3329,8 +3345,11 @@ void haltestelle_t::display_status(KOORD_VAL xpos, KOORD_VAL ypos)
 
 bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 {
-	// fork, platforms: the rows of tiles change
+	// fork, platforms: the rows of tiles change (numbers at the next world step; when loading in finish_rd)
 	platforms_changed();
+	if(  relink_factories  ) {
+		platforms_t::labels_changed( self );
+	}
 
 	assert(gr!=NULL);
 
@@ -3443,8 +3462,9 @@ bool haltestelle_t::add_grund(grund_t *gr, bool relink_factories)
 
 bool haltestelle_t::rem_grund(grund_t *gr)
 {
-	// fork, platforms: the rows of tiles change
+	// fork, platforms: the rows of tiles change (numbers at the next world step)
 	platforms_changed();
+	platforms_t::labels_changed( self );
 
 	// namen merken
 	if(!gr) {

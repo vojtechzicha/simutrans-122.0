@@ -119,18 +119,21 @@ struct card_item_t
 	uint8 type;
 	uint8 dir;
 	waytype_t wt;
-	const char *text;
+	const char *text;     ///< points into the platform model (stable while the frame draws), or NULL: own
+	char own[160];        ///< text made for the card (a run's destinations): kept with the item
+
+	const char *get_text() const { return text ? text : own; }
 };
 
 
 static scr_coord_val item_width(const card_item_t &it)
 {
 	switch(  it.type  ) {
-		case IT_CHIP:  return platform_cards_t::draw_chip( 0, 0, it.text, it.wt, false );
-		case IT_DEST:  return proportional_string_width( it.text ) + 6;
+		case IT_CHIP:  return platform_cards_t::draw_chip( 0, 0, it.get_text(), it.wt, false );
+		case IT_DEST:  return proportional_string_width( it.get_text() ) + 6;
 		case IT_ARROW: return 9;
-		case IT_NAME:  return proportional_string_width( it.text );
-		case IT_PRE:   return proportional_string_width( it.text ) + 2;
+		case IT_NAME:  return proportional_string_width( it.get_text() );
+		case IT_PRE:   return proportional_string_width( it.get_text() ) + 2;
 		default:       return 0;
 	}
 }
@@ -147,13 +150,17 @@ static const char *more_text(uint32 n)
 }
 
 
-static void add(vector_tpl<card_item_t> &items, uint8 type, const char *text = NULL, waytype_t wt = invalid_wt, uint8 dir = 0)
+static void add(vector_tpl<card_item_t> &items, uint8 type, const char *text = NULL, waytype_t wt = invalid_wt, uint8 dir = 0, bool copy = false)
 {
 	card_item_t it;
 	it.type = type;
-	it.text = text;
 	it.wt = wt;
 	it.dir = dir;
+	it.own[0] = 0;
+	it.text = copy ? NULL : (text ? text : "");
+	if(  copy  ) {
+		tstrncpy( it.own, text, lengthof(it.own) );
+	}
 	items.append( it );
 }
 
@@ -169,7 +176,7 @@ static void add_chips(vector_tpl<card_item_t> &items, const platform_run_t &run,
 			in_row = 0;
 		}
 		if(  n > room  &&  i == room - 1  ) {
-			add( items, IT_CHIP, more_text( n - i ), invalid_wt );
+			add( items, IT_CHIP, more_text( n - i ), invalid_wt, 0, true );
 			in_row++;
 			return;
 		}
@@ -192,7 +199,7 @@ static void build_items(const platform_t *p, bool with_destinations, bool compac
 	FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
 		if(  cells == MAX_CELLS - 1  &&  total > MAX_CELLS  ) {
 			add( items, IT_CELL );
-			add( items, IT_CHIP, more_text( total - cells ) );
+			add( items, IT_CHIP, more_text( total - cells ), invalid_wt, 0, true );
 			return;
 		}
 		if(  cells  ) {
@@ -204,7 +211,8 @@ static void build_items(const platform_t *p, bool with_destinations, bool compac
 		FOR( vector_tpl<platform_run_t>, const &r, runs ) {
 			add_chips( items, r, in_row );
 			if(  r.destination[0]  ) {
-				add( items, IT_DEST, r.destination );
+				// the runs are gone once the items are made: the text goes with the item
+				add( items, IT_DEST, r.destination, invalid_wt, 0, true );
 			}
 		}
 		if(  g->name_shown  ||  (compact  &&  p->groups.get_count() > 1)  ) {
@@ -318,19 +326,19 @@ static void draw_flow(scr_coord_val x, scr_coord_val y, scr_size s, const vector
 					cy += row_h();
 					continue;
 				case IT_CHIP:
-					platform_cards_t::draw_chip( cx, cy, it.text, it.wt, true );
+					platform_cards_t::draw_chip( cx, cy, it.get_text(), it.wt, true );
 					break;
 				case IT_DEST:
-					display_proportional_clip_rgb( cx + 1, cy, it.text, ALIGN_LEFT, rgb( DEST_COL ), true );
+					display_proportional_clip_rgb( cx + 1, cy, it.get_text(), ALIGN_LEFT, rgb( DEST_COL ), true );
 					break;
 				case IT_ARROW:
 					platform_cards_t::draw_arrow( cx + 1, cy + (LINESPACE - 7) / 2, it.dir, NAME_COL );
 					break;
 				case IT_NAME:
-					display_proportional_clip_rgb( cx, cy, it.text, ALIGN_LEFT, rgb( NAME_COL ), true );
+					display_proportional_clip_rgb( cx, cy, it.get_text(), ALIGN_LEFT, rgb( NAME_COL ), true );
 					break;
 				case IT_PRE:
-					display_proportional_clip_rgb( cx, cy, it.text, ALIGN_LEFT, rgb( DEST_COL ), true );
+					display_proportional_clip_rgb( cx, cy, it.get_text(), ALIGN_LEFT, rgb( DEST_COL ), true );
 					break;
 			}
 			cx += item_width( it ) + 2;
@@ -585,6 +593,9 @@ static void display_halt(halthandle_t halt, bool full_zoom)
 
 void platform_cards_t::display()
 {
+	// a Platforms tab that is no longer shown gives up the platform it marked
+	platform_marker_t::expire();
+
 	// the card under the mouse in the last frame is drawn in full now
 	const scr_coord mouse( get_mouse_x(), get_mouse_y() );
 	hover_halt = halthandle_t();
@@ -607,7 +618,7 @@ void platform_cards_t::display()
 	const bool full_zoom = R >= base;
 
 	// the displays and signs (physical objects: in every view), at the normal zoom and closer
-	if(  full_zoom  ) {
+	if(  full_zoom  &&  roadsign_t::any_platform_object  ) {
 		const viewport_t *vpo = welt->get_viewport();
 		const scr_coord_val dw = display_get_width(), dh = display_get_height();
 		FOR( vector_tpl<halthandle_t>, const halt, haltestelle_t::get_alle_haltestellen() ) {
@@ -994,7 +1005,8 @@ static void display_objects(halthandle_t halt)
 {
 	const viewport_t *vp = welt->get_viewport();
 	const scr_coord_val R = get_tile_raster_width();
-	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	// the platforms only for a stop with such an object (most have none: no model is built for them)
+	const vector_tpl<platform_t *> *plist = NULL;
 	FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
 		const grund_t *gr = t.grund;
 		if(  !gr->is_visible()  ) {
@@ -1005,6 +1017,14 @@ static void display_objects(halthandle_t halt)
 			continue;
 		}
 		const koord3d pos = gr->get_pos();
+		const scr_coord s0 = vp->get_screen_coord( pos );
+		if(  s0.x < -R  ||  s0.x > display_get_width() + R  ||  s0.y < -R  ||  s0.y > display_get_height() + R  ) {
+			continue;
+		}
+		if(  plist == NULL  ) {
+			plist = &halt->get_platforms();
+		}
+		const vector_tpl<platform_t *> &list = *plist;
 		vector_tpl<const platform_t *> here;
 		FOR( vector_tpl<platform_t *>, const p, list ) {
 			if(  p->contains( pos )  &&  (p->kind != platform_t::STAND  ||  p->dead_end  ||  (p->dir & rs->get_dir()))  ) {

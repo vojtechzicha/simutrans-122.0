@@ -2231,14 +2231,25 @@ const char *tool_move_halt_name_t::work( player_t *player, koord3d pos )
 }
 
 
-// fork, platforms
-halthandle_t tool_number_platform_t::get_target_halt() const
+// fork, platforms: a stop id from a tool parameter, unbound unless it is a number of a valid handle (the parameter
+// comes over the network)
+static halthandle_t parse_halt_id(const char *p)
 {
 	halthandle_t halt;
-	if(  default_param  &&  *default_param >= '0'  &&  *default_param <= '9'  ) {
-		halt.set_id( (uint16)atoi( default_param ) );
+	if(  p == NULL  ||  *p < '0'  ||  *p > '9'  ) {
+		return halt;
+	}
+	const unsigned long id = strtoul( p, NULL, 10 );
+	if(  id > 0  &&  id < halthandle_t::get_size()  ) {
+		halt.set_id( (uint16)id );
 	}
 	return halt;
+}
+
+
+halthandle_t tool_number_platform_t::get_target_halt() const
+{
+	return parse_halt_id( default_param );
 }
 
 
@@ -2305,8 +2316,7 @@ bool tool_change_platforms_t::init( player_t *player )
 	if(  *p == ','  ) {
 		p++;
 	}
-	halthandle_t halt;
-	halt.set_id( (uint16)atoi( p ) );
+	const halthandle_t halt = parse_halt_id( p );
 	if(  !halt.is_bound()  ||  (env_t::networkmode  &&  !player_t::check_owner( halt->get_owner(), player ))  ) {
 		return false;
 	}
@@ -2337,7 +2347,7 @@ bool tool_change_platforms_t::init( player_t *player )
 					labels.remove_at( k );
 				}
 			}
-			halt->platforms_changed();
+			platforms_t::update_labels( halt.get_rep() );
 			break;
 		}
 	}

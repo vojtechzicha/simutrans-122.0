@@ -377,6 +377,8 @@ private:
 
 	/// fork, platforms: the schedule entry of the stop we stand at, to learn which way the line leaves it (255: none; not saved)
 	uint8 platform_learn_entry;
+	halthandle_t platform_learn_halt;  ///< its stop and line: a schedule edit or line change before we leave drops the lesson
+	linehandle_t platform_learn_line;
 
 	/// fork, platforms: we left the stop of platform_learn_entry; tells the line which way
 	void learn_departure_way();

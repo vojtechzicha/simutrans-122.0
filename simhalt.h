@@ -815,6 +815,7 @@ public:
 
 	/// the platforms must be worked out again (lines, tiles or numbers changed)
 	void platforms_changed() { platform_stamp++; }
+	uint32 get_platform_stamp() const { return platform_stamp; }
 
 	uint8 get_platform_flags() const { return platform_flags; }
 	void set_platform_flags(uint8 f) { platform_flags = f; }

@@ -456,7 +456,7 @@ void platforms_t::get_runs(const vector_tpl<platform_member_t> &members, bool wi
 
 // labels: each platform takes the first label on one of its tiles; a label whose tile went takes a platform
 // next to it; other labels go; tracks without one get the next free number (plan 2)
-static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list)
+static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list, bool mutate)
 {
 	vector_tpl<platform_label_t> &labels = halt->access_platform_labels();
 	vector_tpl<sint32> owner_of( list.get_count() );
@@ -503,7 +503,9 @@ static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 			if(  next_to  ) {
 				owner_of[i] = k;
 				used[k] = true;
-				labels[k].anchor = p->get_anchor();
+				if(  mutate  ) {
+					labels[k].anchor = p->get_anchor();
+				}
 				break;
 			}
 		}
@@ -514,6 +516,10 @@ static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 		if(  owner_of[i] >= 0  ) {
 			tstrncpy( list[i]->number, labels[owner_of[i]].text, lengthof(list[i]->number) );
 		}
+	}
+	if(  !mutate  ) {
+		// only reading: tracks without a number stay so until update_labels gives them one
+		return;
 	}
 	// tracks without a label: the next free number, across the station
 	vector_tpl<uint32> unnumbered;
@@ -595,10 +601,85 @@ static void add_member(platform_t *p, halthandle_t next, const char *next_name, 
 }
 
 
+static void build_rows(haltestelle_t *halt, vector_tpl<platform_t *> &list);
+
+
+static vector_tpl<halthandle_t> labels_dirty;
+
+void platforms_t::labels_changed(halthandle_t halt)
+{
+	labels_dirty.append_unique( halt );
+}
+
+
+void platforms_t::clear_pending()
+{
+	labels_dirty.clear();
+}
+
+
+void platforms_t::step()
+{
+	while(  !labels_dirty.empty()  ) {
+		const halthandle_t halt = labels_dirty.pop_back();
+		if(  halt.is_bound()  ) {
+			update_labels( halt.get_rep() );
+		}
+	}
+	// tracks also change without a stop tile coming or going (rails laid or removed between two rows of a stop):
+	// one stop per step in turn, the same on every client
+	// (by the world's step count, which a client joining a network game gets with the save)
+	const vector_tpl<halthandle_t> &all = haltestelle_t::get_alle_haltestellen();
+	if(  !all.empty()  ) {
+		update_labels( all[(uint32)world()->get_steps() % all.get_count()].get_rep() );
+	}
+}
+
+
+static bool same_labels(const vector_tpl<platform_label_t> &a, const vector_tpl<platform_label_t> &b)
+{
+	if(  a.get_count() != b.get_count()  ) {
+		return false;
+	}
+	for(  uint32 i = 0;  i < a.get_count();  i++  ) {
+		if(  a[i].anchor != b[i].anchor  ||  a[i].dir != b[i].dir  ||  strcmp( a[i].text, b[i].text )  ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+void platforms_t::update_labels(haltestelle_t *halt)
+{
+	const vector_tpl<platform_label_t> &labels = halt->access_platform_labels();
+	vector_tpl<platform_label_t> before;
+	FOR( vector_tpl<platform_label_t>, const &l, labels ) {
+		before.append( l );
+	}
+	halt_platforms_t rows;
+	build_rows( halt, rows.list );
+	apply_labels( halt, rows.list, true );
+	if(  !same_labels( before, labels )  ) {
+		// only then: the sweep must not make every stop work out its platforms again
+		halt->platforms_changed();
+	}
+}
+
+
 void platforms_t::build(haltestelle_t *halt, halt_platforms_t &out)
 {
 	out.clear();
 	vector_tpl<platform_t *> &list = out.list;
+	build_rows( halt, list );
+	apply_labels( halt, list, false );
+	add_lines( halt, list );
+}
+
+
+// the platforms of the stop's tiles, without numbers and lines
+static void build_rows(haltestelle_t *halt, vector_tpl<platform_t *> &list)
+{
 	const halthandle_t self = haltestelle_t::get_halt( halt->get_basis_pos3d(), halt->get_owner() );
 
 	// the stop's tiles with a way of a stop
@@ -721,7 +802,13 @@ void platforms_t::build(haltestelle_t *halt, halt_platforms_t &out)
 		}
 	}
 
-	apply_labels( halt, list );
+}
+
+
+// the lines that board at each platform, grouped by next stop (plan 3)
+void platforms_t::add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list)
+{
+	const halthandle_t self = haltestelle_t::get_halt( halt->get_basis_pos3d(), halt->get_owner() );
 
 	// the lines
 	cbuffer_t town;

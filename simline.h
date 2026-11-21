@@ -266,6 +266,12 @@ public:
 
 	/// fork, platforms: the way vehicles come to entry (arrival) and leave it (departure), 0 = not seen yet
 	ribi_t::ribi get_entry_arrival(uint8 entry) const { return entry < entry_ways.get_count() ? entry_ways[entry] & 15 : 0; }
+	/// fork, platforms: the map turned; the learned directions turn with it
+	void rotate_entry_ways() {
+		FOR( vector_tpl<uint8>, &w, entry_ways ) {
+			w = ribi_t::rotate90( w & 15 ) | (ribi_t::rotate90( w >> 4 ) << 4);
+		}
+	}
 	ribi_t::ribi get_entry_departure(uint8 entry) const { return entry < entry_ways.get_count() ? entry_ways[entry] >> 4 : 0; }
 
 	/// fork, platforms: a vehicle of the line came in (arrival) or left (departure) at entry that way (0: not seen)

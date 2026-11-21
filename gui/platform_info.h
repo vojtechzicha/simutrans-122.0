@@ -30,9 +30,14 @@ class platform_t;
 class platform_marker_t
 {
 public:
-	static void mark(halthandle_t halt, koord3d anchor, uint8 dir);
+	/// owner: who marked it (a Platforms tab: it must keep touching the mark while shown, else expire drops it)
+	static void mark(halthandle_t halt, koord3d anchor, uint8 dir, const void *owner = NULL);
 	static void unmark();
 	static bool is_marked(halthandle_t halt, koord3d anchor, uint8 dir);
+	static const void *get_owner();
+	static void touch();
+	/// every frame: a mark whose owner stopped touching it for 300 ms goes
+	static void expire();
 };
 
 

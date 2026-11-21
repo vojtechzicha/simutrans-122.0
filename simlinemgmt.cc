@@ -174,6 +174,7 @@ void simlinemgmt_t::rotate90( sint16 y_size )
 		if (schedule_t* const schedule = i->get_schedule()) {
 			schedule->rotate90( y_size );
 		}
+		i->rotate_entry_ways();
 	}
 }
 

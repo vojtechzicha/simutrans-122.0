@@ -1,0 +1,17 @@
+# Platforms: a road change without a stop tile coming or going (rails or roads laid next to a stop) changes its
+# platforms; the slow sweep (platforms_t::step) brings the numbers up to date. Layout tests/layouts/platforms.inc:
+# the bay at 30,37 is a dead end (one stand). Expect: numbered 7, it keeps 7 once the road goes on north (two
+# stands, the number on one of them), and the stop keeps one number, not two.
+include ../layouts/platforms.inc
+platformnumber 30 37 - 7
+expect_platform 30 37 - 7
+waydesc Road_050
+track 30 37 30 33
+run 5 0
+platforms 30 37
+expect_platform 30 37 N 7
+expect_platform 30 37 S -
+save platforms_road_change.sve
+load platforms_road_change.sve
+expect_platform 30 37 N 7
+expect_platform 30 37 S -

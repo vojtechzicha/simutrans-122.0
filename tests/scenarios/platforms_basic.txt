@@ -73,3 +73,13 @@ expect_platform 33 21 - 4a
 expect_platform 20 40 E A
 expect_platform 20 40 W -
 expect_lines 20 40 E B2>West|B3>South
+
+# rotating the map turns the numbers and learned directions with it: (x, y) becomes (51 - y, x), east becomes south
+rotate
+platforms 31 33
+expect_platform 32 33 - 1
+expect_platform 30 33 - 4a
+expect_platform 11 20 S A
+expect_platform 11 20 N -
+expect_lines 11 20 S B2>West|B3>South
+expect_lines 11 20 N B1>Bay

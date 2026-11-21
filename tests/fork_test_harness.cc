@@ -2067,6 +2067,8 @@ static std::string platform_lines_text(const platform_t *p)
 
 static halthandle_t halt_at(int x, int y)
 {
+	// numbers of stops built since the last step come with the next world step (platforms_t::step)
+	platforms_t::step();
 	grund_t *gr = W->lookup_kartenboden( koord(x, y) );
 	if(  gr  &&  gr->get_halt().is_bound()  ) {
 		return gr->get_halt();

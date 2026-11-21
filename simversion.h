@@ -24,7 +24,8 @@
 // Beware: SAVEGAME minor is often ahead of version minor when there were patches.
 // ==> These have no direct connection at all!
 #define SIM_SAVE_MINOR      18
-#define SIM_SERVER_MINOR    0
+// fork: network resyncs (nwc_sync_t) save and load at this version; at 0 they dropped every fork field
+#define SIM_SERVER_MINOR    SIM_SAVE_MINOR
 // NOTE: increment before next release to enable save/load of new features
 
 #define MAKEOBJ_VERSION "60.5"

@@ -155,6 +155,22 @@ static void split_parts(const char *text, std::vector<std::string> &parts)
 }
 
 
+// "RJ1/1-7": RJ1/1 ... RJ1/7; a range that is reversed or longer than 20 is no line anybody has, so a marker
+// naming it is never taken for one whose lines the cards show
+static void expand_range(const std::string &base, int from, int to, const std::string &word, std::vector<std::string> &out)
+{
+	if(  to < from  ||  to - from >= 20  ) {
+		out.push_back( "?range " + word );
+		return;
+	}
+	for(  int k = from;  k <= to;  k++  ) {
+		char b[32];
+		sprintf( b, "%s/%d", base.c_str(), k );
+		out.push_back( b );
+	}
+}
+
+
 /**
  * The line numbers a text names: words with a digit ("S3", "930", "Ex1/1"); after "Ex1/1" the bare numbers that
  * follow in the same list ("Ex1/1,2,4") are Ex1/2, Ex1/4, and "RJ1/1-7" is RJ1/1 ... RJ1/7. Anything in <> is left
@@ -189,7 +205,13 @@ static void line_tokens(const char *text, std::vector<std::string> &out)
 			digit |= isdigit( (uint8)w[i] ) != 0;
 			high |= (uint8)w[i] >= 0x80;
 		}
-		if(  !digit  ||  high  ||  w.size() > 14  ) {
+		if(  digit  &&  !high  &&  w.size() > 14  ) {
+			// too long for a line number ("RJ1/12345-12344"): no line on any card, so the marker stays
+			out.push_back( "?long " + w );
+			base.clear();
+			continue;
+		}
+		if(  !digit  ||  high  ) {
 			base.clear();
 			continue;
 		}
@@ -205,11 +227,7 @@ static void line_tokens(const char *text, std::vector<std::string> &out)
 			const size_t d = rest.find( '-' );
 			if(  d != std::string::npos  ) {
 				const int from = atoi( rest.c_str() ), to = atoi( rest.c_str() + d + 1 );
-				for(  int k = from;  k <= to  &&  k - from < 20;  k++  ) {
-					char b[32];
-					sprintf( b, "%s/%d", base.c_str(), k );
-					out.push_back( b );
-				}
+				expand_range( base, from, to, w, out );
 			}
 			else {
 				out.push_back( w );
@@ -220,11 +238,7 @@ static void line_tokens(const char *text, std::vector<std::string> &out)
 		}
 		else if(  dash != std::string::npos  &&  !base.empty()  ) {
 			const int from = atoi( w.c_str() ), to = atoi( w.c_str() + dash + 1 );
-			for(  int k = from;  k <= to  &&  k - from < 20;  k++  ) {
-				char b[32];
-				sprintf( b, "%s/%d", base.c_str(), k );
-				out.push_back( b );
-			}
+			expand_range( base, from, to, w, out );
 		}
 		else {
 			base.clear();
@@ -356,9 +370,13 @@ static void find_candidates(const std::vector<near_stop_t> &stops, koord3d pos, 
 			uint8 tier = 255;
 			FOR( vector_tpl<koord3d>, const &k, p->tiles ) {
 				const koord d = k.get_2d() - pos.get_2d();
-				if(  d == koord( 0, 0 )  ) {
+				if(  k == pos  ) {
+					// on it: the same tile, at the same height (not a road under a viaduct)
 					on = true;
 					tier = 0;
+				}
+				else if(  d == koord( 0, 0 )  ) {
+					tier = min( tier, (uint8)1 );
 				}
 				else if(  koord_distance( k.get_2d(), pos.get_2d() ) <= 1  ) {
 					tier = min( tier, (d.x == 0  ||  d.y == 0) ? 1 : 2 );
@@ -654,6 +672,34 @@ bool savegame_platform_markers_t::apply( karte_t *welt, const char *mode, const 
 					fprintf( report, "%skept\tno line numbers\t%s\t%s\n", where, stop_name.c_str(), text_tsv.c_str() );
 				}
 				n_kept++;
+				continue;
+			}
+			// a platform number the marker gives must be on a platform near it (taken now or before), else the
+			// marker is its only record and stays
+			std::string lost;
+			{
+				std::vector<candidate_t> cands;
+				find_candidates( stops, pos, cands );
+				for(  size_t pi = 0;  pi < parts.size();  pi++  ) {
+					std::string number;
+					bool track;
+					if(  parse_prefix( parts[pi].c_str(), number, track ) == NULL  ) {
+						continue;
+					}
+					bool found = false;
+					for(  size_t c = 0;  c < cands.size()  &&  !found;  c++  ) {
+						found = number == cands[c].p->number;
+					}
+					if(  !found  ) {
+						lost += lost.empty() ? number : ", " + number;
+					}
+				}
+			}
+			if(  !lost.empty()  ) {
+				n_kept++;
+				if(  report  ) {
+					fprintf( report, "%skept\tits number %s is on no platform near it\t%s\t%s\n", where, lost.c_str(), stop_name.c_str(), text_tsv.c_str() );
+				}
 				continue;
 			}
 			std::set<std::string> known;
