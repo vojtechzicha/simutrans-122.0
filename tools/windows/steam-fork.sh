@@ -189,10 +189,13 @@ install_texts() {
 		cat "$STOCK_EN_TAB"
 		printf '%s\r\n' "$FORK_TEXT_MARK"
 		# pairs: every non-comment line after the language name is key, value, key, value, ...
+		# A blank line where a key belongs is skipped: as a key it shifted every later pair by one
+		# (the fork texts after the blank line before "# fork: platforms" all showed the next text).
 		LC_ALL=C awk '
 			{ sub(/\r$/, "") }
 			FNR == 1 || /^#/ { next }
-			FILENAME == ARGV[1] { if( ++n % 2 ) have[$0] = 1; next }
+			FILENAME == ARGV[1] { if( $0 == "" && n % 2 == 0 ) next; if( ++n % 2 ) have[$0] = 1; next }
+			$0 == "" && m % 2 == 0 { next }
 			++m % 2 { key = $0; next }
 			!(key in have) { printf "%s\r\n%s\r\n", key, $0; added++ }
 			END { print added + 0 " fork texts added to en.tab" > "/dev/stderr" }
