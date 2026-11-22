@@ -202,6 +202,19 @@ public:
 	 * same places in one run ("1, 13 Kaufland"); without: one run of all chips.
 	 */
 	static void get_runs(const vector_tpl<platform_member_t> &members, bool with_destinations, vector_tpl<platform_run_t> &runs);
+
+	/**
+	 * The order the numbering walks the platforms of a stop (the number editor, "Number stands"): tracks by number
+	 * (without one last, by place), then stands as you read the map: from the top of the screen down, left to right,
+	 * by the kerb they stand at. Stands no line uses only with with_empty_stands. Indices into list.
+	 */
+	static void get_walk_order(const vector_tpl<platform_t *> &list, bool with_empty_stands, vector_tpl<uint32> &order);
+
+	/// the n-th stand number (from 0): 1, 2, 3 ... or A, B, ... Z, AA, AB ...
+	static void get_stand_label(char *buf, size_t len, uint32 n, bool letters);
+
+	/// a compass word for a travel direction (translated): "northbound" ...; "" for none
+	static const char *get_direction_name(ribi_t::ribi dir);
 };
 
 

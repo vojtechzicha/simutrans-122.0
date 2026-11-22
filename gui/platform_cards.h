@@ -38,6 +38,24 @@ public:
 	/// is the mouse over a card drawn in the last frame
 	static bool is_over_card(scr_coord_val mx, scr_coord_val my);
 
+	/**
+	 * Numbering on the map: while a stop's Platforms tab is shown (it calls touch_numbering every frame), its number
+	 * editor is open or its "Number on the map" tool is active, every track and stand of that stop shows a plate with
+	 * its number ("?" without one) and its travel direction instead of the cards, and the other stops show none. A
+	 * click on a plate opens the number editor there.
+	 */
+	static void touch_numbering(halthandle_t halt);
+	static halthandle_t get_numbering_halt();
+
+	/// the platform of halt whose card or plate was under the mouse in the last frame; -1 none
+	static sint32 get_hover_platform(halthandle_t halt);
+
+	/// the screen rectangle of that platform's plate in the last frame (w 0: not drawn)
+	static scr_rect get_plate_rect(halthandle_t halt, uint32 platform);
+
+	/// numbering shows the stands no line uses too (plates, Platforms tab, number editor); this client only
+	static bool show_empty_stands;
+
 	/// stop windows open (their stops always show cards)
 	static void window_opened(halthandle_t halt);
 	static void window_closed(halthandle_t halt);
@@ -46,6 +64,9 @@ public:
 	static void send_flags(halthandle_t halt, uint8 flags);
 	static void send_number(halthandle_t halt, const platform_t *p, const char *text);
 	static void send_renumber(halthandle_t halt);
+	/// stand numbers 1, 2, 3 ... (or A, B, C ...) as you read the map (platforms_t::get_walk_order): only the stands
+	/// without a number get the next free ones, or with all every stand anew
+	static void send_stand_numbers(halthandle_t halt, bool letters, bool with_empty_stands, bool all);
 
 	/// draws a line chip at x, y (LINESPACE high); returns its width; draw false: only measures
 	static scr_coord_val draw_chip(scr_coord_val x, scr_coord_val y, const char *text, waytype_t wt, bool draw);

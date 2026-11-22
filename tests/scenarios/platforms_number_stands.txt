@@ -1,0 +1,43 @@
+# Platforms: "Stands 1, 2, 3" / "A, B, C" of the Platforms tab (tool command s,HALT,LETTERS,EMPTY,ALL) number the stands of
+# a stop as you read the map, from the top of the screen down and left to right by the kerb they stand at. A click keeps
+# every number already there and gives only the stands without one the next free numbers; Shift+click (all) numbers every
+# stand anew. Layout tests/layouts/platforms.inc with the stop Street made a row 20..24,40 (an east-west road: on each
+# tile the westbound stand's kerb is drawn above the eastbound one's). Expect: with the empty stands 1..10 tile by tile,
+# westbound first; A..J when all are numbered anew; a typed number survives a click, which fills only the gaps with the
+# lowest free letters (C, and F that X7 freed); without the empty stands (no line stops there) nothing changes; the
+# numbers survive save and load.
+include ../layouts/platforms.inc
+waydesc Road_050
+station CZR-Stops-ODIS_Bus-Empty-L 21 40
+station CZR-Stops-ODIS_Bus-Empty-L 22 40
+station CZR-Stops-ODIS_Bus-Empty-L 23 40
+station CZR-Stops-ODIS_Bus-Empty-L 24 40
+numberstands 20 40 digits empty
+platforms 20 40
+expect_platform 20 40 W 1
+expect_platform 20 40 E 2
+expect_platform 21 40 W 3
+expect_platform 22 40 E 6
+expect_platform 24 40 E 10
+numberstands 20 40 letters empty
+expect_platform 20 40 W 1
+expect_platform 24 40 E 10
+numberstands 20 40 letters empty all
+expect_platform 20 40 W A
+expect_platform 23 40 W G
+expect_platform 24 40 E J
+platformnumber 21 40 W -
+platformnumber 23 40 W -
+platformnumber 22 40 E X7
+numberstands 20 40 letters empty
+expect_platform 21 40 W C
+expect_platform 23 40 W F
+expect_platform 22 40 E X7
+expect_platform 24 40 E J
+numberstands 20 40 digits
+expect_platform 23 40 W F
+save platforms_number_stands.sve
+load platforms_number_stands.sve
+expect_platform 24 40 E J
+expect_platform 22 40 E X7
+expect_platform 20 40 W A

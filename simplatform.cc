@@ -1072,3 +1072,97 @@ void platforms_t::get_platforms_of(halthandle_t halt, const schedule_t *schedule
 		}
 	}
 }
+
+
+// ---------------------------------------------------------------------------------------------
+// numbering
+
+// where a platform sits on the screen at the neutral zoom (128 px tiles): stands at their kerb (right of the
+// travel direction, as the cards place them), tracks at their first tile
+static void screen_key(const platform_t *p, sint32 &sx, sint32 &sy)
+{
+	const koord3d a = p->get_anchor();
+	sx = (a.x - a.y) * 64;
+	sy = (a.x + a.y) * 32 - a.z * 16;
+	if(  p->kind == platform_t::STAND  ) {
+		switch(  p->dir  ) {
+			case ribi_t::west:  sx += 10; sy -= 5; break;
+			case ribi_t::east:  sx -= 10; sy += 5; break;
+			case ribi_t::north: sx += 10; sy += 5; break;
+			case ribi_t::south: sx -= 10; sy -= 5; break;
+			default: break;
+		}
+	}
+}
+
+
+void platforms_t::get_walk_order(const vector_tpl<platform_t *> &list, bool with_empty_stands, vector_tpl<uint32> &order)
+{
+	order.clear();
+	for(  uint32 i = 0;  i < list.get_count();  i++  ) {
+		const platform_t *p = list[i];
+		if(  !has_card( p )  ||  (p->kind == platform_t::STAND  &&  !with_empty_stands  &&  !p->has_lines())  ) {
+			continue;
+		}
+		order.append( i );
+	}
+	// insertion sort: a stop has few platforms
+	for(  uint32 a = 1;  a < order.get_count();  a++  ) {
+		const uint32 v = order[a];
+		uint32 b = a;
+		while(  b > 0  ) {
+			const platform_t *p = list[order[b-1]], *q = list[v];
+			bool after;
+			if(  p->kind != q->kind  ) {
+				after = p->kind == platform_t::STAND;
+			}
+			else if(  p->kind == platform_t::TRACK  &&  (p->number[0] != 0) != (q->number[0] != 0)  ) {
+				after = p->number[0] == 0;
+			}
+			else if(  p->kind == platform_t::TRACK  &&  p->number[0]  &&  compare_numbers( p->number, q->number ) != 0  ) {
+				after = compare_numbers( p->number, q->number ) > 0;
+			}
+			else {
+				sint32 px, py, qx, qy;
+				screen_key( p, px, py );
+				screen_key( q, qx, qy );
+				after = py > qy  ||  (py == qy  &&  px > qx);
+			}
+			if(  !after  ) {
+				break;
+			}
+			order[b] = order[b-1];
+			b--;
+		}
+		order[b] = v;
+	}
+}
+
+
+void platforms_t::get_stand_label(char *buf, size_t len, uint32 n, bool letters)
+{
+	if(  !letters  ) {
+		snprintf( buf, len, "%u", n + 1 );
+		return;
+	}
+	// A..Z, then AA..ZZ
+	if(  n < 26  ) {
+		snprintf( buf, len, "%c", 'A' + n );
+	}
+	else {
+		n -= 26;
+		snprintf( buf, len, "%c%c", 'A' + (n / 26) % 26, 'A' + n % 26 );
+	}
+}
+
+
+const char *platforms_t::get_direction_name(ribi_t::ribi dir)
+{
+	switch(  dir  ) {
+		case ribi_t::north: return translator::translate( "northbound" );
+		case ribi_t::south: return translator::translate( "southbound" );
+		case ribi_t::east:  return translator::translate( "eastbound" );
+		case ribi_t::west:  return translator::translate( "westbound" );
+		default:            return "";
+	}
+}

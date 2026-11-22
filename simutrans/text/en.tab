@@ -1920,10 +1920,10 @@ Number tracks across
 Number tracks across
 Give the tracks the numbers 1, 2, 3 ... across the station
 Give the tracks the numbers 1, 2, 3 ... across the station
-Number on the map
-Number on the map
-Click a track or stand of this stop on the map to type its number here
-Click a track or stand of this stop on the map to type its number here
+Number on map
+Number on map
+Click a track or stand of this stop on the map to number it
+Click a track or stand of this stop on the map to number it
 No.
 No.
 Kind
@@ -1932,8 +1932,8 @@ Lines boarding here, by next stop
 Lines boarding here, by next stop
 Platforms
 Platforms
-Click a track or stand of %s to type its number
-Click a track or stand of %s to type its number
+Click a track or stand of %s to number it
+Click a track or stand of %s to number it
 This is no track or stand of the stop.
 This is no track or stand of the stop.
 Platform cards: off
@@ -1954,3 +1954,45 @@ off
 off
 Only on a track or stand of a stop.
 Only on a track or stand of a stop.
+northbound
+northbound
+southbound
+southbound
+eastbound
+eastbound
+westbound
+westbound
+Where
+Where
+Click a plate on the map to number it.
+Click a plate on the map to number it.
+Unused stands
+Unused stands
+Also list, show and number the stands no line stops at
+Also list, show and number the stands no line stops at
+Stands 1, 2, 3
+Stands 1, 2, 3
+Stands without a number get the next free number 1, 2, 3 ... as you read the map; Shift+click numbers every stand anew
+Stands without a number get the next free number 1, 2, 3 ... as you read the map; Shift+click numbers every stand anew
+Stands A, B, C
+Stands A, B, C
+Stands without a number get the next free letter A, B, C ... as you read the map; Shift+click numbers every stand anew
+Stands without a number get the next free letter A, B, C ... as you read the map; Shift+click numbers every stand anew
+%u stands no line uses are hidden
+%u stands no line uses are hidden
+Number:
+Number:
+Enter: next, Shift+Enter: back, Esc: done
+Enter: next, Shift+Enter: back, Esc: done
+< Back
+< Back
+Next >
+Next >
+Next empty
+Next empty
+%d of %d
+%d of %d
+Numbering %s
+Numbering %s
+The next platform without a number
+The next platform without a number

@@ -233,8 +233,9 @@ void interaction_t::interactive_event( const event_t &ev )
 			bool suspended = false; // true if execution was suspended, i.e. sent to server
 			tool_t *tool = world->get_tool(world->get_active_player_nr());
 			player_t *player = world->get_active_player();
-			// fork, platforms: a click on a platform card (with the query tool) opens the platform window
-			if(  tool == tool_t::general_tool[TOOL_QUERY]  &&  platform_cards_t::click( ev.mx, ev.my, (event_get_last_control_shift() & 1) != 0 )  ) {
+			// fork, platforms: a click on a platform card (with the query tool) opens the platform window, on a
+			// numbering plate (also with the number tool) the number editor
+			if(  (tool == tool_t::general_tool[TOOL_QUERY]  ||  tool == tool_t::general_tool[TOOL_NUMBER_PLATFORM])  &&  platform_cards_t::click( ev.mx, ev.my, (event_get_last_control_shift() & 1) != 0 )  ) {
 				return;
 			}
 			// first check for visibility etc

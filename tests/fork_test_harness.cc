@@ -2268,6 +2268,27 @@ static void cmd_platform_number(int x, int y, const char *d, const char *text)
 	logf("platformnumber %d,%d %s %s\n", x, y, d, text);
 }
 
+// numberstands X Y digits|letters [empty] [all]: "Stands 1, 2, 3" / "A, B, C" of the Platforms tab for the stop on that
+// tile, through the platform tool as the button sends it (s,HALT,LETTERS,EMPTY,ALL); empty: also the stands no line uses;
+// all: every stand anew (Shift+click), else only stands without a number get the next free one
+static void cmd_number_stands(int x, int y, const char *kind, bool empty, bool all)
+{
+	const grund_t *gr = W->lookup_kartenboden( koord( x, y ) );
+	const halthandle_t halt = gr ? gr->get_halt() : halthandle_t();
+	if(  !halt.is_bound()  ) {
+		logf("ERROR numberstands: no stop at %d,%d\n", x, y);
+		failures++;
+		return;
+	}
+	char param[64];
+	sprintf( param, "s,%u,%d,%d,%d", halt.get_id(), strcmp( kind, "letters" ) == 0 ? 1 : 0, empty ? 1 : 0, all ? 1 : 0 );
+	tool_t *tool = create_tool( TOOL_CHANGE_PLATFORMS | SIMPLE_TOOL );
+	tool->set_default_param( param );
+	tool->init( W->get_active_player() );
+	delete tool;
+	logf("numberstands %d,%d %s%s%s\n", x, y, kind, empty ? " empty" : "", all ? " all" : "");
+}
+
 // expect_state PAT STATE: some convoy matching PAT is in that state now (state_name)
 // expect_wait PAT TEXT...: the wait text of some convoy matching PAT (convoy window) contains TEXT
 static void cmd_expect_now(const char *pat, const std::string &what, bool wait_text)
@@ -2323,6 +2344,11 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="platformnumber"  ) cmd_platform_number( I(1), I(2), S(3), S(4) );
 	else if(  c=="platformsign"  ) cmd_platform_sign( S(1), I(2), I(3), S(4), a.size()>5  &&  !strcmp( S(5), "ctrl" ) );
 	else if(  c=="expect_platform_state"  ) cmd_expect_platform_state( S(1), S(2), S(3) );
+	else if(  c=="numberstands"  ) {
+		bool empty = false, all = false;
+		for(  size_t i=4;  i<a.size();  i++  ) { empty |= !strcmp( a[i], "empty" ); all |= !strcmp( a[i], "all" ); }
+		cmd_number_stands( I(1), I(2), S(3), empty, all );
+	}
 	else if(  c=="expect_sign"  ) {
 		std::string what;
 		for(  size_t i=2;  i<a.size();  i++  ) what += std::string(i>2 ? " " : "") + a[i];

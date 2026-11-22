@@ -1389,7 +1389,8 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   tiles changed, `labels_changed` from `add_grund`/`rem_grund`, and from the tool): `build`, which the display calls,
   only reads them, so clients that look at different stops stay alike. `rotate90` turns anchors, stand directions and
   `entry_ways`. `SIM_SERVER_MINOR` is `SIM_SAVE_MINOR`: network resyncs saved at 0.122.0 and lost every fork field. Typed through the simple tool
-  `TOOL_CHANGE_PLATFORMS` (`f,HALT,FLAGS`, `n,HALT,X,Y,Z,DIR,TEXT`, `a,HALT` renumber tracks), so network safe.
+  `TOOL_CHANGE_PLATFORMS` (`f,HALT,FLAGS`, `n,HALT,X,Y,Z,DIR,TEXT`, `a,HALT` renumber tracks, `s,HALT,LETTERS,EMPTY,ALL`
+  stand numbers), so network safe.
 - Cards (`gui/platform_cards.*`, drawn by `main_view_t::display` after the overlays): number box, then per group the
   chips (train navy, bus blue, tram red, six to a row, "+N" after three rows, four cells at most), the arrow and the
   next stop. Tracks default to the table (a row per next stop, every line with where it ends), `PLATFORMS_TRACKS_COMPACT`
@@ -1400,10 +1401,22 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   Display settings > Stations): off, chosen stops (`PLATFORMS_CHOSEN`, default), all stops; the stop under the mouse and
   stops with an open window always. The card under the mouse draws in full; with the query tool a click opens the
   platform window, Shift+click switches the stop's form for that kind (`siminteraction.cc`).
-- Windows (`gui/platform_info.*`): the stop window's Platforms tab (number inputs, kind, lines by next stop; pointing at
-  a row marks its tiles; buttons: map labels, the two forms, number tracks across, "Number on the map" =
-  `TOOL_NUMBER_PLATFORM`, click a platform to type its number); the platform window (the next departure with the number
-  and destination at double size, then the full table).
+- Windows (`gui/platform_info.*`): the stop window's Platforms tab (number inputs, where: kind, travel arrow and
+  direction, tile as a link that centres the map, lines by next stop; rows in the walk order; pointing at a row marks its
+  tiles, the plate or card under the mouse lights its row; buttons: map labels, the two forms, number tracks across,
+  "Number on map" = `TOOL_NUMBER_PLATFORM`, "Unused stands", "Stands 1, 2, 3" / "A, B, C"); the platform window (the next
+  departure with the number and destination at double size, then the full table).
+- Numbering (2026-11-22, the owner could not tell stands apart in the tab): while a stop's Platforms tab is shown (it calls
+  `platform_cards_t::touch_numbering` every frame), its number editor is open or its number tool is active, that stop
+  shows a plate per track and stand instead of the cards (number or a dashed "?", stand arrow, dimmed when no line uses
+  it, yellow when marked or under the mouse) and no other stop shows cards. Stands no line uses only with "Unused stands"
+  (`platform_cards_t::show_empty_stands`, this client). A click on a plate (query or number tool) or a platform tile with
+  the number tool opens `platform_number_editor_t` by the plate: Enter, Tab or Down keep the number and go to the next
+  platform, Shift+Enter or Up back, "Next empty"; it marks its platform, refreshes a number changed elsewhere while
+  nothing was typed, and moves the map only when the platform is off the screen. Walk order
+  (`platforms_t::get_walk_order`): tracks by number, then stands as you read the map (screen y, then x, of the kerb).
+  "Stands 1, 2, 3" / "A, B, C" (`s` command): a click gives only the stands without a number the lowest free ones in
+  that order and keeps every number already there (the 1,701 from the markers); Shift+click numbers every stand anew.
 - Boards: train board Track column, the other board Stand column, only when a row has a number
   (`gui_departure_board_view_t::set_row_platforms`, `platforms_t::get_platforms_of`): planned (the schedule tile's
   platform, via colour), confirmed (standing there; rail: route end reserved by the convoy or a claimed track; road: a

@@ -434,12 +434,57 @@ struct drawn_card_t
 	scr_rect rect;
 	halthandle_t halt;
 	uint16 platform;
+	bool plate;          ///< a numbering plate, not a card
 };
 
 static vector_tpl<drawn_card_t> drawn;
 static vector_tpl<halthandle_t> window_halts;
 static halthandle_t hover_halt;      // the stop of the card under the mouse in the last frame
 static sint32 hover_platform = -1;
+
+bool platform_cards_t::show_empty_stands = false;
+
+static halthandle_t numbering_halt;
+static uint32 numbering_touched = 0;
+
+
+void platform_cards_t::touch_numbering(halthandle_t halt)
+{
+	numbering_halt = halt;
+	numbering_touched = dr_time();
+}
+
+
+halthandle_t platform_cards_t::get_numbering_halt()
+{
+	if(  tool_number_platform_t *t = dynamic_cast<tool_number_platform_t *>( welt->get_tool( welt->get_active_player_nr() ) )  ) {
+		const halthandle_t h = t->get_target_halt();
+		if(  h.is_bound()  ) {
+			return h;
+		}
+	}
+	if(  numbering_halt.is_bound()  &&  dr_time() - numbering_touched <= 300  ) {
+		return numbering_halt;
+	}
+	return halthandle_t();
+}
+
+
+sint32 platform_cards_t::get_hover_platform(halthandle_t halt)
+{
+	return halt.is_bound()  &&  hover_halt == halt ? hover_platform : -1;
+}
+
+
+scr_rect platform_cards_t::get_plate_rect(halthandle_t halt, uint32 platform)
+{
+	FOR( vector_tpl<drawn_card_t>, const &d, drawn ) {
+		if(  d.plate  &&  d.halt == halt  &&  d.platform == platform  ) {
+			return d.rect;
+		}
+	}
+	return scr_rect( 0, 0, 0, 0 );
+}
 
 
 void platform_cards_t::window_opened(halthandle_t halt)
@@ -586,6 +631,115 @@ static void display_halt(halthandle_t halt, bool full_zoom)
 		d.rect = r;
 		d.halt = halt;
 		d.platform = pi;
+		d.plate = false;
+		drawn.append( d );
+	}
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// numbering plates
+
+#define PLATE_EMPTY_BG   0xE8EEF2
+#define PLATE_DIM_BG     0x6E8796
+#define PLATE_MARK       0xFFD030
+
+// a plate: the number (or "?") and, for a stand, the arrow of its travel direction; returns its size
+static scr_size draw_plate(scr_coord_val x, scr_coord_val y, const platform_t *p, bool mark, bool draw)
+{
+	const bool has_number = p->number[0] != 0;
+	const char *text = has_number ? p->number : "?";
+	const bool stand = p->kind == platform_t::STAND  &&  p->dir != 0;
+	const scr_coord_val w = proportional_string_width( text ) + 8 + (stand ? 11 : 0);
+	const scr_coord_val h = LINESPACE + 4;
+	if(  draw  ) {
+		// a used platform dark, one no line uses greyed, one without a number light with a dashed edge
+		const uint32 bg = !has_number ? PLATE_EMPTY_BG : (p->has_lines() ? NUM_BG : PLATE_DIM_BG);
+		const uint32 fg = !has_number ? CARD_EDGE : 0xFFFFFF;
+		if(  mark  ) {
+			display_fillbox_wh_clip_rgb( x - 2, y - 2, w + 4, h + 4, rgb( PLATE_MARK ), true );
+		}
+		display_fillbox_wh_clip_rgb( x, y, w, h, rgb( has_number ? CARD_EDGE : PLATE_EMPTY_BG ), true );
+		display_fillbox_wh_clip_rgb( x + 1, y + 1, w - 2, h - 2, rgb( bg ), true );
+		if(  !has_number  ) {
+			for(  scr_coord_val k = 0;  k < w;  k += 4  ) {
+				display_fillbox_wh_clip_rgb( x + k, y, 2, 1, rgb( CARD_EDGE ), true );
+				display_fillbox_wh_clip_rgb( x + k, y + h - 1, 2, 1, rgb( CARD_EDGE ), true );
+			}
+			for(  scr_coord_val k = 0;  k < h;  k += 4  ) {
+				display_fillbox_wh_clip_rgb( x, y + k, 1, 2, rgb( CARD_EDGE ), true );
+				display_fillbox_wh_clip_rgb( x + w - 1, y + k, 1, 2, rgb( CARD_EDGE ), true );
+			}
+		}
+		display_proportional_clip_rgb( x + 4, y + 2, text, ALIGN_LEFT, rgb( fg ), true );
+		if(  stand  ) {
+			platform_cards_t::draw_arrow( x + w - 11, y + (h - 7) / 2, p->dir, fg );
+		}
+	}
+	return scr_size( w, h );
+}
+
+
+static void display_plates(halthandle_t halt)
+{
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	const viewport_t *vp = welt->get_viewport();
+	const scr_coord_val R = get_tile_raster_width();
+	for(  uint32 pi = 0;  pi < list.get_count();  pi++  ) {
+		const platform_t *p = list[pi];
+		if(  !platforms_t::has_card( p )  ||  (p->kind == platform_t::STAND  &&  !p->has_lines()  &&  !platform_cards_t::show_empty_stands)  ) {
+			continue;
+		}
+		const bool mark = platform_marker_t::is_marked( halt, p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 )  ||  (hover_halt == halt  &&  hover_platform == (sint32)pi);
+		const scr_size size = draw_plate( 0, 0, p, false, false );
+		scr_coord_val lx0, ly0, lx1, ly1;
+		bool down;
+		if(  p->kind == platform_t::TRACK  ) {
+			// at its end further left on the screen, as the card
+			const koord3d a = p->tiles[0], b = p->tiles.back();
+			const koord3d end = (a.x - a.y) <= (b.x - b.y) ? a : b;
+			const grund_t *gr = welt->lookup( end );
+			if(  gr == NULL  ||  !gr->is_visible()  ) {
+				continue;
+			}
+			const scr_coord s = vp->get_screen_coord( end );
+			lx0 = s.x + R / 2;
+			ly0 = s.y + R * 3 / 4;
+			lx1 = s.x + R * 20 / 128;
+			ly1 = s.y + R * 57 / 128;
+			down = false;
+		}
+		else {
+			const koord3d t = p->tiles[0];
+			const grund_t *gr = welt->lookup( t );
+			if(  gr == NULL  ||  !gr->is_visible()  ) {
+				continue;
+			}
+			const scr_coord s = vp->get_screen_coord( t );
+			sint16 kx, ky, cx, cy;
+			kerb_offsets( p->dir, kx, ky, cx, cy );
+			lx0 = s.x + R / 2 + kx * R / 128;
+			ly0 = s.y + R * 3 / 4 + ky * R / 128;
+			// closer than a card: the plates of one tile's two kerbs stay with their kerb
+			lx1 = lx0 + cx * R / 256;
+			ly1 = ly0 + cy * R / 256;
+			down = cy >= 0;
+		}
+		scr_rect r( lx1 >= lx0 ? lx1 : lx1 - size.w, down ? ly1 : ly1 - size.h, size.w, size.h );
+		for(  int k = 0;  k < 20  &&  overlaps( r, taken );  k++  ) {
+			r.y += down ? size.h + 2 : -(size.h + 2);
+		}
+		if(  r.x > display_get_width()  ||  r.y > display_get_height()  ||  r.x + r.w < 0  ||  r.y + r.h < 0  ) {
+			continue;
+		}
+		leader( lx0, ly0, lx1, down ? r.y : r.y + r.h - 1 );
+		draw_plate( r.x, r.y, p, mark, true );
+		taken.append( scr_rect( r.x - 2, r.y - 2, r.w + 4, r.h + 4 ) );
+		drawn_card_t d;
+		d.rect = r;
+		d.halt = halt;
+		d.platform = pi;
+		d.plate = true;
 		drawn.append( d );
 	}
 }
@@ -632,6 +786,25 @@ void platform_cards_t::display()
 	vector_tpl<halthandle_t> shown;
 	const viewport_t *vp = welt->get_viewport();
 	const scr_coord_val w = display_get_width(), h = display_get_height();
+
+	// numbering a stop: its plates only, no other cards in the way
+	const halthandle_t numbering = get_numbering_halt();
+	if(  numbering.is_bound()  ) {
+		taken.clear();
+		if(  env_t::show_names & 1  ) {
+			const koord3d basis = numbering->get_basis_pos3d();
+			const grund_t *gr = welt->lookup( basis );
+			if(  gr  &&  gr->get_text()  ) {
+				const scr_coord s = vp->get_screen_coord( basis );
+				const scr_coord_val tw = proportional_string_width( gr->get_text() ) + 7;
+				const scr_coord_val half = LINESPACE / 2 + 1;
+				taken.append( scr_rect( s.x - (tw - R) / 2 - 2, s.y - half - 1, tw, 2 * half + 2 ) );
+			}
+		}
+		display_plates( numbering );
+		return;
+	}
+
 	if(  env_t::platform_cards != VIEW_OFF  ) {
 		FOR( vector_tpl<halthandle_t>, const halt, haltestelle_t::get_alle_haltestellen() ) {
 			if(  env_t::platform_cards == VIEW_CHOSEN  &&  !(halt->get_platform_flags() & haltestelle_t::PLATFORMS_CHOSEN)  ) {
@@ -701,7 +874,10 @@ bool platform_cards_t::click(scr_coord_val mx, scr_coord_val my, bool shift)
 			return false;
 		}
 		const platform_t *p = list[d.platform];
-		if(  shift  ) {
+		if(  d.plate  ) {
+			platform_number_editor_t::open( d.halt, p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 );
+		}
+		else if(  shift  ) {
 			// the other form for this kind of platform at the stop
 			const uint8 bit = p->kind == platform_t::TRACK ? haltestelle_t::PLATFORMS_TRACKS_COMPACT : haltestelle_t::PLATFORMS_STANDS_DEST;
 			send_flags( d.halt, d.halt->get_platform_flags() ^ bit );
@@ -1087,5 +1263,13 @@ void platform_cards_t::send_renumber(halthandle_t halt)
 {
 	cbuffer_t buf;
 	buf.printf( "a,%u", halt.get_id() );
+	send( buf );
+}
+
+
+void platform_cards_t::send_stand_numbers(halthandle_t halt, bool letters, bool with_empty_stands, bool all)
+{
+	cbuffer_t buf;
+	buf.printf( "s,%u,%d,%d,%d", halt.get_id(), letters ? 1 : 0, with_empty_stands ? 1 : 0, all ? 1 : 0 );
 	send( buf );
 }

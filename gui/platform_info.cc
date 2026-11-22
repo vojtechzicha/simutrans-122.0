@@ -16,6 +16,7 @@
 #include "halt_info.h"
 #include "simwin.h"
 
+#include "../simevent.h"
 #include "../simhalt.h"
 #include "../simplatform.h"
 #include "../simworld.h"
@@ -26,6 +27,7 @@
 #include "../dataobj/translator.h"
 #include "../display/font.h"
 #include "../display/simgraph.h"
+#include "../display/viewport.h"
 #include "../player/simplay.h"
 #include "../sys/simsys.h"
 #include "../utils/simstring.h"
@@ -359,15 +361,322 @@ bool platform_info_t::action_triggered(gui_action_creator_t *comp, value_t)
 
 
 // ---------------------------------------------------------------------------------------------
+// where a platform is
+
+scr_size gui_platform_where_t::get_min_size() const
+{
+	return scr_size( proportional_string_width( "Stand" ) + 12 + proportional_string_width( "northbound" ) + 8 + proportional_string_width( "8888,8888" ) + 4, LINESPACE + 2 );
+}
+
+
+void gui_platform_where_t::draw(scr_coord offset)
+{
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	const sint32 i = platforms_t::find( list, anchor, dir );
+	if(  i < 0  ) {
+		return;
+	}
+	const platform_t *p = list[i];
+	scr_coord_val x = offset.x + get_pos().x;
+	const scr_coord_val y = offset.y + get_pos().y + 1;
+	x += display_proportional_clip_rgb( x, y, p->get_kind_name(), ALIGN_LEFT, SYSCOL_TEXT, true ) + 6;
+	if(  p->kind == platform_t::STAND  &&  p->dir  ) {
+		platform_cards_t::draw_arrow( x, y + (LINESPACE - 7) / 2, p->dir, 0x000000 );
+		x += 11;
+		x += display_proportional_clip_rgb( x, y, platforms_t::get_direction_name( p->dir ), ALIGN_LEFT, SYSCOL_TEXT, true ) + 8;
+	}
+	const koord3d a = p->get_anchor();
+	char pos[32];
+	sprintf( pos, "%d,%d", a.x, a.y );
+	// looks like a link: a click centres the map there
+	const scr_coord_val w = display_proportional_clip_rgb( x, y, pos, ALIGN_LEFT, SYSCOL_TEXT_HIGHLIGHT, true );
+	display_fillbox_wh_clip_rgb( x, y + LINESPACE - 1, w, 1, SYSCOL_TEXT_HIGHLIGHT, true );
+}
+
+
+bool gui_platform_where_t::infowin_event(const event_t *ev)
+{
+	if(  IS_LEFTRELEASE( ev )  &&  halt.is_bound()  ) {
+		const sint32 i = platforms_t::find( halt->get_platforms(), anchor, dir );
+		if(  i >= 0  ) {
+			welt->get_viewport()->change_world_position( halt->get_platforms()[i]->get_anchor() );
+			return true;
+		}
+	}
+	return false;
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// the number editor
+
+static platform_number_editor_t *the_editor = NULL;
+
+
+platform_number_editor_t::platform_number_editor_t(halthandle_t h, koord3d a, uint8 d) :
+	gui_frame_t( "", h->get_owner() ),
+	halt( h ),
+	anchor( a ),
+	dir( d ),
+	lines( h, 0 )
+{
+	the_editor = this;
+	text[0] = 0;
+	loaded[0] = 0;
+	set_table_layout( 1, 0 );
+	add_table( 2, 1 );
+	{
+		add_component( &where );
+		add_component( &position );
+	}
+	end_table();
+	add_component( &lines );
+	number_row = add_table( 2, 1 );
+	{
+		new_component<gui_label_t>( "Number:" );
+		input.set_text( text, lengthof(text) );
+		input.add_listener( this );
+		add_component( &input );
+	}
+	end_table();
+	new_component<gui_label_t>( "Enter: next, Shift+Enter: back, Esc: done", SYSCOL_TEXT );
+	add_table( 4, 1 );
+	{
+		prev.init( button_t::roundbox, "< Back" );
+		prev.add_listener( this );
+		add_component( &prev );
+		next.init( button_t::roundbox, "Next >" );
+		next.add_listener( this );
+		add_component( &next );
+		next_free.init( button_t::roundbox, "Next empty" );
+		next_free.set_tooltip( "The next platform without a number" );
+		next_free.add_listener( this );
+		add_component( &next_free );
+		close.init( button_t::roundbox, "Done" );
+		close.add_listener( this );
+		add_component( &close );
+	}
+	end_table();
+	set_target( a, d );
+	reset_min_windowsize();
+	set_windowsize( get_min_windowsize() );
+	focus_input();
+}
+
+
+void platform_number_editor_t::focus_input()
+{
+	// the input sits in a row of its own: the focus goes down both levels
+	number_row->set_focus( &input );
+	set_focus( number_row );
+}
+
+
+platform_number_editor_t::~platform_number_editor_t()
+{
+	if(  the_editor == this  ) {
+		the_editor = NULL;
+	}
+	if(  platform_marker_t::get_owner() == this  ) {
+		platform_marker_t::unmark();
+	}
+}
+
+
+void platform_number_editor_t::open(halthandle_t halt, koord3d anchor, uint8 dir)
+{
+	if(  !halt.is_bound()  ) {
+		return;
+	}
+	if(  the_editor  &&  the_editor->halt == halt  ) {
+		the_editor->save();
+		the_editor->set_target( anchor, dir );
+		top_win( the_editor );
+		the_editor->focus_input();
+		return;
+	}
+	if(  the_editor  ) {
+		destroy_win( the_editor );
+	}
+	platform_number_editor_t *e = new platform_number_editor_t( halt, anchor, dir );
+	// by the plate, else by the mouse, on the screen
+	const sint32 i = e->get_index();
+	const scr_rect r = i >= 0 ? platform_cards_t::get_plate_rect( halt, i ) : scr_rect( 0, 0, 0, 0 );
+	scr_coord_val x = r.w ? r.x + r.w + 12 : get_mouse_x() + 16;
+	scr_coord_val y = r.w ? r.y - D_TITLEBAR_HEIGHT : get_mouse_y() + 8;
+	const scr_size s = e->get_windowsize();
+	x = max( 0, min( x, display_get_width() - s.w ) );
+	y = max( (scr_coord_val)env_t::iconsize.h, min( y, display_get_height() - s.h - win_get_statusbar_height() ) );
+	create_win( x, y, e, w_info, magic_none );
+	// opening the window takes the focus from the components: give it back, so typing goes into the number
+	e->focus_input();
+}
+
+
+sint32 platform_number_editor_t::get_index() const
+{
+	return halt.is_bound() ? platforms_t::find( halt->get_platforms(), anchor, dir ) : -1;
+}
+
+
+void platform_number_editor_t::set_target(koord3d a, uint8 d)
+{
+	anchor = a;
+	dir = d;
+	where.set_platform( halt, a, d );
+	const sint32 i = get_index();
+	lines.set_platform( halt, i >= 0 ? i : 0 );
+	tstrncpy( text, i >= 0 ? halt->get_platforms()[i]->number : "", lengthof(text) );
+	tstrncpy( loaded, text, lengthof(loaded) );
+	// (selects the whole number, so typing replaces it)
+	input.set_text( text, lengthof(text) );
+	if(  i >= 0  ) {
+		platform_marker_t::mark( halt, a, d, this );
+	}
+	// bring it into view when it is off the screen
+	const scr_coord s = welt->get_viewport()->get_screen_coord( a );
+	const scr_coord_val R = get_tile_raster_width();
+	// (the ground point of the tile: the middle of its image, three quarters down)
+	const scr_coord_val gx = s.x + R / 2, gy = s.y + R * 3 / 4;
+	if(  gx < 0  ||  gy < 0  ||  gx > display_get_width()  ||  gy > display_get_height() - win_get_statusbar_height()  ) {
+		welt->get_viewport()->change_world_position( a );
+	}
+}
+
+
+void platform_number_editor_t::save()
+{
+	const sint32 i = get_index();
+	if(  i < 0  ) {
+		return;
+	}
+	const platform_t *p = halt->get_platforms()[i];
+	if(  strcmp( p->number, text ) != 0  ) {
+		platform_cards_t::send_number( halt, p, text );
+	}
+	tstrncpy( loaded, text, lengthof(loaded) );
+}
+
+
+void platform_number_editor_t::step(int delta, bool only_without_number)
+{
+	save();
+	const vector_tpl<platform_t *> &list = halt->get_platforms();
+	vector_tpl<uint32> order;
+	platforms_t::get_walk_order( list, platform_cards_t::show_empty_stands, order );
+	if(  order.empty()  ) {
+		return;
+	}
+	const sint32 cur = get_index();
+	sint32 at = -1;
+	for(  uint32 k = 0;  k < order.get_count();  k++  ) {
+		if(  (sint32)order[k] == cur  ) {
+			at = k;
+		}
+	}
+	const sint32 n = order.get_count();
+	for(  sint32 k = 1;  k <= n;  k++  ) {
+		const sint32 j = at < 0 ? (delta > 0 ? k - 1 : n - k) : ((at + delta * k) % n + n) % n;
+		const platform_t *p = list[order[j]];
+		if(  !only_without_number  ||  p->number[0] == 0  ) {
+			set_target( p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 );
+			return;
+		}
+	}
+}
+
+
+bool platform_number_editor_t::infowin_event(const event_t *ev)
+{
+	if(  ev->ev_class == EVENT_KEYBOARD  ) {
+		switch(  ev->ev_code  ) {
+			case SIM_KEY_ENTER:
+			case SIM_KEY_TAB:
+				step( IS_SHIFT_PRESSED( ev ) ? -1 : 1, false );
+				return true;
+			case SIM_KEY_DOWN:
+				step( 1, false );
+				return true;
+			case SIM_KEY_UP:
+				step( -1, false );
+				return true;
+			default:
+				break;
+		}
+	}
+	return gui_frame_t::infowin_event( ev );
+}
+
+
+void platform_number_editor_t::draw(scr_coord pos, scr_size size)
+{
+	if(  !halt.is_bound()  ) {
+		destroy_win( this );
+		return;
+	}
+	platform_cards_t::touch_numbering( halt );
+	// keep the mark on our platform, unless the Platforms tab marks the row under the mouse
+	if(  platform_marker_t::get_owner() == NULL  ||  platform_marker_t::get_owner() == this  ) {
+		platform_marker_t::mark( halt, anchor, dir, this );
+	}
+	if(  platform_marker_t::get_owner() == this  ) {
+		platform_marker_t::touch();
+	}
+	const sint32 i = get_index();
+	vector_tpl<uint32> order;
+	platforms_t::get_walk_order( halt->get_platforms(), platform_cards_t::show_empty_stands, order );
+	sint32 at = -1;
+	for(  uint32 k = 0;  k < order.get_count();  k++  ) {
+		if(  (sint32)order[k] == i  ) {
+			at = k;
+		}
+	}
+	position.buf().printf( at >= 0 ? translator::translate( "%d of %d" ) : "", at + 1, order.get_count() );
+	position.update();
+	lines.set_platform( halt, i >= 0 ? i : 0 );
+	// the number changed elsewhere ("Stands A, B, C", the tab, another client) while nothing was typed here: show it,
+	// else Enter would put the old one back
+	if(  i >= 0  &&  strcmp( halt->get_platforms()[i]->number, loaded ) != 0  &&  strcmp( text, loaded ) == 0  ) {
+		tstrncpy( text, halt->get_platforms()[i]->number, lengthof(text) );
+		tstrncpy( loaded, text, lengthof(loaded) );
+		input.set_text( text, lengthof(text) );
+	}
+	title.clear();
+	title.printf( translator::translate( "Numbering %s" ), halt->get_name() );
+	set_name( title );
+	gui_frame_t::draw( pos, size );
+}
+
+
+bool platform_number_editor_t::action_triggered(gui_action_creator_t *comp, value_t)
+{
+	if(  comp == &prev  ) {
+		step( -1, false );
+	}
+	else if(  comp == &next  ) {
+		step( 1, false );
+	}
+	else if(  comp == &next_free  ) {
+		step( 1, true );
+	}
+	else if(  comp == &close  ) {
+		save();
+		destroy_win( this );
+	}
+	else if(  comp == &input  ) {
+		// the input lost the focus with a changed number
+		save();
+	}
+	return true;
+}
+
+
+// ---------------------------------------------------------------------------------------------
 // the Platforms tab
 
-// a number input as wide as a few letters
-class gui_platform_number_input_t : public gui_textinput_t
-{
-public:
-	scr_size get_min_size() const OVERRIDE { return scr_size( proportional_string_width( "MMMMM" ) + 8, ::max( (int)(LINESPACE + 4), (int)D_BUTTON_HEIGHT ) ); }
-	scr_size get_max_size() const OVERRIDE { return get_min_size(); }
-};
 
 scr_size gui_platform_lines_t::get_min_size() const
 {
@@ -444,11 +753,13 @@ bool gui_platform_lines_t::infowin_event(const event_t *ev)
 
 
 gui_platforms_tab_t::gui_platforms_tab_t() :
+	empty_shown( false ),
 	last_signature( 0 ),
 	hover_row( -1 )
 {
 	set_table_layout( 1, 0 );
-	add_table( 3, 2 );
+	new_component<gui_label_t>( "Click a plate on the map to number it.", SYSCOL_TEXT );
+	add_table( 3, 3 );
 	{
 		chosen.init( button_t::square_state, "Map labels: this stop" );
 		chosen.set_tooltip( "Show this stop's platform cards on the map in the view of chosen stops" );
@@ -467,10 +778,22 @@ gui_platforms_tab_t::gui_platforms_tab_t() :
 		renumber.add_listener( this );
 		new_component<gui_empty_t>();
 		add_component( &renumber );
-		number_tool.init( button_t::roundbox_state, "Number on the map" );
-		number_tool.set_tooltip( "Click a track or stand of this stop on the map to type its number here" );
+		number_tool.init( button_t::roundbox_state, "Number on map" );
+		number_tool.set_tooltip( "Click a track or stand of this stop on the map to number it" );
 		number_tool.add_listener( this );
 		add_component( &number_tool );
+		empty_stands.init( button_t::square_state, "Unused stands" );
+		empty_stands.set_tooltip( "Also list, show and number the stands no line stops at" );
+		empty_stands.add_listener( this );
+		add_component( &empty_stands );
+		stands_digits.init( button_t::roundbox, "Stands 1, 2, 3" );
+		stands_digits.set_tooltip( "Stands without a number get the next free number 1, 2, 3 ... as you read the map; Shift+click numbers every stand anew" );
+		stands_digits.add_listener( this );
+		add_component( &stands_digits );
+		stands_letters.init( button_t::roundbox, "Stands A, B, C" );
+		stands_letters.set_tooltip( "Stands without a number get the next free letter A, B, C ... as you read the map; Shift+click numbers every stand anew" );
+		stands_letters.add_listener( this );
+		add_component( &stands_letters );
 	}
 	end_table();
 	add_component( &list );
@@ -483,6 +806,7 @@ gui_platforms_tab_t::~gui_platforms_tab_t()
 	list.remove_all();
 	FOR( vector_tpl<row_t *>, r, rows ) {
 		delete r->input;
+		delete r->where;
 		delete r;
 	}
 	if(  platform_marker_t::get_owner() == this  ) {
@@ -536,13 +860,19 @@ void gui_platforms_tab_t::update_buttons()
 	tracks_form.set_visible( has_tracks );
 	renumber.set_visible( has_tracks );
 	stands_form.set_visible( has_stands );
+	empty_stands.set_visible( has_stands );
+	stands_digits.set_visible( has_stands );
+	stands_letters.set_visible( has_stands );
 	const bool may = !env_t::networkmode  ||  player_t::check_owner( halt->get_owner(), welt->get_active_player() );
 	chosen.enable( may );
 	tracks_form.enable( may );
 	stands_form.enable( may );
 	renumber.enable( may );
 	number_tool.enable( may );
+	stands_digits.enable( may );
+	stands_letters.enable( may );
 	number_tool.pressed = tool_number_platform_t::is_working_for( halt );
+	empty_stands.pressed = platform_cards_t::show_empty_stands;
 }
 
 
@@ -551,6 +881,7 @@ void gui_platforms_tab_t::rebuild()
 	list.remove_all();
 	FOR( vector_tpl<row_t *>, r, rows ) {
 		delete r->input;
+		delete r->where;
 		delete r;
 	}
 	rows.clear();
@@ -558,25 +889,44 @@ void gui_platforms_tab_t::rebuild()
 		return;
 	}
 	const vector_tpl<platform_t *> &platforms = halt->get_platforms();
+	empty_shown = platform_cards_t::show_empty_stands;
 	list.set_table_layout( 3, 0 );
 	list.new_component<gui_label_t>( "No.", SYSCOL_TEXT_TITLE );
-	list.new_component<gui_label_t>( "Kind", SYSCOL_TEXT_TITLE );
+	list.new_component<gui_label_t>( "Where", SYSCOL_TEXT_TITLE );
 	list.new_component<gui_label_t>( "Lines boarding here, by next stop", SYSCOL_TEXT_TITLE );
 	const bool may = !env_t::networkmode  ||  player_t::check_owner( halt->get_owner(), welt->get_active_player() );
-	for(  uint32 i = 0;  i < platforms.get_count();  i++  ) {
+	// in the order the numbering walks them: tracks by number, then the stands as you read the map
+	vector_tpl<uint32> order;
+	platforms_t::get_walk_order( platforms, empty_shown, order );
+	FOR( vector_tpl<uint32>, const i, order ) {
 		const platform_t *p = platforms[i];
 		row_t *r = new row_t();
 		tstrncpy( r->text, p->number, lengthof(r->text) );
 		r->anchor = p->get_anchor();
 		r->dir = p->kind == platform_t::STAND ? p->dir : 0;
+		r->index = i;
 		r->input = new gui_platform_number_input_t();
 		r->input->set_text( r->text, lengthof(r->text) );
 		r->input->add_listener( this );
 		r->input->set_focusable( may );
+		r->where = new gui_platform_where_t();
+		r->where->set_platform( halt, r->anchor, r->dir );
 		rows.append( r );
 		list.add_component( r->input );
-		list.new_component<gui_label_t>( p->get_kind_name() );
+		list.add_component( r->where );
 		list.new_component<gui_platform_lines_t>( halt, i );
+	}
+	if(  order.get_count() < platforms.get_count()  &&  !empty_shown  ) {
+		uint32 hidden = 0;
+		FOR( vector_tpl<platform_t *>, const p, platforms ) {
+			hidden += p->kind == platform_t::STAND  &&  !p->has_lines();
+		}
+		if(  hidden  ) {
+			list.new_component<gui_empty_t>();
+			gui_label_buf_t *l = list.new_component_span<gui_label_buf_t>( SYSCOL_TEXT, 2 );
+			l->buf().printf( translator::translate( "%u stands no line uses are hidden" ), hidden );
+			l->update();
+		}
 	}
 	last_signature = signature();
 	update_buttons();
@@ -606,7 +956,9 @@ void gui_platforms_tab_t::draw(scr_coord offset)
 	if(  !halt.is_bound()  ) {
 		return;
 	}
-	if(  signature() != last_signature  ) {
+	// shown: the map shows this stop's numbering plates
+	platform_cards_t::touch_numbering( halt );
+	if(  signature() != last_signature  ||  empty_shown != platform_cards_t::show_empty_stands  ) {
 		// keep a number being typed: do not rebuild while an input has the focus
 		bool typing = false;
 		FOR( vector_tpl<row_t *>, r, rows ) {
@@ -617,6 +969,14 @@ void gui_platforms_tab_t::draw(scr_coord offset)
 		}
 	}
 	update_buttons();
+	// the row of the plate or card under the mouse on the map
+	const sint32 on_map = platform_cards_t::get_hover_platform( halt );
+	FOR( vector_tpl<row_t *>, const r, rows ) {
+		if(  on_map >= 0  &&  r->index == (uint32)on_map  ) {
+			const scr_coord_val y = offset.y + get_pos().y + list.get_pos().y + r->input->get_pos().y;
+			display_fillbox_wh_clip_rgb( offset.x + get_pos().x + list.get_pos().x - 2, y - 1, list.get_size().w + 4, r->input->get_size().h + 2, rgb( 0xFFE38A ), true );
+		}
+	}
 	gui_aligned_container_t::draw( offset );
 
 	// pointing at a row marks its platform on the map
@@ -664,6 +1024,13 @@ bool gui_platforms_tab_t::action_triggered(gui_action_creator_t *comp, value_t)
 	}
 	else if(  comp == &renumber  ) {
 		platform_cards_t::send_renumber( halt );
+	}
+	else if(  comp == &empty_stands  ) {
+		platform_cards_t::show_empty_stands = !platform_cards_t::show_empty_stands;
+	}
+	else if(  comp == &stands_digits  ||  comp == &stands_letters  ) {
+		// Shift+click: every stand anew; a click keeps the numbers already there
+		platform_cards_t::send_stand_numbers( halt, comp == &stands_letters, platform_cards_t::show_empty_stands, (event_get_last_control_shift() & 1) != 0 );
 	}
 	else if(  comp == &number_tool  ) {
 		if(  tool_number_platform_t::is_working_for( halt )  ) {

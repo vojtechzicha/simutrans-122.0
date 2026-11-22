@@ -91,6 +91,7 @@
 
 #include "simtool.h"
 #include "gui/halt_info.h"
+#include "gui/platform_info.h"
 #include "simplatform.h"
 #include "player/finance.h"
 
@@ -2263,7 +2264,7 @@ bool tool_number_platform_t::is_working_for( halthandle_t halt )
 const char *tool_number_platform_t::get_tooltip( const player_t * ) const
 {
 	const halthandle_t halt = get_target_halt();
-	sprintf( toolstr, translator::translate( "Click a track or stand of %s to type its number" ), halt.is_bound() ? halt->get_name() : "-" );
+	sprintf( toolstr, translator::translate( "Click a track or stand of %s to number it" ), halt.is_bound() ? halt->get_name() : "-" );
 	return toolstr;
 }
 
@@ -2301,7 +2302,7 @@ const char *tool_number_platform_t::work( player_t *player, koord3d pos )
 	turn = (last_pos == pos) ? turn + 1 : 0;
 	last_pos = pos;
 	const platform_t *p = list[here[turn % here.get_count()]];
-	halt_info_t::focus_platform( halt, p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 );
+	platform_number_editor_t::open( halt, p->get_anchor(), p->kind == platform_t::STAND ? p->dir : 0 );
 	return NULL;
 }
 
@@ -2348,6 +2349,50 @@ bool tool_change_platforms_t::init( player_t *player )
 				}
 			}
 			platforms_t::update_labels( halt.get_rep() );
+			break;
+		}
+		case 's': {
+			// s,HALT,LETTERS,EMPTY,ALL: stand numbers 1, 2, 3 ... (LETTERS 1: A, B, C ...) in reading order on the map.
+			// ALL 0 (the button): only stands without a number get one, the next free one; numbers already there stay.
+			// ALL 1 (Shift+click): every stand is numbered anew. EMPTY 0: only the stands a line uses.
+			int letters = 0, empty = 0, all = 0;
+			sscanf( p, "%d,%d,%d", &letters, &empty, &all );
+			vector_tpl<uint32> order;
+			platforms_t::get_walk_order( halt->get_platforms(), empty != 0, order );
+			// setting a number makes the list again: keep where the stands are, not pointers into it
+			vector_tpl<koord3d> anchors;
+			vector_tpl<uint8> dirs;
+			FOR( vector_tpl<uint32>, const i, order ) {
+				const platform_t *pl = halt->get_platforms()[i];
+				if(  pl->kind == platform_t::STAND  &&  (all  ||  pl->number[0] == 0)  ) {
+					anchors.append( pl->get_anchor() );
+					dirs.append( pl->dir );
+				}
+			}
+			// the numbers other stands keep (all of the stop's stands, shown or not)
+			char kept[256][8];
+			uint32 n_kept = 0;
+			if(  !all  ) {
+				FOR( vector_tpl<platform_t *>, const pl, halt->get_platforms() ) {
+					if(  pl->kind == platform_t::STAND  &&  pl->number[0]  &&  n_kept < lengthof(kept)  ) {
+						tstrncpy( kept[n_kept], pl->number, lengthof(kept[n_kept]) );
+						n_kept++;
+					}
+				}
+			}
+			uint32 next = 0;
+			for(  uint32 k = 0;  k < anchors.get_count();  k++  ) {
+				char label[8];
+				bool used = true;
+				while(  used  ) {
+					platforms_t::get_stand_label( label, lengthof(label), next++, letters != 0 );
+					used = false;
+					for(  uint32 m = 0;  m < n_kept  &&  !used;  m++  ) {
+						used = strcmp( kept[m], label ) == 0;
+					}
+				}
+				halt->set_platform_number( anchors[k], dirs[k], label );
+			}
 			break;
 		}
 	}
