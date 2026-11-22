@@ -29,6 +29,7 @@
 #include "../simlinemgmt.h"
 #include "../simhalt.h"
 #include "../simplatform.h"
+#include "../gui/departure_board.h"
 #include "../simdepot.h"
 #include "../player/simplay.h"
 #include "../bauer/wegbauer.h"
@@ -2165,6 +2166,26 @@ static void cmd_expect_lines(int x, int y, const char *d, const std::string &wan
 	}
 }
 
+// expect_sign PAT TEXT: some convoy matching PAT shows TEXT in the destination of its sign (convoy_sign_t, as over the
+// vehicle and in the convoy window), "-" for none ("Not in service")
+static void cmd_expect_sign(const char *pat, const std::string &text)
+{
+	std::string seen;
+	FOR(vector_tpl<convoihandle_t>, const cnv, W->convoys()) {
+		if(  cnv->get_vehicle_count()==0  ||  !cnv_matches( cnv, pat )  ) continue;
+		convoy_sign_t sign;
+		const bool has = sign.update( cnv );
+		const char *dest = has ? sign.destination : "";
+		seen += std::string(" ") + cnv->get_name() + ":" + (dest[0] ? dest : "-");
+		if(  text=="-" ? dest[0]==0 : strstr( dest, text.c_str() )!=NULL  ) {
+			logf("ok   expect_sign %s %s\n", pat, text.c_str());
+			return;
+		}
+	}
+	logf("FAIL expect_sign %s %s:%s\n", pat, text.c_str(), seen.c_str());
+	failures++;
+}
+
 // expect_platform_state PAT STATE NUMBER: some convoy matching PAT leaves its current stop from the platform with that
 // number (* any), as the boards show it: planned (the schedule's track), confirmed (standing there or reserved into it) or
 // changed (confirmed, not the planned one)
@@ -2302,6 +2323,11 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="platformnumber"  ) cmd_platform_number( I(1), I(2), S(3), S(4) );
 	else if(  c=="platformsign"  ) cmd_platform_sign( S(1), I(2), I(3), S(4), a.size()>5  &&  !strcmp( S(5), "ctrl" ) );
 	else if(  c=="expect_platform_state"  ) cmd_expect_platform_state( S(1), S(2), S(3) );
+	else if(  c=="expect_sign"  ) {
+		std::string what;
+		for(  size_t i=2;  i<a.size();  i++  ) what += std::string(i>2 ? " " : "") + a[i];
+		cmd_expect_sign( S(1), what );
+	}
 	else if(  c=="expect_lines"  ) {
 		std::string what;
 		for(  size_t i=4;  i<a.size();  i++  ) what += std::string(i>4 ? " " : "") + a[i];

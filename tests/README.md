@@ -44,6 +44,7 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `platforms_basic` | Platforms: a station's tracks numbered across, the lines on each by next stop, stands per travel direction (one bus learned the other way than the guess), a bay, typed numbers kept through save and load and turned with the map when it rotates. |
 | `platforms_changed` | Platforms: a train standing on its track is confirmed there; one the choose signal sends elsewhere shows changed, as on the board. |
 | `platforms_road_change` | Platforms: a dead-end stand becomes a through stop when its road goes on (no stop tile added); its number stays on one of the two stands, also after save and load. |
+| `sign_stand_change` | Destination sign: a bus that lets everybody off on one stand (All off) and drives on to another stand of the same stop to board shows the trip it boards for, not "Not in service" (line 159 at Praha, Vinoř, 2026-11-22); a run from an All off stop to another stop still shows none. Fails before the fix. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |
@@ -120,6 +121,8 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
   arrivals as `arr:79`): the platform with that tile and travel direction.
 - `expect_platform_state PATTERN STATE NUMBER`: some matching convoy leaves its current stop from that platform
   (`*` any) as the boards show it: `planned`, `confirmed` or `changed`.
+- `expect_sign PATTERN TEXT...`: some matching convoy shows TEXT in the destination of its sign (over the vehicle
+  and in the convoy window), `-` for none ("Not in service").
 
 Vehicles and signals must exist in the owner's pak128.cs. Diesel trains need no catenary: e.g.
 `VZ-CeskeDrahy-843-najbrt2-843 VZ-CeskeDrahy-843-najbrt2-043 VZ-CeskeDrahy-843-najbrt2-843` (3-car

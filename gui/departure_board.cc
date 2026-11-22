@@ -2162,6 +2162,27 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 				break;
 			}
 		}
+		if(  emptied  ) {
+			// only moving on to another stand or track of the same stop to board there (159 at Vinoř: arrival
+			// stand All off, the turning place All off, then the departure stand): the sign shows that trip
+			const halthandle_t off_at = entry_halt( schedule, e, owner );
+			const uint32 off_key = stop_key( off_at, train_style );
+			for(  uint8 k = 1;  k < n;  k++  ) {
+				const uint8 i = (e + k) % n;
+				const halthandle_t h = entry_halt( schedule, i, owner );
+				if(  !h.is_bound()  ) {
+					continue;
+				}
+				if(  h != off_at  &&  stop_key( h, train_style ) != off_key  ) {
+					break;
+				}
+				if(  schedule->entries[i].loads()  ) {
+					e = i;
+					emptied = false;
+					break;
+				}
+			}
+		}
 	}
 	destination[0] = 0;
 	dest_halt = halthandle_t();

@@ -1,0 +1,31 @@
+# Destination sign: a bus that lets everybody off on one stand (All off) and then drives to another stand of the same
+# stop to board there shows the trip it boards for, not "Not in service" (line 159 at Praha, Vinoř: arrival stand All
+# off, the turning place All off, then the departure stand, 2026-11-22). A run from an All off stop to another stop
+# (a siding) still shows "Not in service". Layout tests/layouts/platforms.inc, the stop Street made a row 20..24,40.
+# Expect: SC on its way from 20,40 to 24,40 shows West (where the ring trip from 24,40 ends before Street); SD on its
+# way from the All off Bay to West shows none. The first fails on the build before the fix.
+include ../layouts/platforms.inc
+waydesc Road_050
+station CZR-Stops-ODIS_Bus-Empty-L 21 40
+station CZR-Stops-ODIS_Bus-Empty-L 22 40
+station CZR-Stops-ODIS_Bus-Empty-L 23 40
+station CZR-Stops-ODIS_Bus-Empty-L 24 40
+platforms 20 40
+vehicles CZ-ODIS-SOR_BN95-Green
+busline SC
+stop 20 40 0 0 A
+stop 24 40 0 0 R
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+busline SD
+stop 25 46 0 0 R
+stop 30 37 0 0 A
+stop 10 43 0 0 R
+endline
+convoy 11 38 SC 1
+convoy 11 38 SD 1
+run_until SC DRIVING 120 1
+expect_sign SC West
+run_until SD DRIVING 120 2
+expect_sign SD -
