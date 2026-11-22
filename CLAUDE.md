@@ -1412,7 +1412,7 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   platform window, Shift+click switches the stop's form for that kind (`siminteraction.cc`).
 - Windows (`gui/platform_info.*`): the stop window's Platforms tab (number inputs, where: kind, travel arrow and
   direction, tile as a link that centres the map, lines by next stop; rows in the walk order; pointing at a row marks its
-  tiles, the plate or card under the mouse lights its row; buttons: map labels, the two forms, number tracks across,
+  tiles, the plate or card under the mouse lights its row; "Number plates on the map" (on while the tab opens; ticking map labels or a card form turns it off so the cards show, any numbering control back on), map labels, "Track/Stand cards with destinations", number tracks across,
   "Number on map" = `TOOL_NUMBER_PLATFORM`, "Unused stands", "Stands 1, 2, 3" / "A, B, C"); the platform window (the next
   departure with the number and destination at double size, then the full table).
 - Numbering (2026-11-22, the owner could not tell stands apart in the tab): while a stop's Platforms tab is shown (it calls

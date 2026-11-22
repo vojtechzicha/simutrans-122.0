@@ -171,7 +171,7 @@ public:
 class gui_platforms_tab_t : public gui_aligned_container_t, private action_listener_t
 {
 	halthandle_t halt;
-	button_t chosen, tracks_form, stands_form, renumber, number_tool, empty_stands, stands_digits, stands_letters;
+	button_t plates_shown, chosen, tracks_form, stands_form, renumber, number_tool, empty_stands, stands_digits, stands_letters;
 	gui_aligned_container_t list;
 	struct row_t {
 		gui_textinput_t *input;
@@ -182,6 +182,7 @@ class gui_platforms_tab_t : public gui_aligned_container_t, private action_liste
 		uint32 index;      ///< into the stop's platforms when the rows were made
 	};
 	bool empty_shown;          ///< show_empty_stands when the rows were made
+	bool plates;               ///< the map shows this stop's numbering plates (else its cards) while the tab is open
 	vector_tpl<row_t *> rows;
 	uint32 last_signature;     ///< of the platforms the rows were made for
 	sint32 hover_row;

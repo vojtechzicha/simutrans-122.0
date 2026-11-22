@@ -764,38 +764,58 @@ bool gui_platform_lines_t::infowin_event(const event_t *ev)
 
 gui_platforms_tab_t::gui_platforms_tab_t() :
 	empty_shown( false ),
+	plates( true ),
 	last_signature( 0 ),
 	hover_row( -1 )
 {
 	set_table_layout( 1, 0 );
 	new_component<gui_label_t>( "Click a plate on the map to number it.", SYSCOL_TEXT );
-	add_table( 3, 3 );
+	// what the map shows: the numbering plates of this stop, or its cards (the card options show only there)
+	add_table( 3, 1 );
 	{
+		plates_shown.init( button_t::square_state, "Number plates on the map" );
+		plates_shown.set_tooltip( "While this tab is open, show a plate with the number of every track and stand of this stop instead of the cards" );
+		plates_shown.add_listener( this );
+		add_component( &plates_shown );
 		chosen.init( button_t::square_state, "Map labels: this stop" );
 		chosen.set_tooltip( "Show this stop's platform cards on the map in the view of chosen stops" );
 		chosen.add_listener( this );
 		add_component( &chosen );
-		tracks_form.init( button_t::roundbox, "Tracks: next stop + destination" );
-		tracks_form.set_tooltip( "What the track cards on the map show (Shift+click a card switches it too)" );
+		new_component<gui_fill_t>();
+	}
+	end_table();
+	add_table( 3, 1 );
+	{
+		tracks_form.init( button_t::square_state, "Track cards with destinations" );
+		tracks_form.set_tooltip( "Track cards list every line with where it ends; off: only the lines by next stop (Shift+click a card switches it too)" );
 		tracks_form.add_listener( this );
 		add_component( &tracks_form );
-		stands_form.init( button_t::roundbox, "Stands: next stop + destination" );
-		stands_form.set_tooltip( "What the stand cards on the map show (Shift+click a card switches it too)" );
+		stands_form.init( button_t::square_state, "Stand cards with destinations" );
+		stands_form.set_tooltip( "Stand cards also list where the lines end; off: only the next stop (Shift+click a card switches it too)" );
 		stands_form.add_listener( this );
 		add_component( &stands_form );
-		renumber.init( button_t::roundbox, "Number tracks across" );
-		renumber.set_tooltip( "Give the tracks the numbers 1, 2, 3 ... across the station" );
-		renumber.add_listener( this );
-		new_component<gui_empty_t>();
-		add_component( &renumber );
+		new_component<gui_fill_t>();
+	}
+	end_table();
+	add_table( 4, 1 );
+	{
 		number_tool.init( button_t::roundbox_state, "Number on map" );
 		number_tool.set_tooltip( "Click a track or stand of this stop on the map to number it" );
 		number_tool.add_listener( this );
 		add_component( &number_tool );
+		renumber.init( button_t::roundbox, "Number tracks across" );
+		renumber.set_tooltip( "Give the tracks the numbers 1, 2, 3 ... across the station" );
+		renumber.add_listener( this );
+		add_component( &renumber );
 		empty_stands.init( button_t::square_state, "Unused stands" );
 		empty_stands.set_tooltip( "Also list, show and number the stands no line stops at" );
 		empty_stands.add_listener( this );
 		add_component( &empty_stands );
+		new_component<gui_fill_t>();
+	}
+	end_table();
+	add_table( 3, 1 );
+	{
 		stands_digits.init( button_t::roundbox, "Stands 1, 2, 3" );
 		stands_digits.set_tooltip( "Stands without a number get the next free number 1, 2, 3 ... as you read the map; Shift+click numbers every stand anew" );
 		stands_digits.add_listener( this );
@@ -804,6 +824,7 @@ gui_platforms_tab_t::gui_platforms_tab_t() :
 		stands_letters.set_tooltip( "Stands without a number get the next free letter A, B, C ... as you read the map; Shift+click numbers every stand anew" );
 		stands_letters.add_listener( this );
 		add_component( &stands_letters );
+		new_component<gui_fill_t>();
 	}
 	end_table();
 	add_component( &list );
@@ -861,8 +882,9 @@ void gui_platforms_tab_t::update_buttons()
 	}
 	const uint8 f = halt->get_platform_flags();
 	chosen.pressed = (f & haltestelle_t::PLATFORMS_CHOSEN) != 0;
-	tracks_form.set_text( (f & haltestelle_t::PLATFORMS_TRACKS_COMPACT) ? "Tracks: next stop" : "Tracks: next stop + destination" );
-	stands_form.set_text( (f & haltestelle_t::PLATFORMS_STANDS_DEST) ? "Stands: next stop + destination" : "Stands: next stop" );
+	plates_shown.pressed = plates;
+	tracks_form.pressed = (f & haltestelle_t::PLATFORMS_TRACKS_COMPACT) == 0;
+	stands_form.pressed = (f & haltestelle_t::PLATFORMS_STANDS_DEST) != 0;
 	bool has_tracks = false, has_stands = false;
 	FOR( vector_tpl<platform_t *>, const p, halt->get_platforms() ) {
 		has_tracks |= p->kind == platform_t::TRACK;
@@ -967,8 +989,10 @@ void gui_platforms_tab_t::draw(scr_coord offset)
 	if(  !halt.is_bound()  ) {
 		return;
 	}
-	// shown: the map shows this stop's numbering plates
-	platform_cards_t::touch_numbering( halt );
+	// shown: the map shows this stop's numbering plates, unless the cards were asked for
+	if(  plates  ) {
+		platform_cards_t::touch_numbering( halt );
+	}
 	if(  signature() != last_signature  ||  empty_shown != platform_cards_t::show_empty_stands  ) {
 		// keep a number being typed: do not rebuild while an input has the focus
 		bool typing = false;
@@ -1024,7 +1048,17 @@ bool gui_platforms_tab_t::action_triggered(gui_action_creator_t *comp, value_t)
 		return true;
 	}
 	const uint8 f = halt->get_platform_flags();
-	if(  comp == &chosen  ) {
+	// a card option shows the cards, so its change can be seen; numbering brings the plates back
+	if(  comp == &chosen  ||  comp == &tracks_form  ||  comp == &stands_form  ) {
+		plates = false;
+	}
+	else if(  comp != &plates_shown  ) {
+		plates = true;
+	}
+	if(  comp == &plates_shown  ) {
+		plates = !plates;
+	}
+	else if(  comp == &chosen  ) {
 		platform_cards_t::send_flags( halt, f ^ haltestelle_t::PLATFORMS_CHOSEN );
 	}
 	else if(  comp == &tracks_form  ) {

@@ -1904,18 +1904,18 @@ Map labels: this stop
 Map labels: this stop
 Show this stop's platform cards on the map in the view of chosen stops
 Show this stop's platform cards on the map in the view of chosen stops
-Tracks: next stop + destination
-Tracks: next stop + destination
-Tracks: next stop
-Tracks: next stop
-Stands: next stop + destination
-Stands: next stop + destination
-Stands: next stop
-Stands: next stop
-What the track cards on the map show (Shift+click a card switches it too)
-What the track cards on the map show (Shift+click a card switches it too)
-What the stand cards on the map show (Shift+click a card switches it too)
-What the stand cards on the map show (Shift+click a card switches it too)
+Number plates on the map
+Number plates on the map
+While this tab is open, show a plate with the number of every track and stand of this stop instead of the cards
+While this tab is open, show a plate with the number of every track and stand of this stop instead of the cards
+Track cards with destinations
+Track cards with destinations
+Stand cards with destinations
+Stand cards with destinations
+Track cards list every line with where it ends; off: only the lines by next stop (Shift+click a card switches it too)
+Track cards list every line with where it ends; off: only the lines by next stop (Shift+click a card switches it too)
+Stand cards also list where the lines end; off: only the next stop (Shift+click a card switches it too)
+Stand cards also list where the lines end; off: only the next stop (Shift+click a card switches it too)
 Number tracks across
 Number tracks across
 Give the tracks the numbers 1, 2, 3 ... across the station
