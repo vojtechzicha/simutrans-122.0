@@ -36,6 +36,10 @@ expect_platform 22 40 E X7
 expect_platform 24 40 E J
 numberstands 20 40 digits
 expect_platform 23 40 W F
+# Shift+click with the unused stands hidden: no line stops here, so no stand is renumbered
+numberstands 20 40 digits all
+expect_platform 23 40 W F
+expect_platform 20 40 W A
 save platforms_number_stands.sve
 load platforms_number_stands.sve
 expect_platform 24 40 E J

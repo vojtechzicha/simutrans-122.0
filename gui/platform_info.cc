@@ -55,6 +55,9 @@ static koord3d marked_anchor = koord3d::invalid;
 static uint8 marked_dir = 0;
 static vector_tpl<koord3d> marked_tiles;
 static const void *marked_owner = NULL;
+// in frames (expire() runs once a frame, before the windows draw), not time: a window in the background may draw less
+// often than any fixed time
+static uint32 marked_frames = 0;
 static uint32 marked_touched = 0;
 
 
@@ -66,13 +69,14 @@ const void *platform_marker_t::get_owner()
 
 void platform_marker_t::touch()
 {
-	marked_touched = dr_time();
+	marked_touched = marked_frames;
 }
 
 
 void platform_marker_t::expire()
 {
-	if(  marked_owner  &&  dr_time() - marked_touched > 300  ) {
+	marked_frames++;
+	if(  marked_owner  &&  marked_frames - marked_touched > 1  ) {
 		unmark();
 	}
 }
@@ -97,12 +101,12 @@ void platform_marker_t::mark(halthandle_t halt, koord3d anchor, uint8 dir, const
 {
 	if(  is_marked( halt, anchor, dir )  ) {
 		marked_owner = owner;
-		marked_touched = dr_time();
+		marked_touched = marked_frames;
 		return;
 	}
 	unmark();
 	marked_owner = owner;
-	marked_touched = dr_time();
+	marked_touched = marked_frames;
 	if(  !halt.is_bound()  ) {
 		return;
 	}
@@ -442,7 +446,7 @@ platform_number_editor_t::platform_number_editor_t(halthandle_t h, koord3d a, ui
 		add_component( &input );
 	}
 	end_table();
-	new_component<gui_label_t>( "Enter: next, Shift+Enter: back, Esc: done", SYSCOL_TEXT );
+	new_component<gui_label_t>( "Enter: keep and next, Shift+Enter: back, Esc: close without keeping", SYSCOL_TEXT );
 	add_table( 4, 1 );
 	{
 		prev.init( button_t::roundbox, "< Back" );
@@ -618,6 +622,10 @@ void platform_number_editor_t::draw(scr_coord pos, scr_size size)
 		return;
 	}
 	platform_cards_t::touch_numbering( halt );
+	// a click on a button takes the focus; typing always goes into the number (not allowed while handling the click)
+	if(  get_focus() != &input  ) {
+		focus_input();
+	}
 	// keep the mark on our platform, unless the Platforms tab marks the row under the mouse
 	if(  platform_marker_t::get_owner() == NULL  ||  platform_marker_t::get_owner() == this  ) {
 		platform_marker_t::mark( halt, anchor, dir, this );
@@ -834,7 +842,8 @@ uint32 gui_platforms_tab_t::signature()
 	const vector_tpl<platform_t *> &platforms = halt->get_platforms();
 	FOR( vector_tpl<platform_t *>, const p, platforms ) {
 		const koord3d a = p->get_anchor();
-		s = (s ^ (uint32)(a.x * 7919 + a.y * 104729 + a.z * 31 + p->dir)) * 16777619u;
+		// (with whether a line uses it: the tab hides stands no line uses)
+		s = (s ^ (uint32)(a.x * 7919 + a.y * 104729 + a.z * 31 + p->dir + (p->has_lines() ? 1u << 20 : 0))) * 16777619u;
 		for(  const char *c = p->number;  *c;  c++  ) {
 			s = (s ^ (uint8)*c) * 16777619u;
 		}

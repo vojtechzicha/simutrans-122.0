@@ -1982,8 +1982,8 @@ Stands without a number get the next free letter A, B, C ... as you read the map
 %u stands no line uses are hidden
 Number:
 Number:
-Enter: next, Shift+Enter: back, Esc: done
-Enter: next, Shift+Enter: back, Esc: done
+Enter: keep and next, Shift+Enter: back, Esc: close without keeping
+Enter: keep and next, Shift+Enter: back, Esc: close without keeping
 < Back
 < Back
 Next >

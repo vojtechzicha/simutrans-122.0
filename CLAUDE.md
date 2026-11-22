@@ -1413,7 +1413,8 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   (`platform_cards_t::show_empty_stands`, this client). A click on a plate (query or number tool) or a platform tile with
   the number tool opens `platform_number_editor_t` by the plate: Enter, Tab or Down keep the number and go to the next
   platform, Shift+Enter or Up back, "Next empty"; it marks its platform, refreshes a number changed elsewhere while
-  nothing was typed, and moves the map only when the platform is off the screen. Walk order
+  nothing was typed, and moves the map only when the platform is off the screen. Numbering mode and the marks the tab and
+  editor keep are renewed every frame (counted in frames, not time: a 300 ms timer dropped them in the background window). Walk order
   (`platforms_t::get_walk_order`): tracks by number, then stands as you read the map (screen y, then x, of the kerb).
   "Stands 1, 2, 3" / "A, B, C" (`s` command): a click gives only the stands without a number the lowest free ones in
   that order and keeps every number already there (the 1,701 from the markers); Shift+click numbers every stand anew.

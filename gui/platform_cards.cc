@@ -445,13 +445,15 @@ static sint32 hover_platform = -1;
 bool platform_cards_t::show_empty_stands = false;
 
 static halthandle_t numbering_halt;
-static uint32 numbering_touched = 0;
+// counted in frames, not time: a window in the background may draw less often than any fixed time
+static uint32 frames = 0;              // platform_cards_t::display() calls
+static uint32 numbering_frame = 0;     // the frame in which the tab or editor last asked for numbering
 
 
 void platform_cards_t::touch_numbering(halthandle_t halt)
 {
 	numbering_halt = halt;
-	numbering_touched = dr_time();
+	numbering_frame = frames;
 }
 
 
@@ -463,7 +465,8 @@ halthandle_t platform_cards_t::get_numbering_halt()
 			return h;
 		}
 	}
-	if(  numbering_halt.is_bound()  &&  dr_time() - numbering_touched <= 300  ) {
+	// windows draw after the map: asked for in the frame before this one (or this one) means still shown
+	if(  numbering_halt.is_bound()  &&  frames - numbering_frame <= 1  ) {
 		return numbering_halt;
 	}
 	return halthandle_t();
@@ -650,8 +653,9 @@ static scr_size draw_plate(scr_coord_val x, scr_coord_val y, const platform_t *p
 	const bool has_number = p->number[0] != 0;
 	const char *text = has_number ? p->number : "?";
 	const bool stand = p->kind == platform_t::STAND  &&  p->dir != 0;
-	const scr_coord_val w = proportional_string_width( text ) + 8 + (stand ? 11 : 0);
-	const scr_coord_val h = LINESPACE + 4;
+	// big enough to hit with the mouse also for a one-digit track
+	const scr_coord_val w = max( proportional_string_width( text ) + 10 + (stand ? 11 : 0), LINESPACE + 10 );
+	const scr_coord_val h = LINESPACE + 6;
 	if(  draw  ) {
 		// a used platform dark, one no line uses greyed, one without a number light with a dashed edge
 		const uint32 bg = !has_number ? PLATE_EMPTY_BG : (p->has_lines() ? NUM_BG : PLATE_DIM_BG);
@@ -671,7 +675,7 @@ static scr_size draw_plate(scr_coord_val x, scr_coord_val y, const platform_t *p
 				display_fillbox_wh_clip_rgb( x + w - 1, y + k, 1, 2, rgb( CARD_EDGE ), true );
 			}
 		}
-		display_proportional_clip_rgb( x + 4, y + 2, text, ALIGN_LEFT, rgb( fg ), true );
+		display_proportional_clip_rgb( x + 5, y + 3, text, ALIGN_LEFT, rgb( fg ), true );
 		if(  stand  ) {
 			platform_cards_t::draw_arrow( x + w - 11, y + (h - 7) / 2, p->dir, fg );
 		}
@@ -749,6 +753,7 @@ void platform_cards_t::display()
 {
 	// a Platforms tab that is no longer shown gives up the platform it marked
 	platform_marker_t::expire();
+	frames++;
 
 	// the card under the mouse in the last frame is drawn in full now
 	const scr_coord mouse( get_mouse_x(), get_mouse_y() );

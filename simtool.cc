@@ -2369,15 +2369,20 @@ bool tool_change_platforms_t::init( player_t *player )
 					dirs.append( pl->dir );
 				}
 			}
-			// the numbers other stands keep (all of the stop's stands, shown or not)
+			// the numbers the other stands keep (every stand not numbered now, shown or not: also hidden ones with Shift+click)
 			char kept[256][8];
 			uint32 n_kept = 0;
-			if(  !all  ) {
-				FOR( vector_tpl<platform_t *>, const pl, halt->get_platforms() ) {
-					if(  pl->kind == platform_t::STAND  &&  pl->number[0]  &&  n_kept < lengthof(kept)  ) {
-						tstrncpy( kept[n_kept], pl->number, lengthof(kept[n_kept]) );
-						n_kept++;
-					}
+			FOR( vector_tpl<platform_t *>, const pl, halt->get_platforms() ) {
+				if(  pl->kind != platform_t::STAND  ||  pl->number[0] == 0  ||  n_kept >= lengthof(kept)  ) {
+					continue;
+				}
+				bool renumbered = false;
+				for(  uint32 k = 0;  k < anchors.get_count()  &&  !renumbered;  k++  ) {
+					renumbered = anchors[k] == pl->get_anchor()  &&  dirs[k] == pl->dir;
+				}
+				if(  !renumbered  ) {
+					tstrncpy( kept[n_kept], pl->number, lengthof(kept[n_kept]) );
+					n_kept++;
 				}
 			}
 			uint32 next = 0;
