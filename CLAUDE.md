@@ -1365,7 +1365,11 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
 - Model (`simplatform.*`): a platform is a station track (a row of the stop's tiles on one track,
   `stop_waytype` from the building) or a stand (one road or tram stop tile in one travel direction: a through tile has
   two, a dead end one; per tile because the owner numbers the tiles of a bus station row separately); ships and
-  aircraft get one per tile, no card. `platforms_t::build` works them out with the lines that board there (passenger
+  aircraft get one per tile, no card. No stand (`is_no_stand`): a layover tile, and a goods-only building
+  (pak128.cs `Zasobovani`, `CarStop`) or `parking_(catchemnt_area_ext)*` tile where no passenger or mail line stops
+  (the owner has bus stands on goods buildings, e.g. underground UAN Florenc); stop poles that enable nothing
+  themselves stay stands. A number on such a tile stays with the tile and moves to no other platform. On the
+  owner's save (2026-11-22) that left out 8,615 of 66,448 platforms, 239 of them layover tiles with All off arrivals. `platforms_t::build` works them out with the lines that board there (passenger
   lines with convoys; a loading entry not followed by another entry of the same stop), grouped by the next stop where
   passengers may get off, with the departure board's line number and destination
   (`gui_departure_board_view_t::get_departure_texts`), lines that only let people off as arrivals, rule 4 (a group

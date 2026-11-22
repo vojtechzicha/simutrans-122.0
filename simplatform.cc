@@ -82,6 +82,34 @@ static waytype_t stop_waytype(const grund_t *gr)
 }
 
 
+// the owner's parking tiles, road stops that only stretch a stop's catchment (see savegame_strip_parking)
+static const char PARKING_PREFIX[] = "parking_(catchemnt_area_ext)";
+
+/**
+ * A road or tram stop tile that is no stand:
+ * - a layover bay (waiting bay), always;
+ * - a loading bay (a building for goods only, e.g. pak128.cs Zasobovani and CarStop) or a parking tile, unless a
+ *   passenger or mail line stops on it: the owner's game also has bus stands on such buildings (the underground UAN
+ *   Florenc).
+ * Bus and tram stop poles that enable nothing themselves (the stop's main building enables passengers) stay stands.
+ * Station tracks stay tracks whatever they take: stations number all their tracks.
+ */
+static bool is_no_stand(const grund_t *gr, const vector_tpl<koord3d> &passenger_stops)
+{
+	const gebaeude_t *gb = gr->find<gebaeude_t>();
+	if(  gb == NULL  ||  gb->get_tile() == NULL  ) {
+		return false;
+	}
+	const building_desc_t *d = gb->get_tile()->get_desc();
+	if(  d->get_layover_kind() != 0  ) {
+		return true;
+	}
+	const bool goods_only = (d->get_enabled() & 3) == 0  &&  (d->get_enabled() & 4) != 0;
+	const bool parking = strncmp( d->get_name(), PARKING_PREFIX, strlen( PARKING_PREFIX ) ) == 0;
+	return (goods_only  ||  parking)  &&  !passenger_stops.is_contained( gr->get_pos() );
+}
+
+
 static uint8 kind_of(waytype_t wt)
 {
 	switch(  wt  ) {
@@ -491,6 +519,13 @@ static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list, bo
 			// a second label of a platform (two rows joined): the older one won
 			continue;
 		}
+		const grund_t *at = world()->lookup( labels[k].anchor );
+		if(  at  &&  at->get_halt().is_bound()  &&  at->get_halt().get_rep() == halt  ) {
+			// the tile is still the stop's but no platform now (a layover bay, or a goods building no passenger
+			// line stops at any more): the label stays there, for when it is a stand again, and moves nowhere
+			used[k] = true;
+			continue;
+		}
 		for(  uint32 i = 0;  i < list.get_count();  i++  ) {
 			platform_t *p = list[i];
 			if(  owner_of[i] >= 0  ||  p->kind == platform_t::OTHER  ||  (p->kind == platform_t::STAND  &&  !p->dead_end  &&  labels[k].dir != p->dir)  ) {
@@ -682,12 +717,26 @@ static void build_rows(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 {
 	const halthandle_t self = haltestelle_t::get_halt( halt->get_basis_pos3d(), halt->get_owner() );
 
+	// the tiles where passenger or mail lines stop (a stand on a building for goods counts then)
+	vector_tpl<koord3d> passenger_stops;
+	FOR( vector_tpl<linehandle_t>, const line, halt->registered_lines ) {
+		if(  !line.is_bound()  ||  !(line->get_goods_catg_index().is_contained( goods_manager_t::INDEX_PAS )  ||  line->get_goods_catg_index().is_contained( goods_manager_t::INDEX_MAIL ))  ) {
+			continue;
+		}
+		FOR( minivec_tpl<schedule_entry_t>, const &e, line->get_schedule()->entries ) {
+			const grund_t *gr = world()->lookup( e.pos );
+			if(  gr  &&  gr->get_halt() == self  ) {
+				passenger_stops.append_unique( e.pos );
+			}
+		}
+	}
+
 	// the stop's tiles with a way of a stop
 	vector_tpl<cell_t> cells;
 	FOR( slist_tpl<haltestelle_t::tile_t>, const &t, halt->get_tiles() ) {
 		const waytype_t wt = stop_waytype( t.grund );
 		const uint8 kind = kind_of( wt );
-		if(  kind == 255  ) {
+		if(  kind == 255  ||  (kind == platform_t::STAND  &&  is_no_stand( t.grund, passenger_stops ))  ) {
 			continue;
 		}
 		cell_t c;
