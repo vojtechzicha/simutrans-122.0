@@ -1873,6 +1873,30 @@ vehicle_t::~vehicle_t()
 }
 
 
+// fork: the labels over the vehicles, queued while the map is drawn, drawn after the platform cards
+struct queued_label_t {
+	const vehicle_t *v;
+	int x, y;
+};
+static vector_tpl<queued_label_t> queued_labels;
+static bool labels_replaying = false;
+
+
+void vehicle_t::display_queued_labels()
+{
+	labels_replaying = true;
+	FOR( vector_tpl<queued_label_t>, const &q, queued_labels ) {
+#ifdef MULTI_THREAD
+		q.v->vehicle_t::display_overlay( q.x, q.y );
+#else
+		q.v->vehicle_t::display_after( q.x, q.y, true );
+#endif
+	}
+	labels_replaying = false;
+	queued_labels.clear();
+}
+
+
 #ifdef MULTI_THREAD
 void vehicle_t::display_overlay(int xpos, int ypos) const
 {
@@ -1897,6 +1921,15 @@ void vehicle_t::display_after(int xpos, int ypos, bool is_global) const
 		}
 		if( state != 3 ) {
 			// nothing to show
+			return;
+		}
+		if(  !labels_replaying  ) {
+			// fork: drawn after the platform cards (display_queued_labels)
+			queued_label_t q;
+			q.v = this;
+			q.x = xpos;
+			q.y = ypos;
+			queued_labels.append( q );
 			return;
 		}
 

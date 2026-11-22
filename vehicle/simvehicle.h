@@ -490,6 +490,12 @@ public:
 #else
 	void display_after(int xpos, int ypos, bool dirty) const OVERRIDE;
 #endif
+
+	/**
+	 * Fork: the labels over the vehicles (state, sign) are queued while the map is drawn and drawn by this after the
+	 * platform cards (main_view_t::display), so no card covers them.
+	 */
+	static void display_queued_labels();
 };
 
 
