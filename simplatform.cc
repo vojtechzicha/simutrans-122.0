@@ -1038,14 +1038,26 @@ void platforms_t::add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 			if(  pi < 0  ) {
 				continue;
 			}
-			// a departure: it loads here and goes on to another stop (not first to another tile of this one)
-			const uint8 j = next_halt_entry( schedule, i, owner, false );
-			bool departure = e.loads()  &&  j < n  &&  haltestelle_t::get_halt( schedule->entries[j].pos, owner ) != self;
+			// a departure: it loads here and goes on to another stop where passengers may get off. Further stands or
+			// tracks of this stop on the way are skipped: a bus that boards at two bays of one stop (both loading)
+			// shows in full at both, with the next stop after them. An All off arrival stand does not load, so it
+			// stays an arrival.
 			uint8 next = n;
-			if(  departure  ) {
-				next = next_halt_entry( schedule, i, owner, true );
-				departure = next < n  &&  haltestelle_t::get_halt( schedule->entries[next].pos, owner ) != self;
+			if(  e.loads()  ) {
+				uint8 at = i;
+				for(  uint8 k = 1;  k < n;  k++  ) {
+					const uint8 j = next_halt_entry( schedule, at, owner, true );
+					if(  j >= n  ||  j == i  ) {
+						break;
+					}
+					if(  haltestelle_t::get_halt( schedule->entries[j].pos, owner ) != self  ) {
+						next = j;
+						break;
+					}
+					at = j;
+				}
 			}
+			const bool departure = next < n;
 			if(  departure  ) {
 				cbuffer_t number, category, destination;
 				halthandle_t dest;

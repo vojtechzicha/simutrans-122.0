@@ -1370,7 +1370,7 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   (the owner has bus stands on goods buildings, e.g. underground UAN Florenc); stop poles that enable nothing
   themselves stay stands. A number on such a tile stays with the tile and moves to no other platform. On the
   owner's save (2026-11-22) that left out 8,615 of 66,448 platforms, 239 of them layover tiles with All off arrivals. `platforms_t::build` works them out with the lines that board there (passenger
-  lines with convoys; a loading entry not followed by another entry of the same stop), grouped by the next stop where
+  lines with convoys; a loading entry, with the next stop after any further stands or tracks of the same stop: a bus boarding on two bays of one stop shows at both, an All off arrival stand only as arrival), grouped by the next stop where
   passengers may get off, with the departure board's line number and destination
   (`gui_departure_board_view_t::get_departure_texts`), lines that only let people off as arrivals, rule 4 (a group
   names its next stop only when the platform has several groups or a line of it leaves another platform for another

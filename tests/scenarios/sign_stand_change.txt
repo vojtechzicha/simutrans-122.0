@@ -1,9 +1,11 @@
-# Destination sign: a bus that lets everybody off on one stand (All off) and then drives to another stand of the same
-# stop to board there shows the trip it boards for, not "Not in service" (line 159 at Praha, Vinoř: arrival stand All
-# off, the turning place All off, then the departure stand, 2026-11-22). A run from an All off stop to another stop
-# (a siding) still shows "Not in service". Layout tests/layouts/platforms.inc, the stop Street made a row 20..24,40.
-# Expect: SC on its way from 20,40 to 24,40 shows West (where the ring trip from 24,40 ends before Street); SD on its
-# way from the All off Bay to West shows none. The first fails on the build before the fix.
+# Two stands of one stop on a trip (2026-11-22). A bus that lets everybody off on one stand (All off) and then drives to
+# another stand of the same stop to board there is not in service on the way (Praha, Kačerov: arrival stand All off,
+# then the departure stand); a first build of this check showed the trip there, which the owner did not want. A bus
+# that boards on two stands of one stop (both Regular, no All off) shows in full at both: its line with the next stop
+# after them on the cards and the Platforms tab, not "arr." on the first one. Layout tests/layouts/platforms.inc, the
+# stop Street made a row 20..24,40. Expect: SC on its way from the All off 20,40 to 24,40 and SD on its way from the
+# All off Bay to West show no destination; SE on its way from 20,40 to 24,40 shows West (none before), and it is listed
+# with its next stop at both stands (only at 24,40 before), SC at 20,40 as an arrival.
 include ../layouts/platforms.inc
 waydesc Road_050
 station CZR-Stops-ODIS_Bus-Empty-L 21 40
@@ -23,9 +25,22 @@ stop 25 46 0 0 R
 stop 30 37 0 0 A
 stop 10 43 0 0 R
 endline
+busline SE
+stop 20 40 0 0 R
+stop 24 40 0 0 R
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
 convoy 11 38 SC 1
 convoy 11 38 SD 1
+convoy 11 38 SE 1
 run_until SC DRIVING 120 1
-expect_sign SC West
+expect_sign SC -
 run_until SD DRIVING 120 2
 expect_sign SD -
+run_until SE DRIVING 120 1
+expect_sign SE West
+run 60 0
+platforms 20 40
+expect_lines 20 40 E SE>South|arr:SC
+expect_lines 24 40 E SC,SE>South

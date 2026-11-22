@@ -782,6 +782,10 @@ static bool find_destination(const schedule_t *schedule, uint8 e, const player_t
 			continue;
 		}
 		const uint32 key = stop_key( h, train );
+		if(  !last.is_bound()  &&  (h == here  ||  key == here_key)  ) {
+			// another stand or track of this stop right after it (a bus boarding at two bays): not back yet
+			continue;
+		}
 		if(  h == last  ||  (last.is_bound()  &&  key == last_key)  ) {
 			// the next tile of the same stop
 			continue;
@@ -2160,27 +2164,6 @@ bool convoy_sign_t::update(convoihandle_t cnv)
 				e = i;
 				emptied = true;
 				break;
-			}
-		}
-		if(  emptied  ) {
-			// only moving on to another stand or track of the same stop to board there (159 at Vinoř: arrival
-			// stand All off, the turning place All off, then the departure stand): the sign shows that trip
-			const halthandle_t off_at = entry_halt( schedule, e, owner );
-			const uint32 off_key = stop_key( off_at, train_style );
-			for(  uint8 k = 1;  k < n;  k++  ) {
-				const uint8 i = (e + k) % n;
-				const halthandle_t h = entry_halt( schedule, i, owner );
-				if(  !h.is_bound()  ) {
-					continue;
-				}
-				if(  h != off_at  &&  stop_key( h, train_style ) != off_key  ) {
-					break;
-				}
-				if(  schedule->entries[i].loads()  ) {
-					e = i;
-					emptied = false;
-					break;
-				}
 			}
 		}
 	}
