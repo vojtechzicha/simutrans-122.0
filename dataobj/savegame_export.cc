@@ -957,6 +957,8 @@ static void export_stops( json_writer_t &w, const halt_lines_map_t &halt_lines )
 				w.start_object();
 				w.kv_int( "next_halt_id", g->next.is_bound() ? g->next.get_id() : 0 );
 				w.kv_string( "next_name", g->next_name );
+				w.kv_int( "heading_halt_id", g->heading.is_bound() ? g->heading.get_id() : 0 );
+				w.kv_string( "heading_name", g->heading_name );
 				w.kv_string( "out", g->out ? dir_names[g->out] : "" );
 				w.kv_bool( "name_shown", g->name_shown );
 				w.array_key( "lines" );

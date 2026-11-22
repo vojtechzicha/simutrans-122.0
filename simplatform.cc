@@ -630,6 +630,9 @@ static void add_member(platform_t *p, halthandle_t next, const char *next_name, 
 	platform_group_t *g = new platform_group_t();
 	g->next = next;
 	tstrncpy( g->next_name, next_name, lengthof(g->next_name) );
+	// until add_lines finds a better one
+	g->heading = next;
+	tstrncpy( g->heading_name, next_name, lengthof(g->heading_name) );
 	g->out = out;
 	g->members.append( m );
 	p->groups.append( g );
@@ -637,6 +640,154 @@ static void add_member(platform_t *p, halthandle_t next, const char *next_name, 
 
 
 static void build_rows(haltestelle_t *halt, vector_tpl<platform_t *> &list);
+
+
+// ---------------------------------------------------------------------------------------------
+// headings: the stop a group's card names
+
+#define HEADING_LOOK_STANDS (6)   // stops looked at ahead of a stand
+#define HEADING_LOOK_TRACKS (4)   // of a track: trains stop less often, and a metro shares the halts of main stations
+
+static bool is_rail_wt(waytype_t wt)
+{
+	return wt == track_wt  ||  wt == monorail_wt  ||  wt == maglev_wt  ||  wt == narrowgauge_wt;
+}
+
+
+/**
+ * How important a stop is for a heading: the passenger lines with vehicles that serve it, each line number once
+ * (variants of one line, Ex1/1 and Ex1/2, count once). For a stand a train or metro line counts as much as a bus or
+ * tram line (the transfer people go there for); for a track the other kinds count a quarter, so a big bus station does
+ * not outweigh a railway junction.
+ */
+static double stop_weight(halthandle_t h, bool train, vector_tpl<halthandle_t> &cache_halt, vector_tpl<double> &cache_weight)
+{
+	for(  uint32 i = 0;  i < cache_halt.get_count();  i++  ) {
+		if(  cache_halt[i] == h  ) {
+			return cache_weight[i];
+		}
+	}
+	vector_tpl<const char *> same, other;
+	vector_tpl<char *> owned;
+	FOR( vector_tpl<linehandle_t>, const line, h->registered_lines ) {
+		if(  !line.is_bound()  ||  line->count_convoys() == 0  ||  !line->get_goods_catg_index().is_contained( goods_manager_t::INDEX_PAS )  ) {
+			continue;
+		}
+		cbuffer_t number;
+		board_names_t::get_line_number( number, line->get_name() );
+		char *key = strdup( number.len() ? (const char *)number : line->get_name() );
+		owned.append( key );
+		vector_tpl<const char *> &list = is_rail_wt( line->get_schedule()->get_waytype() ) == train ? same : other;
+		bool seen = false;
+		FOR( vector_tpl<const char *>, const k, list ) {
+			seen |= strcmp( k, key ) == 0;
+		}
+		if(  !seen  ) {
+			list.append( key );
+		}
+	}
+	double w = same.get_count();
+	FOR( vector_tpl<const char *>, const k, other ) {
+		bool also_same = false;
+		FOR( vector_tpl<const char *>, const s, same ) {
+			also_same |= strcmp( s, k ) == 0;
+		}
+		if(  !also_same  ) {
+			w += train ? 0.25 : 1.0;
+		}
+	}
+	FOR( vector_tpl<char *>, k, owned ) {
+		free( k );
+	}
+	cache_halt.append( h );
+	cache_weight.append( w );
+	return w;
+}
+
+
+// the stops after entry of the schedule, as far as the trip goes (a Terminal or All off entry ends it, or coming back
+// here), at most look of them; waypoints, depots, Hold entries and further tiles of the same stop are left out
+static void stops_ahead(const schedule_t *schedule, uint8 entry, const player_t *owner, halthandle_t self, uint32 look, vector_tpl<halthandle_t> &out)
+{
+	out.clear();
+	const uint8 n = schedule->get_count();
+	halthandle_t last = self;
+	for(  uint8 k = 1;  k < n  &&  out.get_count() < look;  k++  ) {
+		const schedule_entry_t &e = schedule->entries[(entry + k) % n];
+		const halthandle_t h = haltestelle_t::get_halt( e.pos, owner );
+		if(  !h.is_bound()  ||  e.stop_type == schedule_entry_t::hold  ||  h == last  ) {
+			continue;
+		}
+		if(  h == self  ) {
+			break;
+		}
+		out.append( h );
+		last = h;
+		if(  e.unloads_all()  ) {
+			break;
+		}
+	}
+}
+
+
+/**
+ * The heading of a group: the nearest stop ahead that every line of the group reaches within the lookahead and on its
+ * trip, and that is clearly more important than the next stop (at least twice its weight and two lines more), e.g.
+ * Praha, Poliklinika Černý Most towards Ronešova -> Rajská zahrada (metro B and trains). None: the next stop.
+ */
+static halthandle_t find_heading(const platform_t *p, const platform_group_t *g, halthandle_t self, vector_tpl<halthandle_t> &cache_halt, vector_tpl<double> &cache_weight)
+{
+	if(  !g->next.is_bound()  ||  g->members.empty()  ) {
+		return g->next;
+	}
+	const bool train = p->kind == platform_t::TRACK;
+	const uint32 look = train ? HEADING_LOOK_TRACKS : HEADING_LOOK_STANDS;
+	// the stops ahead of every line, one after the other: line k has ahead[start[k] .. start[k+1])
+	vector_tpl<halthandle_t> ahead, part;
+	vector_tpl<uint32> start;
+	FOR( vector_tpl<platform_member_t>, const &m, g->members ) {
+		if(  !m.line.is_bound()  ) {
+			return g->next;
+		}
+		start.append( ahead.get_count() );
+		stops_ahead( m.line->get_schedule(), m.entry, m.line->get_owner(), self, look, part );
+		FOR( vector_tpl<halthandle_t>, const h, part ) {
+			ahead.append( h );
+		}
+	}
+	start.append( ahead.get_count() );
+	const double w_next = stop_weight( g->next, train, cache_halt, cache_weight );
+	// the stops every line reaches, nearest first (by the furthest any of the lines has to go)
+	halthandle_t best;
+	sint32 best_dist = 0x7FFFFFFF;
+	for(  uint32 c = start[0];  c < start[1];  c++  ) {
+		const halthandle_t h = ahead[c];
+		if(  h == g->next  ) {
+			continue;
+		}
+		sint32 dist = 0;
+		bool everyone = true;
+		for(  uint32 k = 0;  k + 1 < start.get_count()  &&  everyone;  k++  ) {
+			sint32 found = -1;
+			for(  uint32 i = start[k];  i < start[k+1]  &&  found < 0;  i++  ) {
+				if(  ahead[i] == h  ) {
+					found = i - start[k];
+				}
+			}
+			everyone = found >= 0;
+			dist = max( dist, found );
+		}
+		if(  !everyone  ||  dist >= best_dist  ) {
+			continue;
+		}
+		const double w = stop_weight( h, train, cache_halt, cache_weight );
+		if(  w >= 2.0 * w_next  &&  w >= w_next + 2.0  ) {
+			best = h;
+			best_dist = dist;
+		}
+	}
+	return best.is_bound() ? best : g->next;
+}
 
 
 static vector_tpl<halthandle_t> labels_dirty;
@@ -1004,6 +1155,33 @@ void platforms_t::add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 			}
 		}
 	}
+
+	// headings: what the cards call each group (the nearest clearly more important stop ahead, else the next stop);
+	// one that another group of the platform also leads to, or goes to next, would not tell them apart: the next stop
+	vector_tpl<halthandle_t> cache_halt;
+	vector_tpl<double> cache_weight;
+	FOR( vector_tpl<platform_t *>, p, list ) {
+		vector_tpl<halthandle_t> found;
+		FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+			found.append( find_heading( p, g, self, cache_halt, cache_weight ) );
+		}
+		for(  uint32 gi = 0;  gi < p->groups.get_count();  gi++  ) {
+			platform_group_t *g = p->groups[gi];
+			halthandle_t h = found[gi];
+			for(  uint32 o = 0;  o < p->groups.get_count()  &&  h != g->next;  o++  ) {
+				if(  o != gi  &&  (found[o] == h  ||  p->groups[o]->next == h)  ) {
+					h = g->next;
+				}
+			}
+			if(  h.is_bound()  &&  h != g->next  ) {
+				const bool train = p->kind == platform_t::TRACK;
+				cbuffer_t name;
+				board_names_t::get_stop_name( name, h->get_name(), train, train ? train_town : town );
+				g->heading = h;
+				tstrncpy( g->heading_name, name, lengthof(g->heading_name) );
+			}
+		}
+	}
 }
 
 
@@ -1135,6 +1313,17 @@ void platforms_t::get_walk_order(const vector_tpl<platform_t *> &list, bool with
 			b--;
 		}
 		order[b] = v;
+	}
+}
+
+
+void platforms_t::get_group_name(cbuffer_t &buf, const platform_group_t *g, bool with_next)
+{
+	if(  with_next  &&  g->has_heading()  ) {
+		buf.printf( translator::translate( "%s via %s" ), g->heading_name, g->next_name );
+	}
+	else {
+		buf.append( g->heading_name );
 	}
 }
 

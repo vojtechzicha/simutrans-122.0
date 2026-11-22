@@ -218,7 +218,7 @@ static void build_items(const platform_t *p, bool with_destinations, bool compac
 		if(  g->name_shown  ||  (compact  &&  p->groups.get_count() > 1)  ) {
 			add( items, IT_ARROW, NULL, invalid_wt, g->out );
 			if(  !compact  ) {
-				add( items, IT_NAME, g->next_name );
+				add( items, IT_NAME, g->heading_name );
 			}
 		}
 	}
@@ -356,7 +356,9 @@ scr_size platform_cards_t::draw_table(scr_coord_val x, scr_coord_val y, const pl
 	const scr_coord_val x0 = 4 + (number_width( number ) ? number_width( number ) + 5 : 0);
 	scr_coord_val col1 = 0;
 	FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
-		col1 = max( col1, 9 + 3 + proportional_string_width( g->next_name ) );
+		cbuffer_t name;
+		platforms_t::get_group_name( name, g, true );
+		col1 = max( col1, 9 + 3 + proportional_string_width( name ) );
 	}
 	if(  !p->arrivals.empty()  ) {
 		col1 = max( col1, proportional_string_width( translator::translate( "arr." ) ) + 2 );
@@ -381,7 +383,9 @@ scr_size platform_cards_t::draw_table(scr_coord_val x, scr_coord_val y, const pl
 				const platform_group_t *g = p->groups[gi];
 				if(  paint  ) {
 					draw_arrow( x + x0 + 1, y + ry + (LINESPACE - 7) / 2, g->out, NAME_COL );
-					display_proportional_clip_rgb( x + x0 + 12, y + ry, g->next_name, ALIGN_LEFT, rgb( NAME_COL ), true );
+					cbuffer_t name;
+					platforms_t::get_group_name( name, g, true );
+					display_proportional_clip_rgb( x + x0 + 12, y + ry, name, ALIGN_LEFT, rgb( NAME_COL ), true );
 				}
 				members = &g->members;
 				platforms_t::get_runs( *members, true, runs );

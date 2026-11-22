@@ -1,0 +1,40 @@
+# Platforms: a card names the nearest stop ahead that every line of the group reaches and that is clearly more important
+# than the next stop (at least twice the lines and two more), else the next stop; the group itself stays the lines with
+# that next stop (Praha, Poliklinika Černý Most: towards Ronešova, heading Rajská zahrada, 2026-11-22). Layout
+# tests/layouts/platforms.inc with a stop Minor on the ring's east side (40,43) that only line 1 serves; South is served
+# by lines 1 to 4. Expect: at Street line 1 goes to Minor next and is headed South; at Minor (next South) and at South
+# (next West, as important as South) the next stop is the heading.
+include ../layouts/platforms.inc
+waydesc Road_050
+station CZR-Stops-ODIS_Bus-Empty-L 40 43
+haltname 40 43 Minor
+vehicles CZ-ODIS-SOR_BN95-Green
+busline [1]
+stop 20 40 0 0 R
+stop 40 43 0 0 R
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+busline [2]
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+busline [3]
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+busline [4]
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+convoy 11 38 [1] 1
+convoy 11 38 [2] 1
+convoy 11 38 [3] 1
+convoy 11 38 [4] 1
+run 2 0
+platforms 20 40
+platforms 40 43
+platforms 25 46
+expect_heading 20 40 E Minor>South
+expect_lines 20 40 E 1>Minor
+expect_heading 40 43 S South>South

@@ -727,7 +727,9 @@ void gui_platform_lines_t::draw(scr_coord offset)
 		}
 		platform_cards_t::draw_arrow( x + 2, y + (LINESPACE - 7) / 2, g->out, 0x000000 );
 		x += 12;
-		x += display_proportional_clip_rgb( x, y, g->next_name, ALIGN_LEFT, SYSCOL_TEXT, true ) + 2;
+		cbuffer_t name;
+		platforms_t::get_group_name( name, g, true );
+		x += display_proportional_clip_rgb( x, y, name, ALIGN_LEFT, SYSCOL_TEXT, true ) + 2;
 		if(  x > right  ) {
 			return;
 		}

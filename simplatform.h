@@ -55,11 +55,20 @@ struct platform_group_t
 {
 	halthandle_t next;        ///< the next stop where passengers may get off
 	char next_name[96];       ///< as a departure board names it
+	/**
+	 * What the cards call the group: the nearest stop ahead that every line of the group reaches and that is clearly
+	 * more important than the next one (platforms_t::add_lines, "heading"), else the next stop itself. Only shown:
+	 * the group is still the lines with that next stop.
+	 */
+	halthandle_t heading;
+	char heading_name[96];
 	ribi_t::ribi out;         ///< the way the vehicles leave (one direction), 0 unknown
 	bool name_shown;          ///< show the next stop on a compact card (plan 3, rule 4)
 	vector_tpl<platform_member_t> members;
 
-	platform_group_t() : out(0), name_shown(false) { next_name[0] = 0; }
+	platform_group_t() : out(0), name_shown(false) { next_name[0] = 0; heading_name[0] = 0; }
+
+	bool has_heading() const { return heading.is_bound()  &&  heading != next; }
 };
 
 
@@ -209,6 +218,9 @@ public:
 	 * by the kerb they stand at. Stands no line uses only with with_empty_stands. Indices into list.
 	 */
 	static void get_walk_order(const vector_tpl<platform_t *> &list, bool with_empty_stands, vector_tpl<uint32> &order);
+
+	/// what a group is called: its heading, and with_next "Rajská zahrada via Ronešova" when that is not the next stop
+	static void get_group_name(cbuffer_t &buf, const platform_group_t *g, bool with_next);
 
 	/// the n-th stand number (from 0): 1, 2, 3 ... or A, B, ... Z, AA, AB ...
 	static void get_stand_label(char *buf, size_t len, uint32 n, bool letters);

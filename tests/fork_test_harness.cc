@@ -2123,7 +2123,7 @@ static void cmd_platforms(int x, int y)
 			p->number, p->tiles[0].x, p->tiles[0].y, p->tiles.back().x, p->tiles.back().y, ax, p->dir ? ll_dir( p->dir ) : "-", p->dead_end ? " dead end" : "",
 			platform_lines_text( p ).c_str());
 		FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
-			logf("      > %s%s out %s:", g->next_name, g->name_shown ? "" : " (not named)", g->out ? ll_dir( g->out ) : "?");
+			logf("      > %s%s%s%s out %s:", g->next_name, g->has_heading() ? " heading " : "", g->has_heading() ? g->heading_name : "", g->name_shown ? "" : " (not named)", g->out ? ll_dir( g->out ) : "?");
 			vector_tpl<platform_run_t> runs;
 			platforms_t::get_runs( g->members, true, runs );
 			FOR( vector_tpl<platform_run_t>, const &r, runs ) {
@@ -2162,6 +2162,28 @@ static void cmd_expect_lines(int x, int y, const char *d, const std::string &wan
 	}
 	else {
 		logf("FAIL expect_lines %d,%d %s: want '%s', have '%s'\n", x, y, d, want.c_str(), have.c_str());
+		failures++;
+	}
+}
+
+// expect_heading X Y D TEXT: the groups of the platform as "next>heading|next>heading" (heading: what the cards call
+// the group, the next stop unless a clearly more important stop lies ahead of all its lines)
+static void cmd_expect_heading(int x, int y, const char *d, const std::string &want)
+{
+	halthandle_t halt;
+	const platform_t *p = platform_at( x, y, d, halt );
+	std::string have = p ? "" : "no platform";
+	if(  p  ) {
+		FOR( vector_tpl<platform_group_t *>, const g, p->groups ) {
+			if(  !have.empty()  ) have += "|";
+			have += std::string( g->next_name ) + ">" + g->heading_name;
+		}
+	}
+	if(  have == want  ) {
+		logf("ok   expect_heading %d,%d %s %s\n", x, y, d, want.c_str());
+	}
+	else {
+		logf("FAIL expect_heading %d,%d %s: want '%s', have '%s'\n", x, y, d, want.c_str(), have.c_str());
 		failures++;
 	}
 }
@@ -2358,6 +2380,11 @@ static void run_command(std::vector<char *> &a)
 		std::string what;
 		for(  size_t i=4;  i<a.size();  i++  ) what += std::string(i>4 ? " " : "") + a[i];
 		cmd_expect_lines( I(1), I(2), S(3), what );
+	}
+	else if(  c=="expect_heading"  ) {
+		std::string what;
+		for(  size_t i=4;  i<a.size();  i++  ) what += std::string(i>4 ? " " : "") + a[i];
+		cmd_expect_heading( I(1), I(2), S(3), what );
 	}
 	else if(  c=="expect_state"  ||  c=="expect_wait"  ) {
 		std::string what;

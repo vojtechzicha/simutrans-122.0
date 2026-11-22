@@ -46,6 +46,7 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `platforms_road_change` | Platforms: a dead-end stand becomes a through stop when its road goes on (no stop tile added); its number stays on one of the two stands, also after save and load. |
 | `sign_stand_change` | Destination sign: a bus that lets everybody off on one stand (All off) and drives on to another stand of the same stop to board shows the trip it boards for, not "Not in service" (line 159 at Praha, Vinoř, 2026-11-22); a run from an All off stop to another stop still shows none. Fails before the fix. |
 | `platforms_number_stands` | Platforms: "Stands 1, 2, 3" / "A, B, C" number the stands as you read the map; a click keeps the numbers already there and fills only the gaps, Shift+click (`all`) numbers every stand anew; save and load. |
+| `platforms_heading` | Platforms: a card names the nearest clearly more important stop ahead of all lines of a group (Poliklinika Černý Most -> Rajská zahrada), else the next stop; the group stays the lines with that next stop. |
 | `coupling_r18` | Coupling and parting of two lines every hour (R18 at Staré Město). |
 | `coupling_s4` | A unit coupled for part of the way only, left and taken back at the far station (S4 Kralupy). |
 | `layover_cluster` | Timetabled buses in a cluster of dead-end layover bays: every bus parks, no bay errors. |
@@ -124,6 +125,8 @@ Checking (each failed one logs `FAIL ...` and makes the result FAIL):
   (`*` any) as the boards show it: `planned`, `confirmed` or `changed`.
 - `numberstands X Y digits|letters [empty] [all]`: the Platforms tab's "Stands 1, 2, 3" / "A, B, C" for the stop on that tile,
   through the platform tool; `empty` also the stands no line uses, `all` every stand anew (Shift+click).
+- `expect_heading X Y D TEXT`: the groups of that platform as `next>heading|next>heading` (the heading is what the cards
+  call the group).
 - `expect_sign PATTERN TEXT...`: some matching convoy shows TEXT in the destination of its sign (over the vehicle
   and in the convoy window), `-` for none ("Not in service").
 

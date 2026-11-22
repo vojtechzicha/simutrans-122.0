@@ -1391,6 +1391,15 @@ list lines at stops. All four phases of the plan are in (cards, numbers, boards,
   `entry_ways`. `SIM_SERVER_MINOR` is `SIM_SAVE_MINOR`: network resyncs saved at 0.122.0 and lost every fork field. Typed through the simple tool
   `TOOL_CHANGE_PLATFORMS` (`f,HALT,FLAGS`, `n,HALT,X,Y,Z,DIR,TEXT`, `a,HALT` renumber tracks, `s,HALT,LETTERS,EMPTY,ALL`
   stand numbers), so network safe.
+- Headings (2026-11-22): a group stays the lines with one next stop, but its cards name the nearest stop ahead that every
+  line of the group reaches on its trip (a Terminal or All off entry ends it; 6 stops ahead of a stand, 4 of a track)
+  and that is clearly more important than the next stop: at least twice its weight and two more (`find_heading` in
+  `simplatform.cc`). Weight: passenger lines with vehicles at the stop, each line number once (`board_names_t::
+  get_line_number`); for a stand train and metro lines count fully, for a track buses and trams a quarter. A heading
+  another group of the platform also has or goes to next falls back to the next stop. Compact cards show the heading, the
+  table, the tab and the platform window "Rajská zahrada via Ronešova" (`platforms_t::get_group_name`); export
+  `heading_halt_id`, `heading_name`. Tuned with a prototype on the owner's save: 11,013 of 31,317 groups get one
+  (Poliklinika Černý Most -> Rajská zahrada, Bučovice -> Brno hl.n.); a metro at a main station keeps its next stop.
 - Cards (`gui/platform_cards.*`, drawn by `main_view_t::display` after the overlays): number box, then per group the
   chips (train navy, bus blue, tram red, six to a row, "+N" after three rows, four cells at most), the arrow and the
   next stop. Tracks default to the table (a row per next stop, every line with where it ends), `PLATFORMS_TRACKS_COMPACT`

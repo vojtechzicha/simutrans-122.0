@@ -118,7 +118,8 @@ year: higher spreads passengers over the map, lower keeps them near home) and `l
 Platforms (fork, savegame 122.18): every stop has `platform_flags` (1: cards in the "chosen stops" view, 2: track
 cards show the next stop only, 4: stand cards show destinations) and `platforms`, one per station track or stand:
 `kind` (`track`, `stand`, `other`), `number` (null: none), `direction` (a stand's travel direction N/E/S/W, null for
-tracks), `dead_end`, `tiles`, `groups` (lines boarding there by next stop: `next_halt_id`, `next_name`, `out` the
+tracks), `dead_end`, `tiles`, `groups` (lines boarding there by next stop: `next_halt_id`, `next_name`, `heading_halt_id` and `heading_name` (what the
+cards call the group: the next stop, or a clearly more important stop all its lines reach soon), `out` the
 way they leave, `name_shown`, `lines` with `line_id`, `entry`, `number` as the line chip says and `destination`) and
 `arrivals` (lines that only let passengers off there). Schedule entries have `platform`, the number of the track or
 stand they stop at; convoys `platform` and `platform_state` (`planned`, `confirmed`, `changed`) for the stop they
