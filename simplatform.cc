@@ -611,12 +611,18 @@ static void apply_labels(haltestelle_t *halt, vector_tpl<platform_t *> &list, bo
 }
 
 
+// one line under two numbers (board texts: Praha 195 that runs on as 158) is two members, else the first entry hid the other
+static bool same_member(const platform_member_t &a, const platform_member_t &b)
+{
+	return a.line == b.line  &&  strcmp( a.number, b.number ) == 0  &&  strcmp( a.destination, b.destination ) == 0;
+}
+
 static void add_member(platform_t *p, halthandle_t next, const char *next_name, ribi_t::ribi out, const platform_member_t &m)
 {
 	FOR( vector_tpl<platform_group_t *>, g, p->groups ) {
 		if(  g->next == next  ) {
 			FOR( vector_tpl<platform_member_t>, const &o, g->members ) {
-				if(  o.line == m.line  ) {
+				if(  same_member( o, m )  ) {
 					return;
 				}
 			}
@@ -1107,11 +1113,7 @@ void platforms_t::add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 		FOR( vector_tpl<departs_t>, const &d, departs ) {
 			departs_here |= d.line == a.line  &&  d.platform == a.platform;
 		}
-		bool listed = false;
-		FOR( vector_tpl<platform_member_t>, const &m, p->arrivals ) {
-			listed |= m.line == a.line;
-		}
-		if(  departs_here  ||  listed  ) {
+		if(  departs_here  ) {
 			continue;
 		}
 		const schedule_t *schedule = a.line->get_schedule();
@@ -1136,7 +1138,13 @@ void platforms_t::add_lines(haltestelle_t *halt, vector_tpl<platform_t *> &list)
 		else {
 			first_word( m.number, lengthof(m.number), a.line->get_name() );
 		}
-		p->arrivals.append( m );
+		bool listed = false;
+		FOR( vector_tpl<platform_member_t>, const &o, p->arrivals ) {
+			listed |= same_member( o, m );
+		}
+		if(  !listed  ) {
+			p->arrivals.append( m );
+		}
 	}
 
 	// order, and when a group names its next stop (plan 3, rules 4 and 8)

@@ -2422,6 +2422,11 @@ static void run_command(std::vector<char *> &a)
 	else if(  c=="holdline"  ) { lines[S(1)]->set_hold_marker( I(2)!=0 ); logf("holdline %s %d\n", S(1), I(2)); }
 	else if(  c=="vstates"  ) env_t::show_vehicle_states = I(1);
 	else if(  c=="timetable"  ) { cur_sched->entries.back().departure_interval = I(1); cur_sched->entries.back().departure_offset = I(2); }
+	else if(  c=="boardline"  ) {   // boardline TEXT|auto: the line number boards show from the last stop added on
+		schedule_entry_t &e = cur_sched->entries.back();
+		if(  strcmp( S(1), "auto" ) == 0  ) e.board_auto |= 1 << schedule_entry_t::BOARD_LINE;
+		else e.board_text[schedule_entry_t::BOARD_LINE] = S(1);
+	}
 	else if(  c=="endline"  ) cmd_endline();
 	else if(  c=="convoy"  ) cmd_convoy( I(1), I(2), S(3), a.size()>4 ? I(4) : 1 );
 	else if(  c=="run"  ) cmd_run( I(1), I(2) );

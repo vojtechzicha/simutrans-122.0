@@ -44,6 +44,7 @@ line per scenario, PASS or FAIL, the `FAIL`/`ERROR` lines of the failed ones, an
 | `platforms_basic` | Platforms: a station's tracks numbered across, the lines on each by next stop, stands per travel direction (one bus learned the other way than the guess), a bay, typed numbers kept through save and load and turned with the map when it rotates. |
 | `platforms_changed` | Platforms: a train standing on its track is confirmed there; one the choose signal sends elsewhere shows changed, as on the board. |
 | `platforms_road_change` | Platforms: a dead-end stand becomes a through stop when its road goes on (no stop tile added); its number stays on one of the two stands, also after save and load. |
+| `platforms_board_number` | One line under two numbers (a board text) boarding at one stand with the same next stop shows both chips (Praha, Avia Letňany: 195 and 158). Fails on the build before (2026-11-23). |
 | `sign_stand_change` | Two stands of one stop: a bus that lets everybody off on one (All off) and boards on another is not in service on the way (Praha, Kačerov); a bus that boards on both (no All off) shows its trip and is listed with its next stop at both. Fails on the build before (2026-11-22). |
 | `platforms_number_stands` | Platforms: "Stands 1, 2, 3" / "A, B, C" number the stands as you read the map; a click keeps the numbers already there and fills only the gaps, Shift+click (`all`) numbers every stand anew; save and load. |
 | `platforms_heading` | Platforms: a card names the nearest clearly more important stop ahead of all lines of a group (Poliklinika Černý Most -> Rajská zahrada), else the next stop; the group stays the lines with that next stop. |
@@ -76,7 +77,7 @@ Building a world:
 - `sign NAME X Y DIR` a signal or sign applying to trains heading DIR (N, S, E, W, B = both)
 - `depot NAME X Y` at a track end; `list ways|depots|stations|signs|vehicles|road|tram` names in the pakset
 - `line NAME` / `tramline` / `busline`, then `stop X Y MINLOAD WAIT TYPE` (TYPE R, T, A, L, U, H as in
-  the schedule dialog), `timetable INTERVAL OFFSET` and `couple LINE MAXWAIT` for the last stop, `endline`
+  the schedule dialog), `timetable INTERVAL OFFSET`, `boardline TEXT|auto` (the line number boards show from there on) and `couple LINE MAXWAIT` for the last stop, `endline`
 - `vehicles NAME...` then `convoy DEPOT_X DEPOT_Y LINE COUNT` (named LINE#1, LINE#2, ...)
 
 Running and looking:

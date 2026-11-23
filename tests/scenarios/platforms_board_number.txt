@@ -1,0 +1,26 @@
+# One line under two numbers at one stand (2026-11-23). Praha, Avia Letňany: line 100195 runs as 195 to Sídliště
+# Letňany and on as 158 (a board text from stop 37), and passes the northbound stand both times with the same next stop.
+# The stand showed only 195: a platform counted a line once per next stop, the first entry's number winning, so 158 was
+# missing (and 195 at the Sídliště Letňany stand where 158 came first). Layout tests/layouts/platforms.inc. Line SF
+# boards at Street 24,40 twice, first as SF (auto), then as 77; both go on to South. Expect both chips there.
+include ../layouts/platforms.inc
+waydesc Road_050
+station CZR-Stops-ODIS_Bus-Empty-L 21 40
+station CZR-Stops-ODIS_Bus-Empty-L 22 40
+station CZR-Stops-ODIS_Bus-Empty-L 23 40
+station CZR-Stops-ODIS_Bus-Empty-L 24 40
+vehicles CZ-ODIS-SOR_BN95-Green
+busline SF
+stop 24 40 0 0 R
+boardline auto
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+stop 24 40 0 0 R
+boardline 77
+stop 25 46 0 0 R
+stop 10 43 0 0 R
+endline
+convoy 11 38 SF 1
+run 10 0
+platforms 24 40
+expect_lines 24 40 E 77,SF>South
